@@ -1,0 +1,9 @@
+{
+  "id": "c",
+  "name": "C",
+  "extensions": [".c"],
+  "lsp": { "command": "clangd", "args": [] },
+  "run": "gcc {file} -o /tmp/talos_c_out && /tmp/talos_c_out",
+  "build": "gcc {file} -o a.out",
+  "paths": []
+}

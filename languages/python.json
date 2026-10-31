@@ -1,0 +1,9 @@
+{
+  "id": "python",
+  "name": "Python",
+  "extensions": [".py"],
+  "lsp": { "command": "pylsp", "args": [] },
+  "run": "python3 {file}",
+  "build": null,
+  "paths": []
+}

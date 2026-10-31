@@ -1,0 +1,18 @@
+{
+  "id": "lang-ruby",
+  "kind": "language",
+  "name": "Ruby support",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "Adds Run support for Ruby files (needs ruby installed).",
+  "language": {
+    "id": "ruby",
+    "name": "Ruby",
+    "extensions": [
+      ".rb"
+    ],
+    "run": "ruby {file}",
+    "build": null,
+    "paths": []
+  }
+}

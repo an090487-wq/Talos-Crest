@@ -1,0 +1,11 @@
+[package]
+name = "talos-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "tcode"
+path = "src/main.rs"
+
+[dependencies]
+talos-core = { path = "../core" }

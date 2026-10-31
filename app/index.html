@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Talos Crest</title>
+    <style>
+      :root { --bg:#14161a; --panel:#1b1e24; --line:#2a2e36; --text:#e8e6e1; --muted:#8b8f98; --bronze:#c9863a; }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font: 13px system-ui, sans-serif; }
+      #app { display: flex; flex-direction: column; height: 100vh; }
+      .hidden { display: none !important; }
+      .spacer { flex: 1; }
+
+      header, footer { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--panel); }
+      header { border-bottom: 1px solid var(--line); }
+      footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+      .brand { font-weight: 700; letter-spacing: .2em; color: var(--bronze); margin-right: 8px; }
+      button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 12px; cursor: pointer; font: inherit; }
+      button:hover { border-color: var(--bronze); color: var(--bronze); }
+      button.accent { border-color: var(--bronze); color: var(--bronze); }
+      button.mini { padding: 1px 8px; font-size: 11px; }
+      #file { margin-left: auto; color: var(--muted); }
+      #msg { color: #ff7b72; }
+
+      #main { display: flex; flex: 1; min-height: 0; }
+      #editor { flex: 1; min-width: 0; }
+      .cm-editor { height: 100%; }
+      .cm-scroller { overflow: auto; }
+
+      #pdf-pane { width: 46%; min-width: 280px; border-left: 1px solid var(--line); display: flex; flex-direction: column; background: #0f1114; }
+      #pdf-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
+      #pdf-bar button { padding: 2px 9px; }
+      #pdf-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+      #pdf-page { width: 42px; text-align: center; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 2px; }
+      #pdf-view { flex: 1; overflow: auto; padding: 12px; display: flex; justify-content: flex-start; }
+      #pdf-canvas { display: block; margin: 0 auto; background: #fff; box-shadow: 0 4px 18px rgba(0,0,0,.5); }
+      #pdf-view.dark #pdf-canvas { filter: invert(1) hue-rotate(180deg); }
+
+      #panel { height: 190px; border-top: 1px solid var(--line); display: flex; flex-direction: column; background: var(--bg); }
+      #tabs { display: flex; align-items: center; gap: 4px; padding: 3px 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
+      #tabs .tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 3px 10px; color: var(--muted); }
+      #tabs .tab.active { color: var(--text); border-bottom-color: var(--bronze); }
+      #count { background: var(--line); border-radius: 8px; padding: 0 6px; font-size: 11px; }
+      #problems, #output { flex: 1; overflow: auto; margin: 0; padding: 6px 10px; font: 12px ui-monospace, Menlo, monospace; }
+      #output { white-space: pre-wrap; }
+      #output .err { color: #ff7b72; }
+      #output .ok { color: #50fa7b; }
+      #output .dim { color: var(--muted); }
+      .row { padding: 2px 4px; cursor: pointer; border-radius: 4px; white-space: pre; }
+      .row:hover { background: var(--panel); }
+      .row::before { content: "\25CF"; margin-right: 8px; }
+      .row.error::before { color: #ff5555; }
+      .row.warning::before { color: #f1fa8c; }
+      .row.info::before, .row.hint::before { color: #8be9fd; }
+      .empty { color: var(--muted); padding: 4px; }
+
+      #meter { display: flex; align-items: center; gap: 8px; }
+      #meter-label { color: var(--muted); }
+      #gauge { width: 90px; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+      #gauge-fill { display: block; height: 100%; width: 0; background: #50fa7b; transition: width .25s, background .25s; }
+      #meter[data-level="Stable"] #gauge-fill { background: #a6e22e; }
+      #meter[data-level="Warning"] #gauge-fill { background: #f1fa8c; }
+      #meter[data-level="Critical"] #gauge-fill { background: #ffb86c; }
+      #meter[data-level="Failing"] #gauge-fill { background: #ff5555; }
+
+      #market { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 50; }
+      #market-box { width: min(860px, 94vw); height: min(620px, 88vh); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; overflow: hidden; }
+      #market-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
+      #market-head input, #market-source input { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font: inherit; }
+      #market-tabs { display: flex; gap: 4px; padding: 4px 10px 0; border-bottom: 1px solid var(--line); }
+      #market-tabs .tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); padding: 5px 12px; }
+      #market-tabs .tab.active { color: var(--text); border-bottom-color: var(--bronze); }
+      #market-source { display: flex; align-items: center; gap: 8px; padding: 8px 12px; color: var(--muted); font-size: 12px; }
+      #market-msg { padding: 0 12px; min-height: 18px; color: #ff7b72; font-size: 12px; }
+      #market-list { flex: 1; overflow: auto; padding: 8px 12px 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; align-content: start; }
+      .card { border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: var(--panel); display: flex; flex-direction: column; gap: 6px; }
+      .card-top { display: flex; align-items: center; gap: 8px; }
+      .card-title { font-weight: 600; flex: 1; }
+      .badge { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; border: 1px solid var(--line); border-radius: 8px; padding: 0 6px; color: var(--muted); }
+      .card-meta { color: var(--muted); font-size: 11px; word-break: break-all; }
+      .card-desc { font-size: 12px; }
+      .card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 4px; }
+      .note { grid-column: 1 / -1; color: var(--muted); padding: 6px 2px; }
+
+      button:disabled { opacity: .6; cursor: default; }
+
+      @media (max-width: 700px) {
+        html, body { height: 100%; overflow: hidden; }
+        #app { height: 100vh; height: 100dvh; }
+        header {
+          flex: 0 0 auto;
+          flex-wrap: wrap;
+          gap: 6px;
+          padding: max(8px, env(safe-area-inset-top)) 8px 8px;
+        }
+        .brand { margin-right: 2px; }
+        header button, footer button, #pdf-bar button {
+          min-height: 40px;
+          padding: 7px 10px;
+          touch-action: manipulation;
+        }
+        #file {
+          flex: 1 0 100%;
+          min-width: 0;
+          margin: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          text-align: left;
+        }
+        #main { flex-direction: column; }
+        #editor { min-height: 0; }
+        .cm-editor { font-size: 15px; }
+        #pdf-pane {
+          width: 100%;
+          min-width: 0;
+          min-height: 35%;
+          border-left: 0;
+          border-top: 1px solid var(--line);
+        }
+        #pdf-bar { flex-wrap: wrap; }
+        #pdf-name { min-width: 100%; }
+        #panel { height: min(30dvh, 240px); flex: 0 0 auto; }
+        footer {
+          flex-wrap: wrap;
+          gap: 6px;
+          padding: 6px 8px max(8px, env(safe-area-inset-bottom));
+        }
+        #msg { flex: 1 0 100%; order: 2; }
+        #meter { flex: 1 1 100%; order: 3; min-width: 0; }
+        #meter-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        footer .spacer { display: none; }
+        #market { align-items: stretch; }
+        #market-box { width: 100%; height: 100%; border-radius: 0; }
+        #market-head { flex-wrap: wrap; }
+        #market-head strong { flex: 1; }
+        #market-head input { flex: 1 0 100%; min-height: 40px; }
+        #market-tabs { overflow-x: auto; }
+        #market-tabs .tab { flex: 0 0 auto; min-height: 40px; }
+        #market-source { flex-wrap: wrap; }
+        #market-source input { flex: 1 0 100%; min-height: 40px; }
+        #market-list { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <span id="brand" class="brand">TALOS CREST</span>
+        <button id="btn-open">Open</button>
+        <button id="btn-pdf">Open PDF</button>
+        <button id="btn-save">Save</button>
+        <button id="btn-saveas">Save As</button>
+        <button id="btn-run" class="accent">&#9654; Run</button>
+        <select id="run-language" aria-label="Run language" title="Choose a language for an unsaved file">
+          <option value="auto">Auto (Python for new files)</option>
+          <option value="python">Python</option>
+          <option value="javascript">JavaScript</option>
+          <option value="c">C</option>
+          <option value="cpp">C++</option>
+          <option value="java">Java</option>
+        </select>
+        <button id="btn-ext">Extensions</button>
+        <button id="btn-tpl">New from template</button>
+        <span id="file">Untitled</span>
+      </header>
+
+      <div id="main">
+        <div id="editor"></div>
+        <aside id="pdf-pane" class="hidden">
+          <div id="pdf-bar">
+            <span id="pdf-name">PDF</span>
+            <button id="pdf-prev">&lsaquo;</button>
+            <input id="pdf-page" value="1" />
+            <span id="pdf-total">/ 0</span>
+            <button id="pdf-next">&rsaquo;</button>
+            <button id="pdf-zout">&minus;</button>
+            <button id="pdf-zin">+</button>
+            <button id="pdf-fit">Fit</button>
+            <button id="pdf-dark">Dark</button>
+            <button id="pdf-close">&times;</button>
+          </div>
+          <div id="pdf-view"><canvas id="pdf-canvas"></canvas></div>
+        </aside>
+      </div>
+
+      <section id="panel" class="hidden">
+        <div id="tabs">
+          <button class="tab active" data-tab="problems">Problems <span id="count">0</span></button>
+          <button class="tab" data-tab="output">Output</button>
+          <span class="spacer"></span>
+          <button id="btn-panel-close" class="mini">&times;</button>
+        </div>
+        <div id="problems"></div>
+        <pre id="output" class="hidden"></pre>
+      </section>
+
+      <footer>
+        <span id="lang">Plain text</span>
+        <span id="pos">Ln 1, Col 1</span>
+        <span id="msg"></span>
+        <span class="spacer"></span>
+        <button id="btn-fun" class="mini">Fun mode: off</button>
+        <span id="meter" data-level="Clean">
+          <span id="meter-label">Error Meter</span>
+          <span id="gauge"><i id="gauge-fill"></i></span>
+          <span id="meter-text"></span>
+        </span>
+        <button id="btn-panel" class="mini">Panel</button>
+      </footer>
+    </div>
+    <div id="market" class="hidden">
+      <div id="market-box">
+        <div id="market-head">
+          <strong>Extensions &amp; API Market</strong>
+          <input id="market-search" placeholder="Search..." />
+          <button id="market-close" class="mini">&times;</button>
+        </div>
+        <div id="market-tabs">
+          <button class="tab active" data-mtab="extensions">Extensions</button>
+          <button class="tab" data-mtab="apis">API Market</button>
+          <button class="tab" data-mtab="installed">Installed</button>
+          <button class="tab" data-mtab="templates">Templates</button>
+        </div>
+        <div id="market-source">
+          <span>Registry</span>
+          <input id="market-registry" />
+          <button id="market-reload" class="mini">Reload</button>
+        </div>
+        <div id="market-msg"></div>
+        <div id="market-list"></div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

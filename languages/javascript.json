@@ -1,0 +1,9 @@
+{
+  "id": "javascript",
+  "name": "JavaScript",
+  "extensions": [".js", ".mjs"],
+  "lsp": { "command": "typescript-language-server", "args": ["--stdio"] },
+  "run": "node {file}",
+  "build": null,
+  "paths": []
+}

@@ -1,0 +1,18 @@
+{
+  "id": "lang-go",
+  "kind": "language",
+  "name": "Go support",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "Adds Run support for Go files (needs go installed).",
+  "language": {
+    "id": "go",
+    "name": "Go",
+    "extensions": [
+      ".go"
+    ],
+    "run": "go run {file}",
+    "build": null,
+    "paths": []
+  }
+}
