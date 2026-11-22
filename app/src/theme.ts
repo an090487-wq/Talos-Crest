@@ -27,12 +27,30 @@ export function resetUi() {
 
 export function applyUi(ui: Record<string, string>) {
   resetUi();
+  const resolved: Record<string, string> = {};
+
   for (const [k, v] of Object.entries(ui)) {
     const c = color(v);
-    if (/^--[a-z0-9-]+$/.test(k) && c) {
-      document.documentElement.style.setProperty(k, c);
-      appliedUi.push(k);
-    }
+    if (/^--[a-z0-9-]+$/.test(k) && c) resolved[k] = c;
+  }
+
+  // Older themes only set a few legacy tokens. Keep their palettes coherent by
+  // deriving the newer design-system tokens instead of leaving teal defaults.
+  const aliases: Array<[string, string]> = [
+    ["--bronze", "--accent"],
+    ["--accent", "--bronze"],
+    ["--accent", "--focus"],
+    ["--panel", "--panel-2"],
+    ["--panel", "--surface-raised"],
+    ["--line", "--line-strong"],
+  ];
+  for (const [source, target] of aliases) {
+    if (resolved[source] && !resolved[target]) resolved[target] = resolved[source];
+  }
+
+  for (const [k, v] of Object.entries(resolved)) {
+    document.documentElement.style.setProperty(k, v);
+    appliedUi.push(k);
   }
 }
 

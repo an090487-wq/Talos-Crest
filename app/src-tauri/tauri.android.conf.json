@@ -9,6 +9,8 @@
     ]
   },
   "bundle": {
-    "resources": ["../../registry"]
+    "resources": {
+      "../../registry": "registry"
+    }
   }
 }

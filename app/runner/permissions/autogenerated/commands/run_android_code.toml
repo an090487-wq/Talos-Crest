@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-run-android-code"
+description = "Enables the run_android_code command without any pre-configured scope."
+commands.allow = ["run_android_code"]
+
+[[permission]]
+identifier = "deny-run-android-code"
+description = "Denies the run_android_code command without any pre-configured scope."
+commands.deny = ["run_android_code"]

@@ -1,149 +1,119 @@
-// Basic built-in checks (brackets, JSON, TODO notes).
-// Real language-server diagnostics replace/extend this in the next step.
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { linter } from "@codemirror/lint";
 import type { Diagnostic } from "@codemirror/lint";
-import type { Text } from "@codemirror/state";
+import type { EditorState } from "@codemirror/state";
 
-export type Listener = (diags: readonly Diagnostic[], doc: Text) => void;
+export type Listener = (diags: readonly Diagnostic[], doc: EditorState["doc"]) => void;
 
 let languageName = "";
+
 export function setDiagnosticsLanguage(name: string) {
   languageName = name;
 }
 
-// Languages where bracket checking is reliable enough.
-const BRACKET_LANGS = new Set([
-  "C", "C++", "C#", "Java", "JavaScript", "TypeScript", "JSX", "TSX",
-  "Rust", "Go", "Kotlin", "Swift", "PHP", "Scala", "CSS", "Python",
-]);
-const BACKTICK_LANGS = new Set(["JavaScript", "TypeScript", "JSX", "TSX", "Go"]);
-
-function findClose(text: string, start: number, quote: string, multiline: boolean): number {
-  for (let j = start + 1; j < text.length; j++) {
-    const ch = text[j];
-    if (ch === "\\") {
-      j++;
-      continue;
-    }
-    if (ch === quote) return j;
-    if (ch === "\n" && !multiline) return -1;
+export function diagnosticsAvailability(name = languageName): string {
+  if (name === "JSON") {
+    return "Talos JSON parser diagnostics are active. Comment TODO notes are informational when supported.";
   }
-  return -1;
+  const label = name || "Plain text";
+  return `No compiler or language-server diagnostics are configured for ${label}. Comment TODO notes are informational when supported.`;
 }
 
-function bracketCheck(text: string, name: string, out: Diagnostic[]) {
-  const hash = name === "Python";
-  const slash = !hash && name !== "CSS";
-  const backtick = BACKTICK_LANGS.has(name);
-  const rust = name === "Rust";
-  const stack: { ch: string; pos: number }[] = [];
-  const closeToOpen: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
+const commentNodes: Record<string, ReadonlySet<string>> = {
+  Python: new Set(["Comment"]),
+  JavaScript: new Set(["LineComment", "BlockComment"]),
+  JSX: new Set(["LineComment", "BlockComment"]),
+  TypeScript: new Set(["LineComment", "BlockComment"]),
+  TSX: new Set(["LineComment", "BlockComment"]),
+  Rust: new Set(["LineComment", "BlockComment"]),
+  Go: new Set(["LineComment", "BlockComment"]),
+  C: new Set(["LineComment", "BlockComment"]),
+  "C++": new Set(["LineComment", "BlockComment"]),
+  Java: new Set(["LineComment", "BlockComment"]),
+};
 
-  let i = 0;
-  while (i < text.length) {
-    const c = text[i];
+// Reuse whatever the editor's incremental parser already produced. Only ask
+// for a bounded parse when the tree does not cover the document yet. This
+// keeps linting from re-parsing the whole file on the main thread every time.
+function documentTree(state: EditorState, timeout: number): ReturnType<typeof syntaxTree> {
+  const parsed = syntaxTree(state);
+  if (parsed.length >= state.doc.length) return parsed;
+  return ensureSyntaxTree(state, state.doc.length, timeout) ?? parsed;
+}
 
-    if (hash && c === "#") {
-      const e = text.indexOf("\n", i);
-      i = e < 0 ? text.length : e;
-      continue;
-    }
-    if (slash && c === "/" && text[i + 1] === "/") {
-      const e = text.indexOf("\n", i);
-      i = e < 0 ? text.length : e;
-      continue;
-    }
-    if (!hash && c === "/" && text[i + 1] === "*") {
-      const e = text.indexOf("*/", i + 2);
-      i = e < 0 ? text.length : e + 2;
-      continue;
-    }
+const marker = /\b(TODO|FIXME|HACK|XXX)\b/g;
+const MAX_DIAGNOSTICS = 500;
 
-    if (c === '"' || c === "'" || (backtick && c === "`")) {
-      if (hash && (text.startsWith('"""', i) || text.startsWith("'''", i))) {
-        const q = text.slice(i, i + 3);
-        const e = text.indexOf(q, i + 3);
-        if (e >= 0) {
-          i = e + 3;
-          continue;
+function scanTree(state: EditorState, name: string, limit: number): Diagnostic[] {
+  const isJson = name === "JSON";
+  const nodes = commentNodes[name];
+  if (!isJson && !nodes) return [];
+  const doc = state.doc;
+  if (doc.length === 0) return [];
+
+  const tree = documentTree(state, isJson ? 8 : 6);
+  // A partial tree would produce misleading results (missing or extra errors),
+  // so wait for the background parser and report nothing until it catches up.
+  if (tree.length < doc.length) return [];
+
+  const diagnostics: Diagnostic[] = [];
+  let full = false;
+  tree.iterate({
+    enter(node) {
+      if (full) return false;
+      if (diagnostics.length >= limit) {
+        full = true;
+        return false;
+      }
+      if (isJson && node.name === "\u26a0") {
+        const from = Math.min(node.from, doc.length);
+        const to = Math.max(from, Math.min(node.to, doc.length));
+        diagnostics.push({
+          from,
+          to: to > from ? to : Math.min(from + 1, doc.length),
+          severity: "error",
+          source: "Talos JSON parser",
+          message: "Invalid JSON syntax.",
+        });
+        return;
+      }
+      if (!nodes?.has(node.name)) return;
+      const comment = doc.sliceString(node.from, node.to);
+      marker.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = marker.exec(comment)) !== null) {
+        diagnostics.push({
+          from: node.from + match.index,
+          to: node.to,
+          severity: "info",
+          source: "Talos TODO marker",
+          message: match[1] + " note",
+        });
+        if (diagnostics.length >= limit) {
+          full = true;
+          return false;
         }
       }
-      if (rust && c === "'") {
-        const m = /^'(\\.|[^\\'])'/.exec(text.slice(i, i + 6));
-        i += m ? m[0].length : 1;
-        continue;
-      }
-      const end = findClose(text, i, c, c === "`");
-      i = end >= 0 ? end + 1 : i + 1;
-      continue;
-    }
-
-    if (c === "(" || c === "[" || c === "{") {
-      stack.push({ ch: c, pos: i });
-    } else if (c === ")" || c === "]" || c === "}") {
-      const top = stack.pop();
-      if (!top) {
-        out.push({ from: i, to: i + 1, severity: "error", message: "Unmatched '" + c + "'" });
-      } else if (top.ch !== closeToOpen[c]) {
-        out.push({
-          from: i,
-          to: i + 1,
-          severity: "error",
-          message: "'" + c + "' does not match '" + top.ch + "'",
-        });
-      }
-    }
-    i++;
-  }
-  for (const s of stack) {
-    out.push({ from: s.pos, to: s.pos + 1, severity: "error", message: "Unclosed '" + s.ch + "'" });
-  }
+    },
+  });
+  return diagnostics;
 }
 
-function jsonCheck(text: string, out: Diagnostic[]) {
-  if (!text.trim()) return;
-  try {
-    JSON.parse(text);
-  } catch (e) {
-    out.push({
-      from: 0,
-      to: Math.min(1, text.length),
-      severity: "error",
-      message: "Invalid JSON: " + (e as Error).message,
-    });
-  }
-}
-
-const TODO = /\b(TODO|FIXME|HACK|XXX)\b/g;
-function todoCheck(text: string, out: Diagnostic[]) {
-  TODO.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = TODO.exec(text)) !== null) {
-    const end = text.indexOf("\n", m.index);
-    out.push({
-      from: m.index,
-      to: end < 0 ? text.length : end,
-      severity: "info",
-      message: m[1] + " note",
-    });
-  }
-}
-
-function scan(text: string): Diagnostic[] {
-  const out: Diagnostic[] = [];
-  if (!languageName || BRACKET_LANGS.has(languageName)) bracketCheck(text, languageName, out);
-  if (languageName === "JSON") jsonCheck(text, out);
-  todoCheck(text, out);
-  return out.slice(0, 500);
+export function scanDiagnostics(
+  state: EditorState,
+  name = languageName,
+  limit = MAX_DIAGNOSTICS
+): Diagnostic[] {
+  return scanTree(state, name, Math.max(1, limit));
 }
 
 export function basicLinter(onResult: Listener) {
   return linter(
     (view) => {
-      const diags = scan(view.state.doc.toString());
+      const diags = scanDiagnostics(view.state);
       onResult(diags, view.state.doc);
       return diags;
     },
-    { delay: 300 }
+    { delay: 500 }
   );
 }

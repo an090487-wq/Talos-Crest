@@ -1,5 +1,6 @@
 {
   "name": "Talos Registry (local starter)",
+  "schemaVersion": 1,
   "extensions": [
     {
       "id": "talos-bronze",
@@ -7,9 +8,23 @@
       "kind": "theme",
       "version": "1.0.0",
       "author": "Talos",
+      "publisher": "Talos",
       "description": "Dark metal tones with bronze accents.",
+      "category": "themes",
+      "compatibility": "Talos manifest v1",
+      "featured": true,
+      "features": [
+        "Workspace and editor theme"
+      ],
       "url": "extensions/talos-bronze.talosext.json",
-      "sha256": "648beebc0e0a125d8b8248ae381900b71eb089f9a8914b998edcdde53c3f4413"
+      "sha256": "648beebc0e0a125d8b8248ae381900b71eb089f9a8914b998edcdde53c3f4413",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "curatedRank": 1
     },
     {
       "id": "midnight-blue",
@@ -17,9 +32,21 @@
       "kind": "theme",
       "version": "1.0.0",
       "author": "Talos",
+      "publisher": "Talos",
       "description": "Deep navy background with cool blue accents.",
+      "category": "themes",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Workspace and editor theme"
+      ],
       "url": "extensions/midnight-blue.talosext.json",
-      "sha256": "153f5060e53e56900bab70cac7e73df4592d6157000ae3b2cd5ef93a85935921"
+      "sha256": "153f5060e53e56900bab70cac7e73df4592d6157000ae3b2cd5ef93a85935921",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
     },
     {
       "id": "paper-light",
@@ -27,9 +54,279 @@
       "kind": "theme",
       "version": "1.0.0",
       "author": "Talos",
+      "publisher": "Talos",
       "description": "A clean light theme for bright rooms.",
+      "category": "themes",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Workspace and editor theme"
+      ],
       "url": "extensions/paper-light.talosext.json",
-      "sha256": "f471ad5dea0aed77e76456a59035dba4dfb01eeafe8fc8ebc9d3f5a4154b332d"
+      "sha256": "f471ad5dea0aed77e76456a59035dba4dfb01eeafe8fc8ebc9d3f5a4154b332d",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "solarized-dark",
+      "name": "Solarized Dark",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos",
+      "publisher": "Talos",
+      "description": "A calm, low-contrast dark palette inspired by Solarized.",
+      "category": "themes",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Workspace and editor theme"
+      ],
+      "url": "extensions/solarized-dark.talosext.json",
+      "sha256": "c34b5fa90593cd9b1412b11df658814a854c0bdc7ee952b3740329852e1102e2",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "dracula",
+      "name": "Dracula",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos",
+      "publisher": "Talos",
+      "description": "A vivid dark theme with purple, pink, and aqua accents.",
+      "category": "themes",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Workspace and editor theme"
+      ],
+      "url": "extensions/dracula.talosext.json",
+      "sha256": "d05b761b85f7f5de995f93a24c22938d1f174aa7004ccf26e7e2999fd6f10489",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "nord",
+      "name": "Nord",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos",
+      "publisher": "Talos",
+      "description": "A cool blue-gray theme with soft arctic accents.",
+      "category": "themes",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Workspace and editor theme"
+      ],
+      "url": "extensions/nord.talosext.json",
+      "sha256": "1d4e24f6c6161aaf34bd88041ae138fcb02b4bb1ff8d0bc57603fb106282518d",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "forest-green",
+      "name": "Forest Green",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos",
+      "publisher": "Talos",
+      "description": "Deep evergreen surfaces with fresh green and warm amber accents.",
+      "category": "themes",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Workspace and editor theme"
+      ],
+      "url": "extensions/forest-green.talosext.json",
+      "sha256": "2ed3d230ee99d91a717cf6a4bbe73a9f55cb0eb804351df36c4add6d35c415f6",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "rose-pine",
+      "name": "Rosé Pine",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos",
+      "publisher": "Talos",
+      "description": "A muted dusk palette with rose, iris, and pine accents.",
+      "category": "themes",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Workspace and editor theme"
+      ],
+      "url": "extensions/rose-pine.talosext.json",
+      "sha256": "58b0de2ffb1741a1cf7ce3580271ea0dbe3a42fa58a4226347f6bb4ba3822b1c",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-rust",
+      "name": "Rust support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos",
+      "publisher": "Talos",
+      "description": "Adds Run support for Rust files (needs rustc installed).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "permissions": [
+        "process.execution"
+      ],
+      "features": [
+        "Language run configuration"
+      ],
+      "url": "extensions/lang-rust.talosext.json",
+      "sha256": "61b36bc046d0d17779e5208b912f12e99cc31f22983cc360cc7c5b97f57a25d7",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [
+        {
+          "name": "rustc",
+          "kind": "executable",
+          "description": "Rust compiler used by the run command",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "featured": true,
+      "curatedRank": 3
+    },
+    {
+      "id": "lang-php",
+      "name": "PHP support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos",
+      "publisher": "Talos",
+      "description": "Adds Run support for PHP files (needs php installed).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "permissions": [
+        "process.execution"
+      ],
+      "features": [
+        "Language run configuration"
+      ],
+      "url": "extensions/lang-php.talosext.json",
+      "sha256": "a09f89a08b4ea04d7cbc5f688cd5aa11af0e00c9d17e83fdaa7d6fda76c40dc3",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [
+        {
+          "name": "php",
+          "kind": "executable",
+          "description": "PHP CLI interpreter",
+          "required": true
+        }
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "lang-bash",
+      "name": "Bash support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos",
+      "publisher": "Talos",
+      "description": "Adds Run support for Bash scripts (needs bash installed).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "permissions": [
+        "process.execution"
+      ],
+      "features": [
+        "Language run configuration"
+      ],
+      "url": "extensions/lang-bash.talosext.json",
+      "sha256": "3f4c15db8bdb3e675d3ab0978466e6f4fc1d1a9b946cdf8fce0484ab1f4201af",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [
+        {
+          "name": "bash",
+          "kind": "executable",
+          "description": "Bash shell",
+          "required": true
+        }
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "lang-perl",
+      "name": "Perl support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos",
+      "publisher": "Talos",
+      "description": "Adds Run support for Perl files (needs perl installed).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "permissions": [
+        "process.execution"
+      ],
+      "features": [
+        "Language run configuration"
+      ],
+      "url": "extensions/lang-perl.talosext.json",
+      "sha256": "d86bb98290d64212e0c086e1c63bfa2b6c2f6cd809db154cd69ff3f798018abb",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [
+        {
+          "name": "perl",
+          "kind": "executable",
+          "description": "Perl interpreter",
+          "required": true
+        }
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "extra-templates",
+      "name": "More Starter Templates",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos",
+      "publisher": "Talos",
+      "description": "Rust, Go, TypeScript, and Markdown starter files.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Starter-file templates"
+      ],
+      "url": "extensions/extra-templates.talosext.json",
+      "sha256": "a3b3fab42b5b72e2f81a0d2b9f0ebcabfa31f14324df7dc2d285ffec12687ba2",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
     },
     {
       "id": "starter-templates",
@@ -37,9 +334,23 @@
       "kind": "template",
       "version": "1.0.0",
       "author": "Talos",
+      "publisher": "Talos",
       "description": "Python, C, Node and HTML starter files.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "featured": true,
+      "features": [
+        "Starter-file templates"
+      ],
       "url": "extensions/starter-templates.talosext.json",
-      "sha256": "5c1d45d3c6e029fbadd7202ca2655ed5b107f98504a8e84956b39232569d6290"
+      "sha256": "5c1d45d3c6e029fbadd7202ca2655ed5b107f98504a8e84956b39232569d6290",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "curatedRank": 2
     },
     {
       "id": "lang-ruby",
@@ -47,9 +358,30 @@
       "kind": "language",
       "version": "1.0.0",
       "author": "Talos",
+      "publisher": "Talos",
       "description": "Adds Run support for Ruby files (needs ruby installed).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "permissions": [
+        "process.execution"
+      ],
+      "features": [
+        "Language run configuration"
+      ],
       "url": "extensions/lang-ruby.talosext.json",
-      "sha256": "9a4d569ebb182ad29bbe948dc57c36b949f4a1f4cf09e4f7983f0295985cd38b"
+      "sha256": "9a4d569ebb182ad29bbe948dc57c36b949f4a1f4cf09e4f7983f0295985cd38b",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [
+        {
+          "name": "ruby",
+          "kind": "executable",
+          "description": "Ruby interpreter",
+          "required": true
+        }
+      ],
+      "dependencies": []
     },
     {
       "id": "lang-lua",
@@ -57,9 +389,30 @@
       "kind": "language",
       "version": "1.0.0",
       "author": "Talos",
+      "publisher": "Talos",
       "description": "Adds Run support for Lua files (needs lua installed).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "permissions": [
+        "process.execution"
+      ],
+      "features": [
+        "Language run configuration"
+      ],
       "url": "extensions/lang-lua.talosext.json",
-      "sha256": "20ed355ad0938fb4836cc239853d60809c7076fda2b2b259e8c44f502e694046"
+      "sha256": "20ed355ad0938fb4836cc239853d60809c7076fda2b2b259e8c44f502e694046",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [
+        {
+          "name": "lua",
+          "kind": "executable",
+          "description": "Lua interpreter",
+          "required": true
+        }
+      ],
+      "dependencies": []
     },
     {
       "id": "lang-go",
@@ -67,9 +420,3154 @@
       "kind": "language",
       "version": "1.0.0",
       "author": "Talos",
+      "publisher": "Talos",
       "description": "Adds Run support for Go files (needs go installed).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "permissions": [
+        "process.execution"
+      ],
+      "features": [
+        "Language run configuration"
+      ],
       "url": "extensions/lang-go.talosext.json",
-      "sha256": "82911d08e8f0ad6013a9c3b50968bac3ff76f987c55f7e7e3bae23b6e438eb41"
+      "sha256": "82911d08e8f0ad6013a9c3b50968bac3ff76f987c55f7e7e3bae23b6e438eb41",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "externalExecutables": [
+        {
+          "name": "go",
+          "kind": "executable",
+          "description": "Go toolchain",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "featured": true,
+      "curatedRank": 17
+    },
+    {
+      "id": "snippets-c",
+      "name": "C Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Free, MIT-licensed snippets for C: main, includes, loops, structs, pointers, and switch.",
+      "category": "snippets",
+      "compatibility": "Talos manifest v1",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "features": [
+        "8 editor snippets",
+        "MIT licensed",
+        "No permissions required"
+      ],
+      "url": "extensions/snippets-c.talosext.json",
+      "sha256": "1f56db53490e001baf078687d608854f4b7d8af3043f21466bfb01cec1fb999b",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "snippets-python",
+      "name": "Python Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Free, MIT-licensed snippets for Python: functions, classes, comprehensions, context managers, and tests.",
+      "category": "snippets",
+      "compatibility": "Talos manifest v1",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "features": [
+        "8 editor snippets",
+        "MIT licensed",
+        "No permissions required"
+      ],
+      "url": "extensions/snippets-python.talosext.json",
+      "sha256": "94959e818a16d6ecbeb557c0bd17210aa65d56cc7405f04af9aa7a8c87e2675f",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 5
+    },
+    {
+      "id": "snippets-java",
+      "name": "Java Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Free, MIT-licensed snippets for Java: classes, main methods, loops, exception handling, and streams.",
+      "category": "snippets",
+      "compatibility": "Talos manifest v1",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "features": [
+        "8 editor snippets",
+        "MIT licensed",
+        "No permissions required"
+      ],
+      "url": "extensions/snippets-java.talosext.json",
+      "sha256": "d0f0fc681a6006683ca5c85b9153b8b1d7671c8555fd18a85326ae906aeefeea",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "snippets-html",
+      "name": "HTML Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Free, MIT-licensed snippets for HTML5: document skeleton, semantic tags, forms, media, and scripts.",
+      "category": "snippets",
+      "compatibility": "Talos manifest v1",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "features": [
+        "8 editor snippets",
+        "MIT licensed",
+        "No permissions required"
+      ],
+      "url": "extensions/snippets-html.talosext.json",
+      "sha256": "e2bc0994c3ec16b64f9ed07d6d082bc1f8f100216936d3d445219bc2133555f9",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "snippets-rust",
+      "name": "Rust Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Free, MIT-licensed snippets for Rust: functions, structs, impl blocks, matches, tests, and derives.",
+      "category": "snippets",
+      "compatibility": "Talos manifest v1",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "features": [
+        "8 editor snippets",
+        "MIT licensed",
+        "No permissions required"
+      ],
+      "url": "extensions/snippets-rust.talosext.json",
+      "sha256": "1f21a8eacd53e5f86b03c8cd37210d3ccfcb9b2c46243db2f49b9f6ac2c31e42",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "snippets-r",
+      "name": "R Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Free, MIT-licensed snippets for R: functions, pipes, data frames, plotting, and modeling.",
+      "category": "snippets",
+      "compatibility": "Talos manifest v1",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "features": [
+        "8 editor snippets",
+        "MIT licensed",
+        "No permissions required"
+      ],
+      "url": "extensions/snippets-r.talosext.json",
+      "sha256": "1571e5b99e35dd69a57174f06e28ea6595cec755d557c594f5b1c537215541d7",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "snippets-ruby",
+      "name": "Ruby Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Free, MIT-licensed snippets for Ruby: classes, modules, blocks, each loops, and common idioms.",
+      "category": "snippets",
+      "compatibility": "Talos manifest v1",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "features": [
+        "8 editor snippets",
+        "MIT licensed",
+        "No permissions required"
+      ],
+      "url": "extensions/snippets-ruby.talosext.json",
+      "sha256": "a92f8b62eb1afe3a5ee4b5723bfeea1fccd9555a35209878475b3f278ba91712",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "snippets-swift",
+      "name": "Swift Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Free, MIT-licensed snippets for Swift: structs, classes, optionals, guards, control flow, and tests.",
+      "category": "snippets",
+      "compatibility": "Talos manifest v1",
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "features": [
+        "8 editor snippets",
+        "MIT licensed",
+        "No permissions required"
+      ],
+      "url": "extensions/snippets-swift.talosext.json",
+      "sha256": "2a85990bf135769bc99594543c661bb4b4da340ddba785428ec95cadac755ca7",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-cpp",
+      "name": "C++ support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for C++ support files (user-approved command).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-cpp.talosext.json",
+      "sha256": "abc205f6aa09a3abfc50a207e62c61008f776ca9ffaf90abc6ee8dffb8df2c73",
+      "externalExecutables": [
+        {
+          "name": "g++",
+          "kind": "executable",
+          "description": "GNU C++ compiler",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-csharp",
+      "name": "C# script support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for C# script support files (user-approved command).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-csharp.talosext.json",
+      "sha256": "fa49034b9fd929e73fe23338dd35720bfd66ff72eddb25c83c8984d201272890",
+      "externalExecutables": [
+        {
+          "name": "dotnet",
+          "kind": "executable",
+          "description": ".NET SDK",
+          "required": true
+        },
+        {
+          "name": "dotnet-script",
+          "kind": "executable",
+          "description": "dotnet-script global tool",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-typescript",
+      "name": "TypeScript support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for TypeScript support files (user-approved command).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-typescript.talosext.json",
+      "sha256": "f58a411a12b72a081e1ac0f0e3d3add08bcd357436aaf7f29ef8b7fd9ea82a82",
+      "externalExecutables": [
+        {
+          "name": "node",
+          "kind": "executable",
+          "description": "Node.js runtime",
+          "required": true
+        },
+        {
+          "name": "tsx",
+          "kind": "executable",
+          "description": "TypeScript execute helper",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-dart",
+      "name": "Dart support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for Dart support files (user-approved command).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-dart.talosext.json",
+      "sha256": "f21fb33b170456411c20dc91cbd74896f91115c88983912422fe51293025fe27",
+      "externalExecutables": [
+        {
+          "name": "dart",
+          "kind": "executable",
+          "description": "Dart SDK",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-elixir",
+      "name": "Elixir support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for Elixir support files (user-approved command).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-elixir.talosext.json",
+      "sha256": "cba06ada92c055ff93b87a307aa060810808dfa755eb4b75f20f78382a6988ca",
+      "externalExecutables": [
+        {
+          "name": "elixir",
+          "kind": "executable",
+          "description": "Elixir interpreter",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-haskell",
+      "name": "Haskell support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for Haskell support files (user-approved command).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-haskell.talosext.json",
+      "sha256": "8eec458166e372302e0e98ff3d397df9d48f6321a7c0d7be466177dbd4918ba1",
+      "externalExecutables": [
+        {
+          "name": "runghc",
+          "kind": "executable",
+          "description": "GHC script runner",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-kotlin",
+      "name": "Kotlin script support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for Kotlin script support files (user-approved command).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-kotlin.talosext.json",
+      "sha256": "db382090c72b01f5a7ff1a22f7cd51d51cd842867dca6292b44d94badf3da3cc",
+      "externalExecutables": [
+        {
+          "name": "kotlinc",
+          "kind": "executable",
+          "description": "Kotlin compiler",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-scala",
+      "name": "Scala support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for Scala support files (user-approved command).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-scala.talosext.json",
+      "sha256": "52a3b15d4d627f69d75aa414f6e75d5a8b07d9c4344892b431232f7606f88c62",
+      "externalExecutables": [
+        {
+          "name": "scala-cli",
+          "kind": "executable",
+          "description": "Scala CLI",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-clojure",
+      "name": "Clojure support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for Clojure support files (user-approved command).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-clojure.talosext.json",
+      "sha256": "d2a7d6fe481e8e2718180c3cdf92afda091b046151904e13b41399381fd964b2",
+      "externalExecutables": [
+        {
+          "name": "clojure",
+          "kind": "executable",
+          "description": "Clojure CLI",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-julia",
+      "name": "Julia support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for Julia support files (user-approved command).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-julia.talosext.json",
+      "sha256": "caab086d06d3cbc89c45abf99e8c93c90fe5f1c973daff1cc8339f746456cb01",
+      "externalExecutables": [
+        {
+          "name": "julia",
+          "kind": "executable",
+          "description": "Julia runtime",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-r",
+      "name": "R script support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for R script support files (user-approved command).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-r.talosext.json",
+      "sha256": "68b04153f0a7817d06bbeb1346f96fa94a22c3ed426da35fa85c428a2f24b23c",
+      "externalExecutables": [
+        {
+          "name": "Rscript",
+          "kind": "executable",
+          "description": "R script interpreter",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-make",
+      "name": "Makefile support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for Makefile support files (user-approved command).",
+      "category": "programming-languages",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-make.talosext.json",
+      "sha256": "33d367bbe4fc3dfff05a45289066fb2cf9422c7e5587d2faefa9fd2e46b67c2c",
+      "externalExecutables": [
+        {
+          "name": "make",
+          "kind": "executable",
+          "description": "GNU Make",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-zsh",
+      "name": "Zsh script support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for Zsh script support files (user-approved command).",
+      "category": "linux-sysadmin",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-zsh.talosext.json",
+      "sha256": "0ab802e65b4c7a2e7792b0d52ecf266a369c3066a5549a3bc2e366e951231073",
+      "externalExecutables": [
+        {
+          "name": "zsh",
+          "kind": "executable",
+          "description": "Zsh shell",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "lang-fish",
+      "name": "Fish script support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Adds Run support for Fish script support files (user-approved command).",
+      "category": "linux-sysadmin",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Run configuration",
+        "User-approved process.execution",
+        "No LSP or debugger claimed"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/lang-fish.talosext.json",
+      "sha256": "62b1c488b8b4fa5e4702233ef010b91ebe337f29f3ad0874ca3f7e6862daf7e9",
+      "externalExecutables": [
+        {
+          "name": "fish",
+          "kind": "executable",
+          "description": "Fish shell",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "web-html5-template",
+      "name": "HTML5 Starter",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for html5 starter.",
+      "category": "web-development",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/web-html5-template.talosext.json",
+      "sha256": "49304da98ac9fec8650ba1bbd1d758e5b0bd8030464c68bb966e0bf0c473278c",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "web-react-ts-template",
+      "name": "React + TypeScript Starter",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for react + typescript starter.",
+      "category": "web-development",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/web-react-ts-template.talosext.json",
+      "sha256": "904e3bb5cc809978fb2c79e17cbcb23bd91430dd4711308f9951a57179cf7e42",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 4
+    },
+    {
+      "id": "web-vue-template",
+      "name": "Vue 3 Starter",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for vue 3 starter.",
+      "category": "web-development",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/web-vue-template.talosext.json",
+      "sha256": "d772a3dc4db07bda2e79854e0755c1506d8dae44c8d1d7482896609f1c2f7ca0",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "web-svelte-template",
+      "name": "Svelte Starter",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for svelte starter.",
+      "category": "web-development",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/web-svelte-template.talosext.json",
+      "sha256": "1f897d77b55a71685d1c14a22d0a4a0763c637099a1e5aad599d7796b545e608",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "web-service-worker-template",
+      "name": "Offline Web Starter",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for offline web starter.",
+      "category": "web-development",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/web-service-worker-template.talosext.json",
+      "sha256": "4cd3a80ed0b49b692b2595e982682ac11d7b65bdb0e3610ed737aca7cbeb2d86",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "web-css-snippets",
+      "name": "CSS Layout Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "8 offline CodeMirror snippets for css layout snippets.",
+      "category": "web-development",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "8 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/web-css-snippets.talosext.json",
+      "sha256": "fc332a6498bc8d79da9742cb2221976087d453609873e7c0aa82b7c9c70ef76d",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "web-tailwind-snippets",
+      "name": "Tailwind Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "8 offline CodeMirror snippets for tailwind snippets.",
+      "category": "web-development",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "8 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/web-tailwind-snippets.talosext.json",
+      "sha256": "dd86fdc67498c3fc2fd703e7883e0a00a18023c744f21959c819d7062c781803",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "web-accessibility-snippets",
+      "name": "Accessibility Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "8 offline CodeMirror snippets for accessibility snippets.",
+      "category": "web-development",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "8 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/web-accessibility-snippets.talosext.json",
+      "sha256": "3c7272e0e4bbb7c3da1401bc02b2c04264a10e3141b9cf5598a555ebccd5c1a0",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 18
+    },
+    {
+      "id": "web-forms-snippets",
+      "name": "HTML Forms Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "8 offline CodeMirror snippets for html forms snippets.",
+      "category": "web-development",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "8 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/web-forms-snippets.talosext.json",
+      "sha256": "1eaa1a51c32e1b10b0236fe9d3229693e3890bf2b693703469e52c57777128d0",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "web-fetch-snippets",
+      "name": "Fetch API Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "8 offline CodeMirror snippets for fetch api snippets.",
+      "category": "web-development",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "8 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/web-fetch-snippets.talosext.json",
+      "sha256": "41fb08d4fb1b8a8af3c8e3318433a2b31a0d1734cfc7450d94aaef7bbf28682e",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "web-dom-snippets",
+      "name": "DOM Utility Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "8 offline CodeMirror snippets for dom utility snippets.",
+      "category": "web-development",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "8 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/web-dom-snippets.talosext.json",
+      "sha256": "8b6b69d9547f20293bd6aefb48c3228e9aa2e4f8d889e0c670849085c2827e40",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "web-webcomponents-snippets",
+      "name": "Web Components Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "8 offline CodeMirror snippets for web components snippets.",
+      "category": "web-development",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "8 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/web-webcomponents-snippets.talosext.json",
+      "sha256": "97f87093abbf23e552ae2ff72679e54a0f90b34fad32188f4d911686c5413d8f",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "prod-makefile-template",
+      "name": "Makefile Starter",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for makefile starter.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/prod-makefile-template.talosext.json",
+      "sha256": "a9aa18d882cd4489e515b08a492574eb020603deabf20da335a4bf55a37d904c",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "prod-dockerfile-template",
+      "name": "Dockerfile Starter",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for dockerfile starter.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/prod-dockerfile-template.talosext.json",
+      "sha256": "1f5b6d67ebcdf4ce68aea8368e98bb9114e14f33b576fc37ea7c874f108ecbfe",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 7
+    },
+    {
+      "id": "prod-github-actions-template",
+      "name": "GitHub Actions Starter",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for github actions starter.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/prod-github-actions-template.talosext.json",
+      "sha256": "a0a17260860127056bdb1ba7117dc6cc9d967a6d5e7c7cc991d28a676f231097",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "prod-editorconfig-template",
+      "name": "EditorConfig Starter",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for editorconfig starter.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/prod-editorconfig-template.talosext.json",
+      "sha256": "77978c35c3a0f1328b4f7903df25315789cad398c9b4360aa0119c6ebe4af292",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "prod-precommit-template",
+      "name": "Pre-commit Hooks",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Shell hook template for local checks. Talos does not install the hook automatically.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/prod-precommit-template.talosext.json",
+      "sha256": "6aabde611b6f64f6b8e76c2277be414c699e862b26dc9812bd2e76431a763dbe",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "prod-cicd-checklist-template",
+      "name": "CI/CD Checklist",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for ci/cd checklist.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/prod-cicd-checklist-template.talosext.json",
+      "sha256": "faff2cfdc2ae2da468d66ba7e3538b4bc576459b7b74bd22d0ed8814441df026",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "prod-issue-template-template",
+      "name": "Issue Template Starter",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for issue template starter.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/prod-issue-template-template.talosext.json",
+      "sha256": "11ede5bcff0d9555574422828a0dc819d36560d034eaaa331fa7e4656f3bd6cf",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "prod-code-review-template",
+      "name": "Code Review Checklist",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for code review checklist.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/prod-code-review-template.talosext.json",
+      "sha256": "caa66f318d49e80bac9f3a73fb24ee31ef70ff5e90bc789b6c2b922c71c280d5",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "prod-shell-snippets",
+      "name": "Shell Productivity Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for shell productivity snippets.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/prod-shell-snippets.talosext.json",
+      "sha256": "62cbe06a1ebb612969d7b4a18624f61be6cae7f403959f079c90cce03bb7e1df",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "prod-regex-snippets",
+      "name": "Regex Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for regex snippets.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/prod-regex-snippets.talosext.json",
+      "sha256": "ee79d8d657827f23501d384494a5dd9c13145e644c69ceda22e68c02a6816fcb",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "prod-json-snippets",
+      "name": "JSON Utility Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for json utility snippets.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/prod-json-snippets.talosext.json",
+      "sha256": "79f4eb90b8a4572888a205947d913ad3547ac810128b833e2cd0e8da1edd7776",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "prod-npm-scripts-snippets",
+      "name": "npm Script Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for npm script snippets.",
+      "category": "productivity",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/prod-npm-scripts-snippets.talosext.json",
+      "sha256": "2e18eea3a7d90dd0ff20e8c868fe14584020bdc9028313c361baed5445bcfe1b",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "sec-secure-headers-template",
+      "name": "Security Headers Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for security headers template.",
+      "category": "security",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/sec-secure-headers-template.talosext.json",
+      "sha256": "05c339072323cfea489679a66358c6c61d2f7696b33452bd1fc920fc6bf61e8a",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 10
+    },
+    {
+      "id": "sec-env-secrets-template",
+      "name": "Secrets Layout Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for secrets layout template.",
+      "category": "security",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/sec-env-secrets-template.talosext.json",
+      "sha256": "5e66687fad84471a01f053d4a98983c75c41a944b141dbb5aef050704659e779",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "sec-jwt-snippets",
+      "name": "JWT Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for jwt snippets.",
+      "category": "security",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/sec-jwt-snippets.talosext.json",
+      "sha256": "061bf32445671966883b92c22f10222ccdffc7d4f27426c0bb17475362eba609",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "sec-crypto-basics-snippets",
+      "name": "Cryptography Basics Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for cryptography basics snippets.",
+      "category": "security",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/sec-crypto-basics-snippets.talosext.json",
+      "sha256": "59633d350fecd05812757b504f99fe3d6fde62c084563376440424e1f251d1e7",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "sec-owasp-checklist-template",
+      "name": "OWASP Checklist",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for owasp checklist.",
+      "category": "security",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/sec-owasp-checklist-template.talosext.json",
+      "sha256": "057cd5eebd3bfc677aadb403757e16d99c9e184ba6adc8858e4f9adfd32c3a68",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "sec-tls-check-snippets",
+      "name": "TLS Check Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for tls check snippets.",
+      "category": "security",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/sec-tls-check-snippets.talosext.json",
+      "sha256": "effc081dcf9cfad400d11868e7566e68201cf69770f4a0e5ec0af089e99e43ae",
+      "externalExecutables": [
+        {
+          "name": "openssl",
+          "kind": "executable",
+          "description": "OpenSSL command-line tool",
+          "required": true
+        },
+        {
+          "name": "curl",
+          "kind": "executable",
+          "description": "curl HTTP client",
+          "required": true
+        },
+        {
+          "name": "dig",
+          "kind": "executable",
+          "description": "dig DNS lookup tool",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "sec-log-audit-snippets",
+      "name": "Log Audit Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for log audit snippets.",
+      "category": "security",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/sec-log-audit-snippets.talosext.json",
+      "sha256": "f0f4e35b86461197c431e40bd6c01a5381ee066e07a593110a10e42867e586ce",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "sec-dependency-audit-template",
+      "name": "Dependency Audit Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Checklist for running locally installed dependency-audit tools; Talos does not execute them.",
+      "category": "security",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/sec-dependency-audit-template.talosext.json",
+      "sha256": "9e9fd4f0f70d1b6e3d36f9613183b1a4c1c6812ff9f9e9d68d5bf4a47315bf35",
+      "externalExecutables": [
+        {
+          "name": "npm",
+          "kind": "executable",
+          "description": "Node package manager audit command",
+          "required": true
+        },
+        {
+          "name": "pip3",
+          "kind": "executable",
+          "description": "Python package manager for pip-audit installation",
+          "required": true
+        },
+        {
+          "name": "cargo",
+          "kind": "executable",
+          "description": "Rust package manager for cargo audit",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "sec-incident-response-template",
+      "name": "Incident Response Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for incident response template.",
+      "category": "security",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/sec-incident-response-template.talosext.json",
+      "sha256": "5a6c39621cded187ed271128f187ae035ab69508dfcc012c1862ba74e12e494c",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "sec-threat-model-template",
+      "name": "Threat Model Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for threat model template.",
+      "category": "security",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/sec-threat-model-template.talosext.json",
+      "sha256": "7e2e1c6033d7a92922fe8b3822e7a0b94326769b478f783a00c56ca057f0ccbb",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "db-sql-snippets",
+      "name": "SQL Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for sql snippets.",
+      "category": "database-api",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/db-sql-snippets.talosext.json",
+      "sha256": "0f04e4963e1a131d3f0366d0539b7f8e9641e8e1cc1ea9b59c4b6cfd3f780c6b",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 8
+    },
+    {
+      "id": "db-postgres-snippets",
+      "name": "PostgreSQL Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for postgresql snippets.",
+      "category": "database-api",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/db-postgres-snippets.talosext.json",
+      "sha256": "eac5a0bd91abf70a40470ebf6d43a4167691f9d3d486383aa85be09f0c1ae3df",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "db-sqlite-template",
+      "name": "SQLite Project Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for sqlite project template.",
+      "category": "database-api",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/db-sqlite-template.talosext.json",
+      "sha256": "8f12e8e93acb2c4e52ae20ae547b8c24ca07788dc1fb1572c6c17984a76fb908",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "db-schema-template",
+      "name": "Schema Design Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for schema design template.",
+      "category": "database-api",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/db-schema-template.talosext.json",
+      "sha256": "8110aa31aad7991cd28ad7112ba8ea983f8bd770bd687ff8dada78f8ecfe22c1",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "db-migration-template",
+      "name": "Migration Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for migration template.",
+      "category": "database-api",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/db-migration-template.talosext.json",
+      "sha256": "d136faf61af7fe5a8458dd9ce4931b0de0d4725f75cf57740bb7f9149c3e5058",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "db-indexing-snippets",
+      "name": "Indexing Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for indexing snippets.",
+      "category": "database-api",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/db-indexing-snippets.talosext.json",
+      "sha256": "ba2fba9ab7deb8bc8412f8c03f234563cfc83f536dde85260da94e81481542b2",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "api-rest-client-snippets",
+      "name": "REST Client Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for rest client snippets.",
+      "category": "database-api",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/api-rest-client-snippets.talosext.json",
+      "sha256": "0c69edba86876d0a3b48e7a6c788b4570bb56e6fe43dc2bcd5455822c9ab0132",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 9
+    },
+    {
+      "id": "api-graphql-snippets",
+      "name": "GraphQL Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for graphql snippets.",
+      "category": "database-api",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/api-graphql-snippets.talosext.json",
+      "sha256": "b5cb42e3a6862d64b0de5b390a65a71a5f9509c8670b459ab64a6cda7eff69d1",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "api-openapi-template",
+      "name": "OpenAPI Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for openapi template.",
+      "category": "database-api",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/api-openapi-template.talosext.json",
+      "sha256": "50301b2b8f30388797a6708b61156eda74df1519ac82fcee8688877347de38bc",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "api-curl-snippets",
+      "name": "curl Request Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for curl request snippets.",
+      "category": "database-api",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/api-curl-snippets.talosext.json",
+      "sha256": "a79c46e26cb8c4275b9de422d4df9ad2e2ea6b70e347bb8f50970f8a7ae9a84c",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "api-webhook-template",
+      "name": "Webhook Handler Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for webhook handler template.",
+      "category": "database-api",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/api-webhook-template.talosext.json",
+      "sha256": "4e6b076605f4a90419aa078e3a3e7eca662d3a3babcfe644d06695a40d5453dc",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "api-error-handling-snippets",
+      "name": "API Error Handling Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for api error handling snippets.",
+      "category": "database-api",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/api-error-handling-snippets.talosext.json",
+      "sha256": "b917850c65fdeafd35108f63df0125a00aebd8251ef5883dc23fb23da326f290",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "ai-ollama-prompts-snippets",
+      "name": "Ollama Prompt Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for ollama prompt snippets.",
+      "category": "ai-ml",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/ai-ollama-prompts-snippets.talosext.json",
+      "sha256": "cba5fb75c6cf7f434a92658cf5c827a521ce3ff16c92ee928ae7df4e033a1734",
+      "externalExecutables": [
+        {
+          "name": "ollama",
+          "kind": "service",
+          "description": "Ollama executable and local service used by the terminal helper",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 11
+    },
+    {
+      "id": "ai-python-data-snippets",
+      "name": "Python Data Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for python data snippets.",
+      "category": "ai-ml",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/ai-python-data-snippets.talosext.json",
+      "sha256": "957c00f7563957d360bc9fddb4c3e91add5e036328e22cf02a27894b450d7067",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "ai-pytorch-snippets",
+      "name": "PyTorch Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for pytorch snippets.",
+      "category": "ai-ml",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/ai-pytorch-snippets.talosext.json",
+      "sha256": "5cd93c2eb4764aa739f73524f669d7944e867aa47d13d8c4e29a671d858b0d4a",
+      "externalExecutables": [
+        {
+          "name": "python3",
+          "kind": "executable",
+          "description": "Python 3 interpreter",
+          "required": true
+        },
+        {
+          "name": "torch",
+          "kind": "python-module",
+          "description": "PyTorch Python package",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "ai-tensorflow-snippets",
+      "name": "TensorFlow Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for tensorflow snippets.",
+      "category": "ai-ml",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/ai-tensorflow-snippets.talosext.json",
+      "sha256": "c79b1a54691cd44e693885a05ab2232a2b79484680d6ac97de6feaa43ddc588d",
+      "externalExecutables": [
+        {
+          "name": "python3",
+          "kind": "executable",
+          "description": "Python 3 interpreter",
+          "required": true
+        },
+        {
+          "name": "tensorflow",
+          "kind": "python-module",
+          "description": "TensorFlow Python package",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "ai-langchain-snippets",
+      "name": "LangChain Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for langchain snippets.",
+      "category": "ai-ml",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/ai-langchain-snippets.talosext.json",
+      "sha256": "f330d49791546c7ff1a0f235cd0dfe907703ccca52c99322b6fd2d59037bc9b3",
+      "externalExecutables": [
+        {
+          "name": "python3",
+          "kind": "executable",
+          "description": "Python 3 interpreter",
+          "required": true
+        },
+        {
+          "name": "langchain",
+          "kind": "python-module",
+          "description": "LangChain Python package",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "ai-embeddings-snippets",
+      "name": "Embedding Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for embedding snippets.",
+      "category": "ai-ml",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/ai-embeddings-snippets.talosext.json",
+      "sha256": "4e6b116fd316377022054c7acdbec0fadf6baa27448105ea135d741f779f6830",
+      "externalExecutables": [
+        {
+          "name": "python3",
+          "kind": "executable",
+          "description": "Python 3 interpreter",
+          "required": true
+        },
+        {
+          "name": "sentence_transformers",
+          "kind": "python-module",
+          "description": "sentence-transformers Python package",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "ai-jupyter-notebook-template",
+      "name": "Notebook Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for notebook template.",
+      "category": "ai-ml",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/ai-jupyter-notebook-template.talosext.json",
+      "sha256": "a2aacfb94605faf38b0ab2ee6846ae3f48f958553533093c02c522bdc69d5996",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "ai-model-card-template",
+      "name": "Model Card Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for model card template.",
+      "category": "ai-ml",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/ai-model-card-template.talosext.json",
+      "sha256": "99ce48072440612e013ad217102981b92938632e43051cb85119c568ade356d5",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "ai-eval-checklist-template",
+      "name": "Evaluation Checklist",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for evaluation checklist.",
+      "category": "ai-ml",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/ai-eval-checklist-template.talosext.json",
+      "sha256": "738546cf879f90cad95d83d72c8a257cb3dc98afd7d2de9b18b30f7085d7a951",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "ai-rag-pipeline-template",
+      "name": "RAG Pipeline Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "Local RAG scaffold template; it does not download models or call services by itself.",
+      "category": "ai-ml",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/ai-rag-pipeline-template.talosext.json",
+      "sha256": "a626b7773024d86d87a2325d3386784dd8dff8c763278957869e6b7ea60cd7b0",
+      "externalExecutables": [
+        {
+          "name": "python3",
+          "kind": "executable",
+          "description": "Python 3 interpreter",
+          "required": true
+        },
+        {
+          "name": "sentence_transformers",
+          "kind": "python-module",
+          "description": "sentence-transformers Python package",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "linux-systemd-template",
+      "name": "systemd Unit Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for systemd unit template.",
+      "category": "linux-sysadmin",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/linux-systemd-template.talosext.json",
+      "sha256": "210f3a697d519b250d8371058f1c614a053f0557661caae423d4b7fa68b71f76",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 12
+    },
+    {
+      "id": "linux-cron-template",
+      "name": "Cron Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for cron template.",
+      "category": "linux-sysadmin",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/linux-cron-template.talosext.json",
+      "sha256": "ea1dfc198b00b4e1cc4c21e76260d653b7dbf9c37d6c026bfd7a203244d551f2",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "linux-bash-admin-snippets",
+      "name": "Bash Admin Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for bash admin snippets.",
+      "category": "linux-sysadmin",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/linux-bash-admin-snippets.talosext.json",
+      "sha256": "1dea5835bb7cb885dcb2b05c15257e67098c597851132a64f019d3804a058662",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "linux-network-snippets",
+      "name": "Network Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for network snippets.",
+      "category": "linux-sysadmin",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/linux-network-snippets.talosext.json",
+      "sha256": "cfad467bc746c4b5ac91a4c69e282a716bd92be3bf0f001c80bd9e41d88d69f6",
+      "externalExecutables": [
+        {
+          "name": "ip",
+          "kind": "system-tool",
+          "description": "iproute2 command",
+          "required": true
+        },
+        {
+          "name": "ss",
+          "kind": "system-tool",
+          "description": "socket statistics command",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "linux-permissions-snippets",
+      "name": "Permission Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for permission snippets.",
+      "category": "linux-sysadmin",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/linux-permissions-snippets.talosext.json",
+      "sha256": "aab7ade18004e9997d4242d65c841f39be9805fcae9e199ba7b2b248d44f74e3",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "linux-journalctl-snippets",
+      "name": "journalctl Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for journalctl snippets.",
+      "category": "linux-sysadmin",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/linux-journalctl-snippets.talosext.json",
+      "sha256": "5a2c3db05995a5f0db48df13b087dcf01d2d9bea3e6dcc493edbe886b0d7947d",
+      "externalExecutables": [
+        {
+          "name": "journalctl",
+          "kind": "system-tool",
+          "description": "systemd journal viewer",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "linux-ansible-snippets",
+      "name": "Ansible Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for ansible snippets.",
+      "category": "linux-sysadmin",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/linux-ansible-snippets.talosext.json",
+      "sha256": "74032f0f11c7535090fd619f086251054462a0a3c2ccea596e6a4549df54f545",
+      "externalExecutables": [
+        {
+          "name": "ansible",
+          "kind": "executable",
+          "description": "Ansible playbook runner",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "linux-strace-snippets",
+      "name": "strace Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for strace snippets.",
+      "category": "linux-sysadmin",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/linux-strace-snippets.talosext.json",
+      "sha256": "32b19edb7533dcaa2e8abd446a7d28d839a946d2f8b8a48972895c8ea8ba2284",
+      "externalExecutables": [
+        {
+          "name": "strace",
+          "kind": "executable",
+          "description": "strace syscall tracer",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "linux-disk-snippets",
+      "name": "Disk Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for disk snippets.",
+      "category": "linux-sysadmin",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/linux-disk-snippets.talosext.json",
+      "sha256": "910e62ad01db30d20608c322425950bb6f4b7108708f49dc63db5372831a7f35",
+      "externalExecutables": [
+        {
+          "name": "lsblk",
+          "kind": "system-tool",
+          "description": "block device listing tool",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "linux-service-checklist-template",
+      "name": "Service Checklist",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for service checklist.",
+      "category": "linux-sysadmin",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/linux-service-checklist-template.talosext.json",
+      "sha256": "2d1a3c4372775dc8051c4b8aaadab2ae2fae670dfe5f82b4d5d22dcd1e90963b",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "docs-readme-pro-template",
+      "name": "README Pro Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for readme pro template.",
+      "category": "documentation",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/docs-readme-pro-template.talosext.json",
+      "sha256": "41d54b571ae59b4f3b06d4e763dacfb83472e0ba7eff84a480fcfe1396a4651f",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 13
+    },
+    {
+      "id": "docs-changelog-template",
+      "name": "Changelog Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for changelog template.",
+      "category": "documentation",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/docs-changelog-template.talosext.json",
+      "sha256": "035e3343b51cee84c321fc7e3e89c963b43d0c78eb4bc37e3cf24da4ab1c25de",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "docs-rfc-template",
+      "name": "RFC Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for rfc template.",
+      "category": "documentation",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/docs-rfc-template.talosext.json",
+      "sha256": "e735d9fb0bb010056a9032e497beb720631d2fc1e156d8c7a8352aefc9f8e7c3",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "docs-api-reference-template",
+      "name": "API Reference Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for api reference template.",
+      "category": "documentation",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/docs-api-reference-template.talosext.json",
+      "sha256": "b791e99c7c29c6e5b87d391195c9e6fa16296fa447377455c682eb41f19ca6fe",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "docs-mermaid-snippets",
+      "name": "Mermaid Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for mermaid snippets.",
+      "category": "documentation",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/docs-mermaid-snippets.talosext.json",
+      "sha256": "34c504aee133d580bdd7770dbf172cf249f008a0901c9a86ac95639d63fbeb9f",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "docs-diataxis-template",
+      "name": "Diátaxis Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for diátaxis template.",
+      "category": "documentation",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/docs-diataxis-template.talosext.json",
+      "sha256": "5a6e6f83eef981695cc3f3575cee714268ea80b0c14fdae1ca41c583c3f24b8b",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "docs-adr-template",
+      "name": "Architecture Decision Record",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for architecture decision record.",
+      "category": "documentation",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/docs-adr-template.talosext.json",
+      "sha256": "876fead1b97eef130aacc378160b46e1faaae1f0843c0e948b8873d76ee69fcf",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "docs-glossary-template",
+      "name": "Glossary Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for glossary template.",
+      "category": "documentation",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/docs-glossary-template.talosext.json",
+      "sha256": "96c2ec1ca2d2410513732f6126bc6a4afb7c90a8c3ae1ebc6e308cc32e33bb22",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "docs-release-notes-template",
+      "name": "Release Notes Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for release notes template.",
+      "category": "documentation",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/docs-release-notes-template.talosext.json",
+      "sha256": "a6b86b9d8c521b95aafc6d8989621462757b7a7c60f8b2684033a0cb0d3ef988",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "docs-writing-style-template",
+      "name": "Writing Style Guide",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for writing style guide.",
+      "category": "documentation",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/docs-writing-style-template.talosext.json",
+      "sha256": "c6cb2551a0153a6e60e77e4cdee990405b82fbb47d32c9555ae7429fef0eadb0",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "design-css-variables-snippets",
+      "name": "CSS Design Token Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for css design token snippets.",
+      "category": "design-creative",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/design-css-variables-snippets.talosext.json",
+      "sha256": "70959da172126f5a3094db9114572355abf4e1296f1f1068192d433786a2b71e",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "design-svg-template",
+      "name": "SVG Icon Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for svg icon template.",
+      "category": "design-creative",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/design-svg-template.talosext.json",
+      "sha256": "a2e2547d88b0704059da144552baa7a8ad4ffaafad8844f3fff9f2f820e34bf6",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "design-color-system-template",
+      "name": "Color System Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for color system template.",
+      "category": "design-creative",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/design-color-system-template.talosext.json",
+      "sha256": "752ccb76a0e2b3647763ee7769d58604ec29396b6f90af55397f53204089d7f3",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 14
+    },
+    {
+      "id": "design-typography-template",
+      "name": "Typography Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for typography template.",
+      "category": "design-creative",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/design-typography-template.talosext.json",
+      "sha256": "b4fc340ac2d12cc0a1b62461f1f09532c213df4a3bdb913236c10cdbb7849f84",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "design-motion-snippets",
+      "name": "Motion Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for motion snippets.",
+      "category": "design-creative",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/design-motion-snippets.talosext.json",
+      "sha256": "d66ebeb55fef9e31d9bdb0a49e3a9024cccdfe2f87e1ce36733cfc76bbbea992",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "theme-monokai-pro",
+      "name": "Monokai Pro",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "A high-contrast dark palette with warm amber and magenta accents.",
+      "category": "design-creative",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Workspace and editor theme",
+        "Legacy token compatibility"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/theme-monokai-pro.talosext.json",
+      "sha256": "16cce493d97ea5369a94dc3745acbb9d0870b628fbb2ceaf61061cf1dc1062d0",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "theme-gruvbox",
+      "name": "Gruvbox",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "A warm retro dark palette with muted yellow and orange accents.",
+      "category": "design-creative",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Workspace and editor theme",
+        "Legacy token compatibility"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/theme-gruvbox.talosext.json",
+      "sha256": "65366a71f4a223ae1bc60d7a503f5f87f1a541802075ff72207fc5dd4553ae19",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "theme-tokyo-night",
+      "name": "Tokyo Night",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "A deep blue night palette with cyan and violet accents.",
+      "category": "design-creative",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Workspace and editor theme",
+        "Legacy token compatibility"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/theme-tokyo-night.talosext.json",
+      "sha256": "ac0380bb7635c621dfd47965388f3c933168f18a604ece3541debc6631a90c77",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 16
+    },
+    {
+      "id": "theme-one-dark",
+      "name": "One Dark",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "A balanced dark palette inspired by the classic one-dark look.",
+      "category": "design-creative",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Workspace and editor theme",
+        "Legacy token compatibility"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/theme-one-dark.talosext.json",
+      "sha256": "8d20280b1a6ac676540dd8f6f8f2c820bf1ca86a4c1e58eda94b24930e227513",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 6
+    },
+    {
+      "id": "theme-catppuccin",
+      "name": "Catppuccin Mocha",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "A soft dark palette with pastel rose, teal, and lavender tones.",
+      "category": "design-creative",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Workspace and editor theme",
+        "Legacy token compatibility"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/theme-catppuccin.talosext.json",
+      "sha256": "26b6592b80d07455b99da307c12785395fc4a8e494e171c6b465b2663e04c8a2",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "theme-solarized-light",
+      "name": "Solarized Light",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "A calm light palette with low-contrast teal and amber accents.",
+      "category": "design-creative",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "Workspace and editor theme",
+        "Legacy token compatibility"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/theme-solarized-light.talosext.json",
+      "sha256": "220dcd749cf5cb9d368c17640f57cb8ccb1b1dc55005cb974929fde5b603082f",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "talos-terminal-recipes-snippets",
+      "name": "Terminal Recipe Snippets",
+      "kind": "snippets",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 offline CodeMirror snippets for terminal recipe snippets.",
+      "category": "talos-exclusive",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 CodeMirror snippets",
+        "Offline manifest",
+        "Enable/disable support"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/talos-terminal-recipes-snippets.talosext.json",
+      "sha256": "f195ebcc1a2bee669ce3dd8af5a7ab30d53934452eadc3c7b5fcee81dd619d81",
+      "externalExecutables": [
+        {
+          "name": "ollama",
+          "kind": "service",
+          "description": "Ollama executable and local service for the ollama recipe",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "permissions": [],
+      "featured": true,
+      "curatedRank": 15
+    },
+    {
+      "id": "talos-chronicle-session-template",
+      "name": "Chronicle Session Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for chronicle session template.",
+      "category": "talos-exclusive",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/talos-chronicle-session-template.talosext.json",
+      "sha256": "a3369d716b652e5bdecb11a65cd041db609dc43547cf2e59ab645d07d4460dbd",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "talos-observatory-report-template",
+      "name": "Observatory Report Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for observatory report template.",
+      "category": "talos-exclusive",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/talos-observatory-report-template.talosext.json",
+      "sha256": "39aa4e0a96e2048051ae21d58d0baa54912a12ef54151628290e99e7339d7acd",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "talos-canvas-workflow-template",
+      "name": "Canvas Workflow Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for canvas workflow template.",
+      "category": "talos-exclusive",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/talos-canvas-workflow-template.talosext.json",
+      "sha256": "7df062e80ed2197521afe87c621c6fca5c7650f7ec57dbc7f0445dd1927a0aa0",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "talos-calc-workflow-template",
+      "name": "Calc Workflow Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for calc workflow template.",
+      "category": "talos-exclusive",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/talos-calc-workflow-template.talosext.json",
+      "sha256": "be00c9629cb1e8518c6286d0c685757319b7fd726bf3f3d4971bd3f6eb12a7ae",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "talos-offline-checklist-template",
+      "name": "Offline Checklist",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for offline checklist.",
+      "category": "talos-exclusive",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/talos-offline-checklist-template.talosext.json",
+      "sha256": "33c3ccf600ca28f9cb9aa046240dc8057ceffb8c8793cbf8d7ce85d858fd107e",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "talos-release-checklist-template",
+      "name": "Release Checklist",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for release checklist.",
+      "category": "talos-exclusive",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/talos-release-checklist-template.talosext.json",
+      "sha256": "a843cfc6ff72fb3e35232f603ac6ce890252db45b65b0c3cf9fa622695f05720",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "talos-workspace-bootstrap-template",
+      "name": "Workspace Bootstrap",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for workspace bootstrap.",
+      "category": "talos-exclusive",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/talos-workspace-bootstrap-template.talosext.json",
+      "sha256": "48a716be84f50784d2ce686e58897871905240c94ade053fdc48ca2df2507fe9",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
+    },
+    {
+      "id": "talos-extension-author-template",
+      "name": "Extension Author Template",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos Community",
+      "publisher": "Talos Community",
+      "description": "1 local file templates for extension author template.",
+      "category": "talos-exclusive",
+      "compatibility": "Talos manifest v1",
+      "features": [
+        "1 file templates",
+        "Offline manifest",
+        "No file writes until chosen"
+      ],
+      "license": "MIT",
+      "free": true,
+      "updatedAt": "2026-11-21",
+      "url": "extensions/talos-extension-author-template.talosext.json",
+      "sha256": "7f6c86f40cbd72968e481046dbe1be24cfb4d7bd435174494e97ec72fc1f2c19",
+      "externalExecutables": [],
+      "dependencies": [],
+      "permissions": []
     }
   ],
   "apis": [

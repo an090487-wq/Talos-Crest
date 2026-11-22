@@ -1,14 +1,21 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Capability for Talos application windows",
   "windows": [
-    "main"
+    "main",
+    "talos-*"
   ],
   "permissions": [
     "core:default",
+    "core:window:allow-close",
+    "core:window:allow-destroy",
+    "core:window:allow-get-all-windows",
+    "core:window:allow-set-focus",
+    "core:window:allow-set-title",
     "opener:default",
     "dialog:default",
+    "runner:default",
     "fs:allow-read-file",
     "fs:allow-read-text-file",
     "fs:allow-write-file",

@@ -1,98 +1,942 @@
-import { EditorView, basicSetup } from "codemirror";
-import { Compartment, Prec } from "@codemirror/state";
+import "./ui/design-system.css";
+import { EditorView } from "codemirror";
+import { Compartment, EditorState, Prec } from "@codemirror/state";
 import type { Text } from "@codemirror/state";
-import { keymap } from "@codemirror/view";
-import { LanguageDescription } from "@codemirror/language";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  redo,
+  redoDepth,
+  toggleComment,
+  undo,
+  undoDepth,
+} from "@codemirror/commands";
+import {
+  crosshairCursor,
+  drawSelection,
+  dropCursor,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  highlightSpecialChars,
+  keymap,
+  lineNumbers,
+  rectangularSelection,
+} from "@codemirror/view";
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap,
+  snippetCompletion,
+  startCompletion,
+} from "@codemirror/autocomplete";
+import type { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
+import {
+  bracketMatching,
+  defaultHighlightStyle,
+  foldGutter,
+  foldKeymap,
+  indentOnInput,
+  LanguageDescription,
+  syntaxHighlighting,
+} from "@codemirror/language";
+import {
+  getSearchQuery,
+  highlightSelectionMatches,
+  openSearchPanel,
+  searchKeymap,
+  searchPanelOpen,
+} from "@codemirror/search";
 import { languages } from "@codemirror/language-data";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { forceLinting, lintGutter } from "@codemirror/lint";
+import { forceLinting, lintGutter, lintKeymap } from "@codemirror/lint";
 import type { Diagnostic } from "@codemirror/lint";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { basicLinter, setDiagnosticsLanguage } from "./diagnostics";
+import { listen } from "@tauri-apps/api/event";
+import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { basicLinter, diagnosticsAvailability, setDiagnosticsLanguage } from "./diagnostics";
 import { measure, LABEL, FUN } from "./meter";
 import type { Reading } from "./meter";
-import { openPdf, initPdfPane } from "./pdf";
-import { initExtensions } from "./extensions";
+import { openPdf, isPdfFocused, initPdfPane } from "./pdf";
+import { clearExtensionThemePreference, initExtensions, installedSnippets } from "./extensions";
+import { chooseWorkspace, initArchitectureExplorer, openQuickOpen, openObservatory, openWorkspace } from "./architecture";
+import { initCommandPalette, openCommandPalette } from "./command-palette";
+import { collectOutline } from "./outline";
+import type { OutlineSymbol } from "./outline";
+import { parseLineNumber } from "./editor-navigation";
 import { buildTheme, applyUi, resetUi } from "./theme";
 import type { ThemeDef } from "./theme";
-import { fileNameFromPath, isAndroid, readText, writeText } from "./platform";
+import { builtinThemes, DEFAULT_BUILTIN_THEME } from "./ui/theme-presets";
+import type { BuiltinThemeId } from "./ui/theme-presets";
+import {
+  fileNameFromPath,
+  isAndroid,
+  readFileSnapshot,
+  writeText,
+} from "./platform";
+import type { CheckedWriteResult } from "./platform";
+import { getWindowValue, removeWindowValue, setWindowValue } from "./window-state";
+import {
+  documentKey,
+  DocumentTabRegistry,
+  findDocumentIndex,
+  nextDocumentIndex,
+  parseWindowTabsSession,
+} from "./document-tabs";
+import type { DocumentTabSession } from "./document-tabs";
+import {
+  editorShortcutBindings,
+  initShortcutsUi,
+  installGlobalShortcuts,
+  openShortcutsDialog,
+  registerShortcuts,
+} from "./shortcuts";
+import type { Shortcut } from "./shortcuts";
 
 const langCompartment = new Compartment();
 const themeCompartment = new Compartment();
+const wrapCompartment = new Compartment();
+let wordWrap = localStorage.getItem("talos.word-wrap") === "true";
+let editorFontSize = Number(localStorage.getItem("talos.editor-font-size")) || 0;
 let suggestedName: string | undefined;
 let currentPath: string | null = null;
+let diskRevision: string | null = null;
 let dirty = false;
+let savedDoc: Text | null = null;
+let currentLanguageName = "";
+interface EditorTab extends DocumentTabSession {
+  id: number;
+  state: EditorState;
+  savedDoc: Text | null;
+  revision: string | null;
+  dirty: boolean;
+  languageName: string;
+  problemRows: Row[];
+}
+
+const tabRegistry = new DocumentTabRegistry<EditorTab>();
+const editorTabs = tabRegistry.openTabs;
+const recentlyClosedTabs = tabRegistry.closedTabs;
+let activeTab: EditorTab | null = null;
+let nextTabId = 1;
+let tabSessionTimer = 0;
+let view: EditorView;
 let funMode = false;
 let lastReading: Reading | null = null;
 let android = false;
 let productName = "Talos Crest";
+let lastNativeTitle = "";
 
 const $ = (id: string) => document.getElementById(id)!;
+
+type IdleWindow = Window & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+};
+
+// Defer non-essential work until the browser has a free moment. The timeout
+// guarantees the callback still runs when an engine never reports idle time.
+function whenIdle(callback: () => void, timeout = 500) {
+  const idle = (window as IdleWindow).requestIdleCallback;
+  if (typeof idle === "function") idle(callback, { timeout });
+  else window.setTimeout(callback, 0);
+}
+
+const themeIds = Object.keys(builtinThemes) as BuiltinThemeId[];
+const themeMigrationKey = "talos.theme-industrial-migration";
+const savedTheme = localStorage.getItem("talos.theme");
+// An earlier build rewrote the saved "talos-dark" preference to the new
+// industrial default. Restore it for users who never explicitly picked a new
+// theme; any explicit selection marks the preference as settled.
+const wasAutoMigrated = localStorage.getItem(themeMigrationKey) === "1" && savedTheme === DEFAULT_BUILTIN_THEME;
+const restoredTheme = wasAutoMigrated ? "talos-dark" : savedTheme;
+let activeBuiltinTheme: BuiltinThemeId = themeIds.includes(restoredTheme as BuiltinThemeId)
+  ? (restoredTheme as BuiltinThemeId)
+  : DEFAULT_BUILTIN_THEME;
+if (wasAutoMigrated) localStorage.setItem("talos.theme", activeBuiltinTheme);
+localStorage.setItem(themeMigrationKey, "2");
+
+function applyBuiltinTheme(id: BuiltinThemeId, persist = true) {
+  activeBuiltinTheme = id;
+  document.documentElement.dataset.theme = id;
+  ($("theme-select") as HTMLSelectElement).value = id;
+  const def = builtinThemes[id];
+  resetUi();
+  applyUi(def.ui ?? {});
+  reconfigureTabThemes(buildTheme(def));
+  if (persist) {
+    localStorage.setItem("talos.theme", id);
+    localStorage.setItem(themeMigrationKey, "2");
+  }
+}
+
+function reconfigureTabThemes(theme: ReturnType<typeof buildTheme>) {
+  for (const tab of editorTabs) {
+    tab.state = tab.state.update({
+      effects: themeCompartment.reconfigure(theme),
+    }).state;
+  }
+  if (activeTab) {
+    view.setState(activeTab.state);
+    syncHistoryButtons(view.state);
+  }
+}
+
+const editorFonts: Record<string, string> = {
+  default: '"Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace',
+  cascadia: '"Cascadia Code", "SFMono-Regular", Consolas, monospace',
+  jetbrains: '"JetBrains Mono", "SFMono-Regular", Consolas, monospace',
+  consolas: 'Consolas, "Liberation Mono", monospace',
+  menlo: 'Menlo, Monaco, "Liberation Mono", monospace',
+};
+
+function applyEditorFont(font: string) {
+  const selected = editorFonts[font] ? font : "default";
+  document.documentElement.style.setProperty("--editor-font", editorFonts[selected]);
+  ($("editor-font") as HTMLSelectElement).value = selected;
+}
+
+const MIN_EDITOR_FONT_SIZE = 9;
+const MAX_EDITOR_FONT_SIZE = 28;
+
+function applyEditorFontSize(size: number) {
+  const fallback = window.matchMedia("(max-width: 700px)").matches ? 15 : 13;
+  const next = Math.min(
+    MAX_EDITOR_FONT_SIZE,
+    Math.max(MIN_EDITOR_FONT_SIZE, Number.isFinite(size) && size > 0 ? Math.round(size) : fallback),
+  );
+  editorFontSize = next;
+  document.documentElement.style.setProperty("--editor-font-size", `${next}px`);
+  localStorage.setItem("talos.editor-font-size", String(next));
+}
+
+function adjustEditorFontSize(delta: number) {
+  applyEditorFontSize((editorFontSize || 13) + delta);
+}
+
+function resetEditorFontSize() {
+  applyEditorFontSize(0);
+}
+
+function setWordWrap(enabled: boolean) {
+  wordWrap = enabled;
+  const extension = enabled ? EditorView.lineWrapping : [];
+  const scrollTop = view.scrollDOM.scrollTop;
+  for (const tab of editorTabs) {
+    tab.state = tab.state.update({ effects: wrapCompartment.reconfigure(extension) }).state;
+  }
+  if (activeTab) {
+    view.setState(activeTab.state);
+    view.scrollDOM.scrollTop = scrollTop;
+    syncHistoryButtons(view.state);
+    view.focus();
+  }
+  localStorage.setItem("talos.word-wrap", String(enabled));
+  say(`Word wrap ${enabled ? "on" : "off"}`);
+}
+
+function toggleWordWrap() {
+  setWordWrap(!wordWrap);
+}
+
+// Comparing whole document trees on every keystroke is needlessly expensive.
+// A length mismatch already proves the document is dirty; only run the full
+// comparison when the lengths are equal (for example after undoing back to
+// the saved snapshot).
+function documentIsDirty(doc: Text): boolean {
+  if (savedDoc === null) return true;
+  if (doc.length !== savedDoc.length) return true;
+  return !savedDoc.eq(doc);
+}
+
+// Talos Calc is loaded on demand. Nothing from its parser or UI is evaluated
+// while the editor is handling keystrokes.
+type CalcUiModule = typeof import("./calc/calc-ui");
+let calcUiModulePromise: Promise<CalcUiModule> | null = null;
+
+function currentSelection(): string | undefined {
+  if (!view) return undefined;
+  const range = view.state.selection.main;
+  if (range.empty) return undefined;
+  const text = view.state.doc.sliceString(range.from, range.to).trim();
+  return text || undefined;
+}
+
+function insertCalcResult(text: string): void {
+  if (!view) return;
+  const range = view.state.selection.main;
+  view.dispatch({
+    changes: { from: range.from, to: range.to, insert: text },
+    selection: { anchor: range.from + text.length },
+    scrollIntoView: true,
+  });
+  view.focus();
+}
+
+async function openCalcUi(initialExpression?: string): Promise<void> {
+  calcUiModulePromise ??= import("./calc/calc-ui");
+  const module = await calcUiModulePromise;
+  module.openCalc(initialExpression, { onInsertResult: insertCalcResult });
+}
+
+// Talos Canvas is equally lazy: opening it never costs the editor keystroke
+// path anything, and image codecs/workers are created only on demand.
+type CanvasUiModule = typeof import("./canvas/canvas-ui");
+let canvasUiModulePromise: Promise<CanvasUiModule> | null = null;
+
+async function openCanvasUi(path?: string): Promise<void> {
+  canvasUiModulePromise ??= import("./canvas/canvas-ui");
+  const module = await canvasUiModulePromise;
+  module.openCanvas(path);
+}
+
+// Every keyboard shortcut lives here. "editor" entries are installed through
+// CodeMirror's keymap so they can override CodeMirror defaults; "app" entries
+// are handled globally so they work from the outline, dialogs, and toolbars.
+const SHORTCUTS: Shortcut[] = [
+  { id: "file.new", label: "New file", keys: "Mod+N", group: "File", run: () => showNewUntitledTab() },
+  { id: "file.open", label: "Open file", keys: "Mod+O", group: "File", run: () => void guard(openFile) },
+  { id: "file.save", label: "Save", keys: "Mod+S", group: "File", run: () => void guard(() => saveFile()) },
+  {
+    id: "file.save-as",
+    label: "Save as",
+    keys: "Mod+Shift+S",
+    group: "File",
+    run: () => void guard(() => saveFile(true)),
+  },
+  {
+    id: "file.close-tab",
+    label: "Close tab",
+    keys: "Mod+W",
+    group: "File",
+    run: () => {
+      if (activeTab) void guard(() => closeEditorTab(activeTab!));
+    },
+  },
+  { id: "file.reopen-tab", label: "Reopen closed tab", keys: "Mod+Shift+T", group: "File", run: () => reopenEditorTab() },
+  {
+    id: "file.new-window",
+    label: "New window",
+    keys: "Mod+Shift+N",
+    group: "File",
+    run: () => void guard(() => openNewWindow()),
+  },
+  { id: "file.open-pdf", label: "Open PDF", keys: "Mod+Shift+P", group: "File", run: () => void guard(openPdfDialog) },
+
+  { id: "edit.undo", label: "Undo", keys: "Mod+Z", group: "Edit", scope: "editor", run: () => void undo(view) },
+  { id: "edit.redo", label: "Redo", keys: "Mod+Shift+Z", group: "Edit", scope: "editor", run: () => void redo(view) },
+  { id: "edit.redo-alt", label: "Redo (alternate)", keys: "Mod+Y", group: "Edit", scope: "editor", run: () => void redo(view) },
+  { id: "edit.find", label: "Find", keys: "Mod+F", group: "Edit", scope: "editor", run: () => void openSearchPanel(view) },
+  {
+    id: "edit.replace",
+    label: "Find and replace",
+    keys: "Mod+H",
+    group: "Edit",
+    scope: "editor",
+    run: () => {
+      openSearchPanel(view);
+      view.dom.querySelector<HTMLInputElement>('.cm-search input[name="replace"]')?.focus();
+    },
+  },
+  { id: "edit.comment", label: "Toggle line comment", keys: "Mod+/", group: "Edit", scope: "editor", run: () => void toggleComment(view) },
+  { id: "edit.complete", label: "Show completion", keys: "Ctrl+Space", group: "Edit", scope: "editor", run: () => void startCompletion(view) },
+
+  { id: "navigate.quick-open", label: "Quick Open", keys: "Mod+P", group: "Navigate", run: () => openQuickOpen() },
+  { id: "navigate.goto-line", label: "Go to line", keys: "Mod+G", group: "Navigate", scope: "editor", run: () => openGotoLine() },
+  { id: "navigate.goto-symbol", label: "Go to symbol", keys: "Mod+Shift+O", group: "Navigate", run: () => openGotoSymbol() },
+
+  { id: "view.command-palette", label: "Command palette", keys: "Mod+K", group: "View", run: () => openCommandPalette() },
+  { id: "view.terminal", label: "Focus integrated terminal", keys: "Mod+`", group: "View", run: () => openTerminalUi() },
+  { id: "view.panel", label: "Toggle bottom panel", keys: "Mod+J", group: "View", run: () => togglePanel() },
+  { id: "view.outline", label: "Toggle outline", keys: "Mod+B", group: "View", run: () => toggleOutline() },
+  { id: "view.architecture", label: "Architecture explorer", keys: "Mod+Shift+E", group: "View", run: () => $("btn-architecture").click() },
+  { id: "view.zoom-in", label: "Increase editor font", keys: "Mod+=", group: "View", run: () => adjustEditorFontSize(1) },
+  { id: "view.zoom-in-plus", label: "Increase editor font (plus key)", keys: "Mod+Shift+=", group: "View", run: () => adjustEditorFontSize(1) },
+  { id: "view.zoom-out", label: "Decrease editor font", keys: "Mod+-", group: "View", run: () => adjustEditorFontSize(-1) },
+  { id: "view.zoom-reset", label: "Reset editor font size", keys: "Mod+0", group: "View", run: () => resetEditorFontSize() },
+  { id: "view.word-wrap", label: "Toggle word wrap", keys: "Alt+Z", group: "View", run: () => toggleWordWrap() },
+
+  { id: "tabs.next", label: "Next tab", keys: "Mod+Tab", group: "Tabs", run: () => switchEditorTab(1) },
+  { id: "tabs.previous", label: "Previous tab", keys: "Mod+Shift+Tab", group: "Tabs", run: () => switchEditorTab(-1) },
+  ...Array.from({ length: 9 }, (_, index): Shortcut => ({
+    id: `tabs.${index + 1}`,
+    label: `Activate tab ${index + 1}`,
+    keys: `Mod+${index + 1}`,
+    group: "Tabs",
+    run: () => activateEditorTab(editorTabs[index]),
+  })),
+
+  { id: "tools.calc", label: "Open Talos Calc", keys: "Mod+Shift+C", group: "Tools", run: () => void guard(() => openCalcUi()) },
+  {
+    id: "tools.calc-selection",
+    label: "Evaluate selection in Talos Calc",
+    keys: "Alt+C",
+    group: "Tools",
+    scope: "editor",
+    run: () => void guard(() => openCalcUi(currentSelection())),
+  },
+  { id: "tools.canvas", label: "Open Talos Canvas", keys: "Mod+Shift+I", group: "Tools", run: () => void guard(() => openCanvasUi()) },
+
+  // Canvas-local tool keys are handled by canvas-ui while its workspace is
+  // visible. They are registered here so F1 documents them, without run
+  // handlers that would fire when Canvas is closed.
+  { id: "canvas.select", label: "Canvas: select tool", keys: "V", group: "Canvas" },
+  { id: "canvas.crop", label: "Canvas: crop tool", keys: "C", group: "Canvas" },
+  { id: "canvas.pan", label: "Canvas: pan tool", keys: "H", group: "Canvas" },
+  { id: "canvas.zoom", label: "Canvas: zoom tool", keys: "Z", group: "Canvas" },
+  { id: "canvas.brush", label: "Canvas: brush tool", keys: "B", group: "Canvas" },
+  { id: "canvas.eraser", label: "Canvas: eraser tool", keys: "X", group: "Canvas" },
+  { id: "canvas.line", label: "Canvas: line tool", keys: "L", group: "Canvas" },
+  { id: "canvas.rect", label: "Canvas: rectangle tool", keys: "R", group: "Canvas" },
+  { id: "canvas.ellipse", label: "Canvas: ellipse tool", keys: "O", group: "Canvas" },
+  { id: "canvas.text", label: "Canvas: text tool", keys: "T", group: "Canvas" },
+  { id: "canvas.brush-smaller", label: "Canvas: decrease brush size", keys: "[", group: "Canvas" },
+  { id: "canvas.brush-larger", label: "Canvas: increase brush size", keys: "]", group: "Canvas" },
+  { id: "canvas.fit", label: "Canvas: fit image to screen", keys: "0", group: "Canvas" },
+  { id: "canvas.apply-crop", label: "Canvas: apply crop selection", keys: "Enter", group: "Canvas" },
+  { id: "canvas.clear-crop", label: "Canvas: clear crop selection or close Canvas", keys: "Escape", group: "Canvas" },
+
+  { id: "run.file", label: "Run file", keys: "F5", group: "Run", run: () => void guard(runFile) },
+  { id: "run.file-editor", label: "Run file from editor", keys: "Mod+Enter", group: "Run", scope: "editor", run: () => void guard(runFile) },
+
+  { id: "help.shortcuts", label: "Keyboard shortcuts", keys: "F1", group: "Help", run: () => openShortcutsDialog() },
+  { id: "help.shortcuts-alt", label: "Keyboard shortcuts (alternate)", keys: "Mod+Shift+/", group: "Help", run: () => openShortcutsDialog() },
+];
+
+const paletteCommands = SHORTCUTS
+  .filter((shortcut) => shortcut.run && shortcut.scope !== "editor" && !shortcut.id.startsWith("canvas."))
+  .map((shortcut) => ({
+    id: shortcut.id,
+    label: shortcut.label,
+    category: shortcut.group,
+    keys: shortcut.keys,
+    description: `${shortcut.group} command`,
+    run: shortcut.run!,
+  }));
+
+paletteCommands.push(
+  {
+    id: "workspace.choose",
+    label: "Choose workspace",
+    category: "Workspace",
+    keys: "",
+    description: "Select the project folder used by the workspace tools",
+    run: () => void guard(() => chooseWorkspace()),
+  },
+  {
+    id: "view.chronicle",
+    label: "Open Talos Chronicle",
+    category: "Talos",
+    keys: "",
+    description: "Browse indexed project history, evidence, and decisions",
+    run: () => void guard(() => openChronicleUi()),
+  },
+  {
+    id: "view.observatory",
+    label: "Open Talos Observatory",
+    category: "Talos",
+    keys: "",
+    description: "Explore the current project's dependencies and architecture",
+    run: () => openObservatory(),
+  },
+  {
+    id: "tools.ollama",
+    label: "Run Ollama model in terminal",
+    category: "Tools",
+    keys: "",
+    description: "Type ollama run <model> into the integrated terminal",
+    run: () => runOllamaInTerminal(),
+  },
+);
+
+initCommandPalette(paletteCommands, (error) => say(`Command failed: ${String(error)}`));
+
+function openChronicleUi() {
+  return import("./chronicle").then((module) => module.openChronicle());
+}
+
+let terminalModule: typeof import("./terminal") | null = null;
+
+async function ensureTerminal(focus = false): Promise<void> {
+  try {
+    if (!terminalModule) terminalModule = await import("./terminal");
+    terminalModule.activateTerminal({
+      getCwd: () => getWindowValue("talos.workspace-root"),
+      reportError: (error: unknown) => say(`Terminal: ${String(error)}`),
+    });
+    if (focus) terminalModule.focusTerminal();
+  } catch (error) {
+    say(`Could not load terminal: ${String(error)}`);
+  }
+}
+
+function openTerminalUi(): Promise<void> {
+  showPanel(true);
+  showTab("terminal");
+  return ensureTerminal(true);
+}
+
+async function runOllamaInTerminal(): Promise<void> {
+  showPanel(true);
+  showTab("terminal");
+  await ensureTerminal();
+  terminalModule?.runOllamaModel();
+}
 
 function say(text: string) {
   $("msg").textContent = text;
 }
 
+function updateBreadcrumbs() {
+  const source = currentPath ?? suggestedName ?? "Untitled";
+  const parts = source.replace(/\\/g, "/").split("/").filter(Boolean);
+  const visible = parts.length > 4 ? ["…", ...parts.slice(-4)] : parts;
+  const label = visible.join(" / ") || "Untitled";
+  const breadcrumb = $("breadcrumb-path");
+  if (breadcrumb.textContent !== label) breadcrumb.textContent = label;
+}
+
 function refreshTitle() {
   const path = currentPath && android ? fileNameFromPath(currentPath) : currentPath;
-  const name = (path ?? "Untitled") + (dirty ? " \u2022" : "");
-  $("file").textContent = name;
-  document.title = productName + " \u2014 " + name;
+  const name = (path ?? suggestedName ?? "Untitled") + (dirty ? " \u2022" : "");
+  const file = $("file");
+  if (file.textContent !== name) file.textContent = name;
+  updateBreadcrumbs();
+  const workspace = getWindowValue("talos.workspace-root");
+  const workspaceName = workspace?.replace(/[\\/]+$/, "").split(/[\\/]/).pop();
+  const title = [productName, workspaceName, name].filter(Boolean).join(" \u2014 ");
+  if (document.title === title) return;
+  document.title = title;
+  if (title !== lastNativeTitle) {
+    lastNativeTitle = title;
+    void getCurrentWindow().setTitle(title).catch((error: unknown) => {
+      say(`Could not update window title: ${String(error)}`);
+    });
+  }
 }
 
 // ---------- Error Meter + Problems panel ----------
 interface Row {
   from: number;
+  to: number;
   line: number;
+  column: number;
+  endLine: number;
+  endColumn: number;
   severity: "error" | "warning" | "info" | "hint";
+  source: string;
   message: string;
 }
 
-function renderMeter(r: Reading) {
-  lastReading = r;
-  $("meter").dataset.level = r.level;
-  $("gauge-fill").style.width = Math.max(r.score, 4) + "%";
-  const label = funMode ? FUN[r.level] : LABEL[r.level];
-  $("meter-text").textContent =
-    label + " \u00b7 " + r.score + "% \u00b7 " + r.errors + " err \u00b7 " + r.warnings + " warn";
+interface WindowContext {
+  initialPath: string | null;
+  workspacePath: string | null;
 }
 
-function renderProblems(rows: Row[]) {
+interface FileSavedNotice {
+  path: string;
+  revision: string;
+  owner: string;
+}
+
+let problemRows: Row[] = [];
+let outlineTimer = 0;
+let outlineCache: {
+  doc: EditorState["doc"];
+  language: string;
+  complete: boolean;
+  result: ReturnType<typeof collectOutline>;
+} | null = null;
+let symbolPicker: OutlineSymbol[] = [];
+let symbolPickerIndex = 0;
+let symbolPickerMessage = "";
+let searchCountTimer = 0;
+let searchCountKey = "";
+let externalCheckTimer = 0;
+
+let meterLevel = "";
+let meterText = "";
+
+function renderMeter(r: Reading) {
+  lastReading = r;
+  if (meterLevel !== r.level) {
+    meterLevel = r.level;
+    $("meter").dataset.level = r.level;
+  }
+  $("gauge-fill").style.width = Math.max(r.score, 4) + "%";
+  const label = funMode ? FUN[r.level] : LABEL[r.level];
+  const text =
+    label + " \u00b7 " + r.score + "% \u00b7 " + r.errors + " err \u00b7 " + r.warnings + " warn";
+  if (meterText !== text) {
+    meterText = text;
+    $("meter-text").textContent = text;
+  }
+}
+
+async function restoreEditorSession(): Promise<boolean> {
+  const raw = getWindowValue("talos.editor-session");
+  if (!raw) return false;
+  const session = parseWindowTabsSession(raw);
+  if (!session) {
+    say("The saved editor session is invalid and was not restored.");
+    return false;
+  }
+  const restored: EditorTab[] = [];
+  for (const saved of session.documents) {
+    try {
+      let snapshot: Awaited<ReturnType<typeof readFileSnapshot>> = null;
+      if (saved.path) snapshot = await readFileSnapshot(saved.path);
+      if (saved.path && !snapshot && saved.contents === undefined) {
+        say(`Skipped inaccessible session file: ${saved.path}`);
+        continue;
+      }
+      const contents = saved.contents ?? snapshot?.contents ?? "";
+      if (snapshot?.binary && saved.contents === undefined) {
+        say(`Skipped binary session file: ${saved.path}`);
+        continue;
+      }
+      if (snapshot?.binary) say(`Restored unsaved text for ${saved.path}; the disk file is now binary.`);
+      const state = createEditorState(contents, view.state).update({
+        selection: {
+          anchor: Math.min(saved.anchor, contents.length),
+          head: Math.min(saved.head, contents.length),
+        },
+      }).state;
+      const dirtyBuffer = saved.contents !== undefined && saved.contents !== snapshot?.contents;
+      const savedState = snapshot && !snapshot.binary
+        ? EditorState.create({ doc: snapshot.contents }).doc
+        : null;
+      restored.push({
+        id: nextTabId++,
+        path: saved.path,
+        suggestedName: saved.suggestedName,
+        anchor: saved.anchor,
+        head: saved.head,
+        scrollTop: saved.scrollTop,
+        state,
+        savedDoc: dirtyBuffer ? savedState : state.doc,
+        revision: snapshot?.revision ?? null,
+        dirty: dirtyBuffer,
+        languageName: "",
+        problemRows: [],
+      });
+    } catch (error) {
+      say(`Could not restore ${saved.path ?? saved.suggestedName ?? "an untitled document"}: ${String(error)}`);
+    }
+  }
+  if (!restored.length) return false;
+  tabRegistry.replace(restored);
+  activeTab = null;
+  const selected = restored[session.activeIndex] ?? restored[0];
+  activateEditorTab(selected);
+  void setLanguage(selected.path ?? selected.suggestedName ?? "");
+  return true;
+}
+
+function renderProblems(rows = problemRows) {
   const box = $("problems");
   box.textContent = "";
   $("count").textContent = String(rows.length);
+  const severity = ($("problems-severity") as HTMLSelectElement).value;
+  const visible = severity === "all" ? rows : rows.filter((row) => row.severity === severity);
   if (rows.length === 0) {
     const p = document.createElement("div");
     p.className = "empty";
-    p.textContent = "No problems found by the basic checks.";
+    p.textContent = diagnosticsAvailability(currentLanguageName);
     box.appendChild(p);
     return;
   }
-  for (const r of rows.slice(0, 300)) {
+  if (visible.length === 0) {
+    const p = document.createElement("div");
+    p.className = "empty";
+    p.textContent = "No diagnostics match this severity filter.";
+    box.appendChild(p);
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  for (const r of visible.slice(0, 300)) {
     const el = document.createElement("div");
     el.className = "row " + r.severity;
-    el.textContent = "Ln " + r.line + "   " + r.message;
+    const path = currentPath ?? suggestedName ?? "Untitled";
+    el.textContent =
+      path +
+      ":" +
+      r.line +
+      ":" +
+      r.column +
+      "  [" +
+      r.source +
+      "] " +
+      r.message;
+    el.title = `From line ${r.line}, column ${r.column} to line ${r.endLine}, column ${r.endColumn}`;
     el.addEventListener("click", () => {
       view.dispatch({
-        selection: { anchor: Math.min(r.from, view.state.doc.length) },
+        selection: {
+          anchor: Math.min(r.from, view.state.doc.length),
+          head: Math.min(r.to, view.state.doc.length),
+        },
         scrollIntoView: true,
       });
       view.focus();
     });
-    box.appendChild(el);
+    fragment.appendChild(el);
+  }
+  // Insert once so the browser can lay out the list in a single pass.
+  box.appendChild(fragment);
+}
+
+// Reuse the last outline while the document is unchanged, so typing in the
+// outline filter does not re-parse the file on every key press.
+function currentOutline() {
+  const doc = view.state.doc;
+  if (
+    outlineCache &&
+    outlineCache.doc === doc &&
+    outlineCache.language === currentLanguageName &&
+    outlineCache.complete
+  ) {
+    return outlineCache.result;
+  }
+  const result = collectOutline(view.state, currentLanguageName);
+  outlineCache = { doc, language: currentLanguageName, complete: result.complete, result };
+  return result;
+}
+
+function renderOutline() {
+  const list = $("outline-list");
+  list.textContent = "";
+  const result = currentOutline();
+  const status = $("outline-status");
+  if (!result.supported) {
+    status.textContent = `No symbol parser is configured for ${currentLanguageName || "Plain text"}.`;
+    return;
+  }
+  status.textContent = result.complete
+    ? `${result.symbols.length} symbols from the ${currentLanguageName} syntax parser.`
+    : `Parser has not finished this document; showing ${result.symbols.length} available symbols.`;
+  const query = ($("outline-search") as HTMLInputElement).value.trim().toLowerCase();
+  const symbols = result.symbols.filter((symbol) => !query || symbol.name.toLowerCase().includes(query));
+  if (symbols.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = query ? "No symbols match this filter." : "No symbols found.";
+    list.appendChild(empty);
+    return;
+  }
+  const kindIcons: Record<OutlineSymbol["kind"], string> = {
+    class: "C",
+    function: "ƒ",
+    method: "ƒ",
+    interface: "I",
+    type: "T",
+    variable: "v",
+  };
+  const fragment = document.createDocumentFragment();
+  for (const symbol of symbols) {
+    const row = document.createElement("button");
+    row.className = "outline-row";
+    row.type = "button";
+    row.setAttribute("role", "treeitem");
+    row.setAttribute("aria-level", String(symbol.depth + 1));
+    row.style.paddingInlineStart = `${7 + symbol.depth * 14}px`;
+    row.title = `${symbol.kind}: ${symbol.name}`;
+    const icon = document.createElement("span");
+    icon.className = "outline-kind";
+    icon.textContent = kindIcons[symbol.kind];
+    const name = document.createElement("span");
+    name.className = "outline-name";
+    name.textContent = symbol.name;
+    row.append(icon, name);
+    row.addEventListener("click", () => {
+      view.dispatch({
+        selection: { anchor: symbol.from, head: symbol.to },
+        scrollIntoView: true,
+      });
+      view.focus();
+    });
+    fragment.appendChild(row);
+  }
+  list.appendChild(fragment);
+}
+
+function openGotoLine() {
+  const dialog = $("goto-line-dialog") as HTMLDialogElement;
+  const input = $("goto-line-input") as HTMLInputElement;
+  input.value = String(view.state.doc.lineAt(view.state.selection.main.head).number);
+  $("goto-line-status").textContent = "";
+  if (!dialog.open) dialog.showModal();
+  input.focus();
+  input.select();
+}
+
+function renderSymbolPicker() {
+  const results = $("symbol-results");
+  const status = $("symbol-status");
+  results.textContent = "";
+  const query = ($("symbol-search") as HTMLInputElement).value.trim().toLocaleLowerCase();
+  const matches = symbolPicker.filter((symbol) => symbol.name.toLocaleLowerCase().includes(query));
+  symbolPickerIndex = Math.min(symbolPickerIndex, Math.max(0, matches.length - 1));
+  status.textContent = symbolPickerMessage || `${matches.length} symbols${query ? " match" : ""}`;
+  const fragment = document.createDocumentFragment();
+  for (const [index, symbol] of matches.entries()) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = `workspace-result${index === symbolPickerIndex ? " active" : ""}`;
+    row.setAttribute("role", "option");
+    row.setAttribute("aria-selected", String(index === symbolPickerIndex));
+    const name = document.createElement("span");
+    name.className = "workspace-result-name";
+    name.textContent = `${"  ".repeat(symbol.depth)}${symbol.name}`;
+    const kind = document.createElement("span");
+    kind.className = "workspace-result-path";
+    kind.textContent = symbol.kind;
+    row.append(name, kind);
+    row.addEventListener("mouseenter", () => {
+      symbolPickerIndex = index;
+      [...results.children].forEach((item, itemIndex) => {
+        item.classList.toggle("active", itemIndex === index);
+        item.setAttribute("aria-selected", String(itemIndex === index));
+      });
+    });
+    row.addEventListener("click", () => {
+      view.dispatch({
+        selection: { anchor: symbol.from, head: symbol.to },
+        scrollIntoView: true,
+      });
+      ($("symbol-dialog") as HTMLDialogElement).close();
+      view.focus();
+    });
+    fragment.appendChild(row);
+  }
+  results.appendChild(fragment);
+  if (!matches.length) {
+    const empty = document.createElement("div");
+    empty.className = "workspace-dialog-status";
+    empty.textContent = query ? "No symbols match this filter." : "No symbols found.";
+    results.appendChild(empty);
   }
 }
 
+function scheduleSearchCount() {
+  if (searchCountTimer) window.clearTimeout(searchCountTimer);
+  searchCountTimer = window.setTimeout(() => {
+    searchCountTimer = 0;
+    whenIdle(() => {
+      if (!searchPanelOpen(view.state)) return;
+      const panel = view.dom.querySelector<HTMLElement>(".cm-search");
+      if (!panel) return;
+      let status = panel.querySelector<HTMLElement>(".talos-search-count");
+      if (!status) {
+        status = document.createElement("span");
+        status.className = "talos-search-count";
+        status.setAttribute("role", "status");
+        panel.appendChild(status);
+      }
+      const query = getSearchQuery(view.state);
+      if (!query.search) {
+        status.textContent = "";
+        return;
+      }
+      if (!query.valid) {
+        status.textContent = "Invalid search expression";
+        return;
+      }
+      let count = 0;
+      const cursor = query.getCursor(view.state);
+      let match = cursor.next();
+      while (!match.done) {
+        count++;
+        if (count > 1000) break;
+        match = cursor.next();
+      }
+      status.textContent = count > 1000 ? "1000+ matches" : `${count} match${count === 1 ? "" : "es"}`;
+    }, 250);
+  }, 150);
+}
+
+function openGotoSymbol() {
+  const result = collectOutline(view.state, currentLanguageName);
+  symbolPicker = result.symbols;
+  symbolPickerIndex = 0;
+  if (!result.supported) {
+    symbolPickerMessage = `No symbol parser is configured for ${currentLanguageName || "Plain text"}.`;
+  } else {
+    symbolPickerMessage = result.complete
+      ? `${symbolPicker.length} symbols from the ${currentLanguageName} parser.`
+      : `Parser is incomplete; showing ${symbolPicker.length} available symbols.`;
+  }
+  ($("symbol-search") as HTMLInputElement).value = "";
+  renderSymbolPicker();
+  const dialog = $("symbol-dialog") as HTMLDialogElement;
+  if (!dialog.open) dialog.showModal();
+  $("symbol-search").focus();
+}
+
+function scheduleOutline() {
+  if ($("outline-pane").classList.contains("hidden")) return;
+  if (outlineTimer) window.clearTimeout(outlineTimer);
+  outlineTimer = window.setTimeout(() => {
+    outlineTimer = 0;
+    // Parsing and rebuilding the outline can take a few milliseconds on large
+    // files, so keep it out of the frame where typing stopped.
+    whenIdle(renderOutline, 400);
+  }, 300);
+}
+
+// The outline can contain thousands of rows, so filter typing is coalesced
+// instead of rebuilding the list on every keystroke.
+let outlineFilterTimer = 0;
+
+function scheduleOutlineFilter() {
+  if (outlineFilterTimer) window.clearTimeout(outlineFilterTimer);
+  outlineFilterTimer = window.setTimeout(() => {
+    outlineFilterTimer = 0;
+    renderOutline();
+  }, 80);
+}
+
+// The symbol picker rebuilds every row plus its listeners on each keystroke;
+// coalesce those rebuilds the same way the outline does.
+let symbolFilterTimer = 0;
+
+function flushSymbolFilter() {
+  if (symbolFilterTimer) window.clearTimeout(symbolFilterTimer);
+  symbolFilterTimer = 0;
+  renderSymbolPicker();
+}
+
+function scheduleSymbolFilter() {
+  if (symbolFilterTimer) window.clearTimeout(symbolFilterTimer);
+  symbolFilterTimer = window.setTimeout(flushSymbolFilter, 80);
+}
+
 function onDiagnostics(diags: readonly Diagnostic[], doc: Text) {
-  const rows: Row[] = diags.map((d) => ({
-    from: d.from,
-    line: doc.lineAt(Math.min(d.from, doc.length)).number,
-    severity: d.severity,
-    message: d.message,
-  }));
+  const rows: Row[] = diags.map((diagnostic) => {
+    const from = Math.min(diagnostic.from, doc.length);
+    const to = Math.min(diagnostic.to, doc.length);
+    const start = doc.lineAt(from);
+    const end = doc.lineAt(to);
+    return {
+      from,
+      to,
+      line: start.number,
+      column: from - start.from + 1,
+      endLine: end.number,
+      endColumn: to - end.from + 1,
+      severity: diagnostic.severity,
+      source: diagnostic.source ?? "Unknown source",
+      message: diagnostic.message,
+    };
+  });
   rows.sort((a, b) => a.line - b.line);
-  renderProblems(rows);
+  problemRows = rows;
+  if (activeTab && activeTab.state.doc === doc) activeTab.problemRows = rows;
+  // Rebuilding the problems list is only visible when the panel is open.
+  if (!$("panel").classList.contains("hidden") && !$("problems").classList.contains("hidden")) {
+    renderProblems();
+  }
   renderMeter(
     measure(
       rows.map((x) => x.severity),
@@ -102,44 +946,534 @@ function onDiagnostics(diags: readonly Diagnostic[], doc: Text) {
 }
 
 // ---------- Panel + tabs ----------
-function showTab(tab: "problems" | "output") {
+type BottomTab = "problems" | "output" | "terminal" | "build" | "debug";
+const bottomViews: Record<BottomTab, string> = {
+  problems: "problems",
+  output: "output",
+  terminal: "channel-terminal",
+  build: "channel-build",
+  debug: "channel-debug",
+};
+
+function showTab(tab: BottomTab) {
+  setWindowValue("talos.bottom-panel-tab", tab);
   for (const b of document.querySelectorAll<HTMLElement>("[data-tab]")) {
     b.classList.toggle("active", b.dataset.tab === tab);
   }
-  $("problems").classList.toggle("hidden", tab !== "problems");
-  $("output").classList.toggle("hidden", tab !== "output");
+  for (const [name, id] of Object.entries(bottomViews)) {
+    $(id).classList.toggle("hidden", name !== tab);
+  }
+  $("problems-toolbar").classList.toggle("hidden", tab !== "problems");
+  if (tab === "problems" && !$("panel").classList.contains("hidden")) renderProblems();
+  if (tab === "terminal" && !$("panel").classList.contains("hidden")) void ensureTerminal();
 }
 
-function showPanel(show: boolean) {
+function setPanelMaximized(maximized: boolean) {
+  setWindowValue("talos.panel-maximized", String(maximized));
+  const region = $("editor-region");
+  region.classList.toggle("panel-maximized", maximized);
+  const button = $("btn-panel-max") as HTMLButtonElement;
+  const title = maximized ? "Restore panel" : "Maximize panel";
+  button.setAttribute("aria-pressed", String(maximized));
+  button.setAttribute("aria-label", title);
+  button.title = title;
+  button.textContent = maximized ? "Restore" : "Max";
+  if (!maximized) {
+    const stored = Number(getWindowValue("talos.panel-size"));
+    if (Number.isFinite(stored) && stored > 0) $("panel").style.flexBasis = `${stored}px`;
+    view?.requestMeasure?.();
+  }
+}
+
+function showPanel(show: boolean, persist = true) {
+  if (!show && $("editor-region").classList.contains("panel-maximized")) setPanelMaximized(false);
   $("panel").classList.toggle("hidden", !show);
+  $("panel-splitter").classList.toggle("hidden", !show);
+  if (show && !$("problems").classList.contains("hidden")) renderProblems();
+  if (show && !$("channel-terminal").classList.contains("hidden")) void ensureTerminal();
+  if (persist) setWindowValue("talos.panel-visible", String(show));
+}
+
+function previewHtml() {
+  toggleOutline(false);
+  const preview = $("html-preview");
+  preview.classList.remove("hidden");
+  syncSidePane();
+  ($("html-preview-frame") as HTMLIFrameElement).srcdoc = view.state.doc.toString();
+}
+
+function closeHtmlPreview() {
+  ($("html-preview-frame") as HTMLIFrameElement).srcdoc = "";
+  $("html-preview").classList.add("hidden");
+  syncSidePane();
 }
 
 function togglePanel() {
-  $("panel").classList.toggle("hidden");
+  showPanel($("panel").classList.contains("hidden"));
+}
+
+function sidePaneSizeKey(id: string): string {
+  if (id === "pdf-pane") return "talos.pdf-pane-size";
+  if (id === "html-preview") return "talos.html-preview-size";
+  return "talos.side-pane-size";
+}
+
+function syncSidePane() {
+  const pane = document.querySelector<HTMLElement>("#main > .side-pane:not(.hidden)");
+  const open = pane !== null;
+  $("main").classList.toggle("side-pane-open", open);
+  $("side-splitter").classList.toggle("hidden", !open);
+  if (!pane) return;
+  const mobile = window.matchMedia("(max-width: 700px)").matches;
+  const bounds = $("main").getBoundingClientRect();
+  const min = mobile ? 160 : 240;
+  const max = mobile ? Math.max(min, bounds.height - 120) : Math.max(min, bounds.width - 280);
+  const sizeKey = sidePaneSizeKey(pane.id);
+  const storedSize = getWindowValue(sizeKey);
+  const preferredSize = Number.parseFloat(pane.style.flexBasis) || Number(storedSize);
+  if (Number.isFinite(preferredSize) && preferredSize > 0) {
+    // Clamp only the applied size. Persisting the clamped value would destroy
+    // the user's preferred width whenever the window happens to be narrow.
+    const size = Math.round(Math.min(Math.max(preferredSize, min), max));
+    pane.style.flexBasis = `${size}px`;
+  }
+  const axisSize = mobile ? pane.getBoundingClientRect().height : pane.getBoundingClientRect().width;
+  $("side-splitter").setAttribute("aria-valuemin", String(min));
+  $("side-splitter").setAttribute("aria-valuemax", String(max));
+  $("side-splitter").setAttribute("aria-valuenow", String(Math.round(axisSize)));
+  $("side-splitter").setAttribute("aria-orientation", mobile ? "horizontal" : "vertical");
+}
+
+function toggleOutline(force?: boolean) {
+  const pane = $("outline-pane");
+  const shouldOpen = force ?? pane.classList.contains("hidden");
+  if (shouldOpen) {
+    closeHtmlPreview();
+    if (!$("pdf-pane").classList.contains("hidden")) ($("pdf-close") as HTMLButtonElement).click();
+  }
+  pane.classList.toggle("hidden", !shouldOpen);
+  $("btn-outline").classList.toggle("active", shouldOpen);
+  setWindowValue("talos.outline-visible", String(shouldOpen));
+  syncSidePane();
+  if (shouldOpen) renderOutline();
+}
+
+function installResizeHandle(
+  handle: HTMLElement,
+  getTarget: () => HTMLElement | null,
+  axis: "x" | "y"
+) {
+  const readSize = (target: HTMLElement, dimension: "x" | "y") =>
+    dimension === "x" ? target.getBoundingClientRect().width : target.getBoundingClientRect().height;
+
+  const resizeTo = (target: HTMLElement, size: number, dimension: "x" | "y") => {
+    const bounds = target.parentElement?.getBoundingClientRect();
+    const sidePane = handle.id === "side-splitter";
+    const min = dimension === "x" ? 240 : sidePane ? 160 : 96;
+    const max = dimension === "x"
+      ? Math.max(min, (bounds?.width ?? window.innerWidth) - 280)
+      : sidePane
+        ? Math.max(min, (bounds?.height ?? window.innerHeight) - 120)
+        : Math.max(min, Math.min(window.innerHeight - 180, window.innerHeight * 0.65));
+    const next = Math.round(Math.min(Math.max(size, min), max));
+    target.style.flexBasis = `${next}px`;
+    if (sidePane) document.dispatchEvent(new Event("talos:side-pane-resize"));
+    handle.setAttribute("aria-valuemin", String(min));
+    handle.setAttribute("aria-valuemax", String(max));
+    handle.setAttribute("aria-valuenow", String(next));
+    handle.setAttribute("aria-orientation", dimension === "x" ? "vertical" : "horizontal");
+    setWindowValue(sidePaneSizeKey(target.id), String(next));
+  };
+
+  const targetId = getTarget()?.id;
+  const storedSize = targetId ? getWindowValue(sidePaneSizeKey(targetId)) : null;
+  const initialTarget = getTarget();
+  if (initialTarget && storedSize) {
+    const size = Number(storedSize);
+    if (Number.isFinite(size) && size > 0) initialTarget.style.flexBasis = `${size}px`;
+  }
+
+  handle.addEventListener("pointerdown", (event: PointerEvent) => {
+    const target = getTarget();
+    if (!target || event.button !== 0) return;
+    event.preventDefault();
+    const mobile = axis === "x" && window.matchMedia("(max-width: 700px)").matches;
+    const coordinate = mobile ? event.clientY : axis === "x" ? event.clientX : event.clientY;
+    const actualAxis = mobile ? "y" : axis;
+    const startSize = readSize(target, actualAxis);
+    const startCoordinate = coordinate;
+    handle.setPointerCapture(event.pointerId);
+    const move = (nextEvent: PointerEvent) => {
+      const current = actualAxis === "x" ? nextEvent.clientX : nextEvent.clientY;
+      resizeTo(target, startSize + startCoordinate - current, actualAxis);
+    };
+    const finish = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", finish);
+      handle.removeEventListener("pointercancel", finish);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", finish, { once: true });
+    handle.addEventListener("pointercancel", finish, { once: true });
+  });
+
+  handle.addEventListener("keydown", (event: KeyboardEvent) => {
+    const target = getTarget();
+    if (!target) return;
+    const mobile = axis === "x" && window.matchMedia("(max-width: 700px)").matches;
+    const dimension = mobile ? "y" : axis;
+    const horizontal = dimension === "x";
+    const increase = horizontal ? event.key === "ArrowLeft" : event.key === "ArrowUp";
+    const decrease = horizontal ? event.key === "ArrowRight" : event.key === "ArrowDown";
+    if (!increase && !decrease) return;
+    event.preventDefault();
+    const step = event.shiftKey ? 80 : 20;
+    resizeTo(target, readSize(target, dimension) + (increase ? step : -step), dimension);
+  });
+}
+
+function installWorkspaceResizers() {
+  installResizeHandle(
+    $("side-splitter"),
+    () => document.querySelector<HTMLElement>("#main > .side-pane:not(.hidden)"),
+    "x"
+  );
+  installResizeHandle($("panel-splitter"), () => $("panel"), "y");
+  window.addEventListener("resize", () => {
+    syncSidePane();
+    $("side-splitter").setAttribute(
+      "aria-orientation",
+      window.matchMedia("(max-width: 700px)").matches ? "horizontal" : "vertical"
+    );
+  });
+}
+
+function persistEditorTabs() {
+  if (!($("restore-session-on-startup") as HTMLInputElement).checked) return;
+  const session: DocumentTabSession[] = editorTabs.map((tab) => ({
+    path: tab.path,
+    suggestedName: tab.suggestedName,
+    anchor: tab.state.selection.main.anchor,
+    head: tab.state.selection.main.head,
+    scrollTop: tab === activeTab ? view.scrollDOM.scrollTop : tab.scrollTop,
+    ...(tab.dirty ? { contents: tab.state.doc.toString() } : {}),
+  }));
+  try {
+    setWindowValue(
+      "talos.editor-session",
+      JSON.stringify({
+        version: 1,
+        documents: session,
+        activeIndex: Math.max(0, editorTabs.indexOf(activeTab!)),
+      }),
+    );
+  } catch (error) {
+    say(`Could not persist editor session: ${String(error)}`);
+  }
+}
+
+function scheduleEditorSessionSave() {
+  if (tabSessionTimer) window.clearTimeout(tabSessionTimer);
+  tabSessionTimer = window.setTimeout(() => {
+    tabSessionTimer = 0;
+    // Serializing every dirty document and writing it to localStorage can
+    // stall the main thread. Wait for an idle slot so typing stays responsive.
+    whenIdle(persistEditorTabs, 1500);
+  }, 800);
+}
+
+function renderDocumentTabs() {
+  const strip = $("document-tabs");
+  strip.textContent = "";
+  for (const [index, tab] of editorTabs.entries()) {
+    const button = document.createElement("div");
+    button.className = `document-tab${tab === activeTab ? " active" : ""}`;
+    button.dataset.tabId = String(tab.id);
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", String(tab === activeTab));
+    button.tabIndex = tab === activeTab ? 0 : -1;
+    button.title = tab.path ?? tab.suggestedName ?? "Untitled";
+    const name = document.createElement("span");
+    name.className = "document-tab-name";
+    name.textContent = fileNameFromPath(tab.path ?? tab.suggestedName ?? "Untitled");
+    button.appendChild(name);
+    if (tab.dirty) {
+      const marker = document.createElement("span");
+      marker.className = "document-tab-dirty";
+      marker.setAttribute("aria-label", "Modified");
+      marker.textContent = "●";
+      button.appendChild(marker);
+    }
+    const close = document.createElement("button");
+    close.className = "document-tab-close";
+    close.type = "button";
+    close.setAttribute("aria-label", `Close ${name.textContent}`);
+    close.textContent = "×";
+    close.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void guard(() => closeEditorTab(tab));
+    });
+    button.appendChild(close);
+    button.addEventListener("click", () => activateEditorTab(tab));
+    button.addEventListener("auxclick", (event) => {
+      if (event.button === 1) {
+        event.preventDefault();
+        void guard(() => closeEditorTab(tab));
+      }
+    });
+    button.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      showTabContextMenu(tab, event.clientX, event.clientY);
+    });
+    button.addEventListener("keydown", (event) => {
+      if (event.key === "Delete" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        void guard(() => closeEditorTab(tab));
+      }
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        activateEditorTab(editorTabs[nextDocumentIndex(index, editorTabs.length, event.key === "ArrowRight" ? 1 : -1)]);
+      }
+    });
+    strip.appendChild(button);
+  }
+}
+
+// Update just the active tab's dirty dot instead of rebuilding the whole
+// strip (and all its listeners) on every keystroke.
+function syncActiveTabDirty() {
+  if (!activeTab) return;
+  const button = $("document-tabs").querySelector<HTMLElement>(
+    `.document-tab[data-tab-id="${activeTab.id}"]`,
+  );
+  if (!button) {
+    renderDocumentTabs();
+    return;
+  }
+  const marker = button.querySelector<HTMLElement>(".document-tab-dirty");
+  if (activeTab.dirty && !marker) {
+    const dot = document.createElement("span");
+    dot.className = "document-tab-dirty";
+    dot.setAttribute("aria-label", "Modified");
+    dot.textContent = "●";
+    button.insertBefore(dot, button.querySelector(".document-tab-close"));
+  } else if (!activeTab.dirty && marker) {
+    marker.remove();
+  }
+}
+
+function showTabContextMenu(tab: EditorTab, x: number, y: number) {
+  document.querySelector(".document-tab-context")?.remove();
+  const menu = document.createElement("div");
+  menu.className = "document-tab-context";
+  menu.setAttribute("role", "menu");
+  menu.style.left = `${Math.min(x, window.innerWidth - 180)}px`;
+  menu.style.top = `${Math.min(y, window.innerHeight - 80)}px`;
+  const closeItem = document.createElement("button");
+  closeItem.type = "button";
+  closeItem.setAttribute("role", "menuitem");
+  closeItem.textContent = "Close Tab";
+  closeItem.addEventListener("click", () => {
+    menu.remove();
+    void guard(() => closeEditorTab(tab));
+  });
+  const reopenItem = document.createElement("button");
+  reopenItem.type = "button";
+  reopenItem.setAttribute("role", "menuitem");
+  reopenItem.textContent = "Reopen Closed Tab";
+  reopenItem.disabled = recentlyClosedTabs.length === 0;
+  reopenItem.addEventListener("click", () => {
+    menu.remove();
+    reopenEditorTab();
+  });
+  menu.append(closeItem, reopenItem);
+  document.body.appendChild(menu);
+  const dismiss = (event: MouseEvent) => {
+    if (!menu.contains(event.target as Node)) {
+      menu.remove();
+      document.removeEventListener("pointerdown", dismiss);
+    }
+  };
+  window.setTimeout(() => document.addEventListener("pointerdown", dismiss), 0);
+}
+
+function activateEditorTab(tab: EditorTab | undefined) {
+  if (!tab || tab === activeTab) {
+    view.focus();
+    return;
+  }
+  if (activeTab) {
+    activeTab.state = view.state;
+    activeTab.scrollTop = view.scrollDOM.scrollTop;
+  }
+  activeTab = tab;
+  currentPath = tab.path;
+  suggestedName = tab.suggestedName ?? undefined;
+  diskRevision = tab.revision;
+  dirty = tab.dirty;
+  savedDoc = tab.savedDoc;
+  currentLanguageName = tab.languageName;
+  setDiagnosticsLanguage(currentLanguageName);
+  view.setState(tab.state);
+  view.scrollDOM.scrollTop = tab.scrollTop;
+  problemRows = tab.problemRows;
+  if (!$("panel").classList.contains("hidden") && !$("problems").classList.contains("hidden")) {
+    renderProblems();
+  }
+  syncHistoryButtons(view.state);
+  refreshTitle();
+  renderDocumentTabs();
+  if (tab.path) setWindowValue("talos.open-file", tab.path);
+  // Linting can parse the whole document; let the tab finish painting first.
+  whenIdle(() => {
+    if (activeTab === tab) forceLinting(view);
+  }, 350);
+  scheduleOutline();
+  scheduleEditorSessionSave();
+  view.focus();
+}
+
+function showNewUntitledTab(name: string | null = null, contents = "") {
+  const state = createEditorState(contents, view.state);
+  const tab: EditorTab = {
+    id: nextTabId++,
+    path: null,
+    suggestedName: name,
+    anchor: 0,
+    head: 0,
+    scrollTop: 0,
+    state,
+    savedDoc: null,
+    revision: null,
+    dirty: contents.length > 0,
+    languageName: "",
+    problemRows: [],
+  };
+  tabRegistry.open(tab);
+  activateEditorTab(tab);
+  void setLanguage(name ?? "");
+  renderDocumentTabs();
+}
+
+async function openSnapshotInTab(path: string, snapshot: { contents: string; revision: string; binary: boolean }) {
+  const state = createEditorState(snapshot.contents, view.state);
+  const tab: EditorTab = {
+    id: nextTabId++,
+    path,
+    suggestedName: null,
+    anchor: 0,
+    head: 0,
+    scrollTop: 0,
+    state,
+    savedDoc: state.doc,
+    revision: snapshot.revision,
+    dirty: false,
+    languageName: "",
+    problemRows: [],
+  };
+  const opened = tabRegistry.open(tab);
+  if (!opened.created) {
+    activateEditorTab(opened.tab);
+    return;
+  }
+  activateEditorTab(tab);
+  setWindowValue("talos.open-file", path);
+  await setLanguage(path);
+  renderDocumentTabs();
+}
+
+async function closeEditorTab(tab: EditorTab) {
+  if (tab.dirty) {
+    activateEditorTab(tab);
+    const choice = await askUnsavedChanges(`Save changes to ${fileNameFromPath(tab.path ?? tab.suggestedName ?? "Untitled")} before closing?`);
+    if (choice === "cancel") return;
+    if (choice === "save") {
+      await saveFile();
+      if (tab.dirty) return;
+    }
+  }
+  if (tab === activeTab) {
+    tab.state = view.state;
+    tab.scrollTop = view.scrollDOM.scrollTop;
+  }
+  const closingIndex = editorTabs.indexOf(tab);
+  if (closingIndex < 0) return;
+  tabRegistry.close(tab);
+  if (tab === activeTab) {
+    activeTab = null;
+    if (!editorTabs.length) {
+      showNewUntitledTab();
+      return;
+    }
+    activateEditorTab(editorTabs[Math.min(closingIndex, editorTabs.length - 1)]);
+  } else {
+    renderDocumentTabs();
+  }
+  scheduleEditorSessionSave();
+}
+
+function reopenEditorTab() {
+  const tab = tabRegistry.reopen();
+  if (!tab) return;
+  activateEditorTab(tab);
+}
+
+function switchEditorTab(direction: -1 | 1) {
+  const current = editorTabs.indexOf(activeTab!);
+  activateEditorTab(editorTabs[nextDocumentIndex(current, editorTabs.length, direction)]);
 }
 
 // ---------- Files ----------
 async function setLanguage(fileName: string) {
+  const target = activeTab;
+  if (!target) return;
   const desc = LanguageDescription.matchFilename(languages, fileNameFromPath(fileName));
   const support = desc ? await desc.load() : [];
-  view.dispatch({ effects: langCompartment.reconfigure(support) });
-  $("lang").textContent = desc ? desc.name : "Plain text";
-  setDiagnosticsLanguage(desc ? desc.name : "");
-  forceLinting(view);
+  target.state = target.state.update({
+    effects: langCompartment.reconfigure(support),
+  }).state;
+  target.languageName = desc ? desc.name : "";
+  if (target === activeTab) {
+    view.setState(target.state);
+    currentLanguageName = target.languageName;
+    setDiagnosticsLanguage(currentLanguageName);
+    $("lang").textContent = desc ? desc.name : "Plain text";
+    whenIdle(() => {
+      if (activeTab === target) forceLinting(view);
+    }, 350);
+    scheduleOutline();
+  }
 }
 
 async function loadPath(path: string) {
-  const text = await readText(path);
-  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
-  currentPath = path;
-  dirty = false;
-  refreshTitle();
-  await setLanguage(path);
+  // If the PDF is using the whole area, step aside instead of closing it —
+  // that keeps code, terminal/Ollama and the PDF usable at the same time.
+  if (isPdfFocused()) ($("pdf-focus") as HTMLButtonElement).click();
+  const existingIndex = findDocumentIndex(editorTabs, path);
+  if (existingIndex >= 0) {
+    activateEditorTab(editorTabs[existingIndex]);
+    await checkExternalFileRevision();
+    return;
+  }
+  const snapshot = await readFileSnapshot(path);
+  if (!snapshot) throw new Error(`The file no longer exists: ${path}`);
+  if (snapshot.binary) {
+    say(`Cannot open ${fileNameFromPath(path)}: this is a binary file. Talos opens UTF-8 text files in the editor.`);
+    return;
+  }
+  await openSnapshotInTab(path, snapshot);
 }
 
 async function openAny(path: string) {
-  if (fileNameFromPath(path).toLowerCase().endsWith(".pdf")) {
+  const name = fileNameFromPath(path).toLowerCase();
+  if (name.endsWith(".pdf")) {
+    closeHtmlPreview();
+    toggleOutline(false);
     await openPdf(path);
+    return;
+  }
+  if (/\.(png|jpe?g|webp|svg)$/.test(name)) {
+    await openCanvasUi(path);
     return;
   }
   await loadPath(path);
@@ -158,7 +1492,41 @@ async function openPdfDialog() {
     filters: [{ name: "PDF", extensions: ["pdf"] }],
   });
   if (typeof picked !== "string") return;
+  closeHtmlPreview();
+  toggleOutline(false);
   await openPdf(picked);
+}
+
+async function askFileConflict(path: string): Promise<"reload" | "overwrite" | "cancel"> {
+  const dialog = $("file-conflict-dialog") as HTMLDialogElement;
+  $("file-conflict-path").textContent = path;
+  dialog.showModal();
+  return new Promise((resolve) => {
+    dialog.addEventListener(
+      "close",
+      () => {
+        const choice = dialog.returnValue;
+        resolve(choice === "reload" || choice === "overwrite" ? choice : "cancel");
+      },
+      { once: true },
+    );
+  });
+}
+
+async function askUnsavedChanges(message: string): Promise<"save" | "discard" | "cancel"> {
+  $("close-confirm-message").textContent = message;
+  const dialog = $("close-confirm-dialog") as HTMLDialogElement;
+  dialog.showModal();
+  return new Promise((resolve) => {
+    dialog.addEventListener(
+      "close",
+      () => {
+        const choice = dialog.returnValue;
+        resolve(choice === "save" || choice === "discard" ? choice : "cancel");
+      },
+      { once: true },
+    );
+  });
 }
 
 async function saveFile(forceDialog = false) {
@@ -169,11 +1537,72 @@ async function saveFile(forceDialog = false) {
     if (!chosen) return;
     path = chosen;
   }
-  await writeText(path, view.state.doc.toString());
-  currentPath = path;
-  dirty = false;
-  refreshTitle();
-  await setLanguage(path);
+  if (path !== currentPath && findDocumentIndex(editorTabs, path) >= 0) {
+    throw new Error("That file is already open in another tab. Activate its tab before saving to it.");
+  }
+  const documentAtSave = view.state.doc;
+  let expectedRevision =
+    path === currentPath
+      ? diskRevision
+      : (await isAndroid() ? null : (await readFileSnapshot(path))?.revision ?? null);
+
+  while (true) {
+    const result: CheckedWriteResult = await writeText(
+      path,
+      documentAtSave.toString(),
+      expectedRevision,
+    );
+    if (result.status === "saved") {
+      currentPath = path;
+      if (activeTab) {
+        activeTab.path = path;
+        activeTab.suggestedName = null;
+        activeTab.revision = result.revision;
+      }
+      diskRevision = result.revision;
+      setWindowValue("talos.open-file", path);
+      savedDoc = documentAtSave;
+      dirty = !savedDoc.eq(view.state.doc);
+      if (activeTab) {
+        activeTab.savedDoc = savedDoc;
+        activeTab.dirty = dirty;
+        activeTab.state = view.state;
+      }
+      refreshTitle();
+      renderDocumentTabs();
+      scheduleEditorSessionSave();
+      await setLanguage(path);
+      return;
+    }
+
+    const choice = await askFileConflict(path);
+    if (choice === "cancel") return;
+    if (choice === "reload") {
+      if (!result.snapshot) {
+        say(`The file was deleted outside Talos: ${path}`);
+        return;
+      }
+      if (result.snapshot.binary) {
+        say(`Cannot reload ${fileNameFromPath(path)}: the file now contains binary data.`);
+        return;
+      }
+      replaceDocument(result.snapshot.contents, true);
+      currentPath = path;
+      if (activeTab) {
+        activeTab.path = path;
+        activeTab.suggestedName = null;
+        activeTab.revision = result.snapshot.revision;
+      }
+      diskRevision = result.snapshot.revision;
+      if (activeTab) activeTab.revision = diskRevision;
+      setWindowValue("talos.open-file", path);
+      refreshTitle();
+      await setLanguage(path);
+      say("Reloaded the newer file from disk.");
+      return;
+    }
+    expectedRevision = result.snapshot?.revision ?? null;
+  }
 }
 
 // ---------- Run + Output ----------
@@ -195,6 +1624,21 @@ async function runFile() {
   const selectedLanguage = ($("run-language") as HTMLSelectElement).value;
   const fileName = fileNameFromPath(currentPath ?? suggestedName ?? "");
   const extension = fileName.split(".").pop()?.toLowerCase();
+  if (extension === "html" || extension === "htm") {
+    showPanel(true);
+    showTab("output");
+    $("output").textContent = "";
+    appendOut("Previewing HTML in Talos. Inline CSS and JavaScript are supported.\n", "dim");
+    previewHtml();
+    return;
+  }
+  if (extension === "css") {
+    showPanel(true);
+    showTab("output");
+    $("output").textContent = "";
+    appendOut("CSS cannot run by itself. Add it to an HTML file's <style> block and tap Preview.\n", "err");
+    return;
+  }
   const inferredLanguage =
     extension === "py" ? "python" :
     extension === "js" || extension === "mjs" ? "javascript" :
@@ -214,7 +1658,7 @@ async function runFile() {
 
   if (android) {
     if (!language) {
-      appendOut("Choose a run language, or use a file with a .py, .c, .cpp, or .java extension.\n", "err");
+      appendOut("Choose a run language, or use a file with a .py, .js, .c, .cpp, or .java extension. Use Preview for HTML.\n", "err");
       return;
     }
     appendOut("Running locally with Termux...\n", "dim");
@@ -270,72 +1714,651 @@ async function guard(fn: () => Promise<void>) {
   }
 }
 
-// ---------- Editor ----------
-const view = new EditorView({
-  doc: "Welcome to Talos\n\nOpen a file with Ctrl+O, save with Ctrl+S, run with F5.\n",
-  extensions: [
-    Prec.highest(
-      keymap.of([
-        { key: "Mod-o", run: () => { void guard(openFile); return true; } },
-        { key: "Mod-s", run: () => { void guard(() => saveFile()); return true; } },
-        { key: "Mod-Shift-s", run: () => { void guard(() => saveFile(true)); return true; } },
-        { key: "F5", run: () => { void guard(runFile); return true; } },
-        { key: "Mod-Enter", run: () => { void guard(runFile); return true; } },
-        { key: "Mod-j", run: () => { togglePanel(); return true; } },
-      ])
-    ),
-    basicSetup,
-    themeCompartment.of(oneDark),
-    lintGutter(),
-    basicLinter(onDiagnostics),
-    langCompartment.of([]),
-    EditorView.updateListener.of((u) => {
-      if (u.docChanged) {
-        dirty = true;
-        refreshTitle();
+async function openNewWindow(initialPath: string | null = null, workspacePath: string | null = null) {
+  if (await isAndroid()) throw new Error("Additional windows are available in Talos Crest desktop.");
+  await invoke<string>("create_window", { initialPath, workspacePath });
+}
+
+async function openFolderInNewWindow() {
+  const picked = await open({ multiple: false, directory: true });
+  if (typeof picked === "string") await openNewWindow(null, picked);
+}
+
+async function openFileInNewWindow() {
+  const picked = await open({ multiple: false, directory: false });
+  if (typeof picked === "string") await openNewWindow(picked);
+}
+
+async function openCurrentWorkspaceInNewWindow() {
+  const workspace = getWindowValue("talos.workspace-root");
+  if (workspace) {
+    await openNewWindow(null, workspace);
+    return;
+  }
+  await openFolderInNewWindow();
+}
+
+async function showWindowSwitcher() {
+  const dialog = $("window-dialog") as HTMLDialogElement;
+  const list = $("window-list");
+  list.textContent = "";
+  const windows = await getAllWebviewWindows();
+  for (const nativeWindow of windows) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "workspace-result";
+    const title = await nativeWindow.title().catch(() => nativeWindow.label);
+    const name = document.createElement("span");
+    name.className = "workspace-result-name";
+    name.textContent = title;
+    const label = document.createElement("span");
+    label.className = "workspace-result-path";
+    label.textContent = nativeWindow.label;
+    button.append(name, label);
+    button.addEventListener("click", () => {
+      dialog.close();
+      void nativeWindow.setFocus().catch((error: unknown) => say(`Could not focus window: ${String(error)}`));
+    });
+    list.appendChild(button);
+  }
+  if (!windows.length) {
+    const status = document.createElement("div");
+    status.className = "workspace-dialog-status";
+    status.textContent = "No Talos windows are open.";
+    list.appendChild(status);
+  }
+  if (!dialog.open) dialog.showModal();
+}
+
+async function checkExternalFileRevision(tab: EditorTab | null = activeTab) {
+  if (!tab?.path || android || !tab.revision) return;
+  const snapshot = await readFileSnapshot(tab.path);
+  if (snapshot?.revision !== tab.revision) {
+    say(snapshot
+      ? `${tab.path} changed outside this editor. Saving will ask before replacing newer contents.`
+      : `${tab.path} was removed outside this editor.`);
+  }
+}
+
+async function finishWindowClose(discardUnsaved = false) {
+  if (discardUnsaved) {
+    for (const tab of editorTabs) {
+      if (tab.dirty) {
+        tab.dirty = false;
+        tab.savedDoc = tab.state.doc;
       }
-      const pos = u.state.selection.main.head;
-      const line = u.state.doc.lineAt(pos);
-      $("pos").textContent = "Ln " + line.number + ", Col " + (pos - line.from + 1);
-    }),
-  ],
+    }
+  }
+  persistEditorTabs();
+  await invoke("stop_project_watch");
+  await getCurrentWindow().destroy();
+}
+
+let closePromptOpen = false;
+
+async function handleWindowCloseRequest(event: { preventDefault: () => void }) {
+  event.preventDefault();
+  if (closePromptOpen) return;
+  closePromptOpen = true;
+
+  if (!editorTabs.some((tab) => tab.dirty)) {
+    try {
+      await finishWindowClose();
+    } catch (error) {
+      say(`Could not close the window cleanly: ${String(error)}`);
+      closePromptOpen = false;
+    }
+    return;
+  }
+
+  const dirtyCount = editorTabs.filter((tab) => tab.dirty).length;
+  const choice = await askUnsavedChanges(
+    `Save changes in ${dirtyCount} open document${dirtyCount === 1 ? "" : "s"} before closing this window?`,
+  );
+  if (choice === "save") {
+    try {
+      const activeId = activeTab?.id;
+      for (const tab of [...editorTabs]) {
+        if (!tab.dirty) continue;
+        activateEditorTab(tab);
+        await saveFile();
+        if (tab.dirty) {
+          if (activeId !== undefined) activateEditorTab(editorTabs.find((item) => item.id === activeId));
+          closePromptOpen = false;
+          return;
+        }
+      }
+      if (activeId !== undefined) activateEditorTab(editorTabs.find((item) => item.id === activeId));
+      await finishWindowClose();
+    } catch (error) {
+      say(`Could not save before closing: ${String(error)}`);
+      closePromptOpen = false;
+    }
+  } else if (choice === "discard") {
+    try {
+      await finishWindowClose(true);
+    } catch (error) {
+      say(`Could not close the window cleanly: ${String(error)}`);
+      closePromptOpen = false;
+    }
+  } else {
+    closePromptOpen = false;
+  }
+}
+
+// ---------- Editor ----------
+// Snippet packs are installed from the extension market. They are offered on
+// demand with Ctrl+Space so typing never pays for completion queries.
+function snippetCompletionSource(context: CompletionContext): CompletionResult | null {
+  const word = context.matchBefore(/[\w!#$@-]*/);
+  if (!word || (word.from === word.to && !context.explicit)) return null;
+  const candidates = new Set<string>();
+  if (currentLanguageName) candidates.add(currentLanguageName.trim().toLowerCase());
+  const filename = currentPath ?? suggestedName ?? "";
+  const dot = filename.lastIndexOf(".");
+  if (dot >= 0 && dot < filename.length - 1) {
+    candidates.add(filename.slice(dot + 1).toLowerCase());
+  }
+  const options = installedSnippets()
+    .filter((snippet) =>
+      !snippet.languages?.length ||
+      snippet.languages.some((language) => candidates.has(language.trim().toLowerCase()))
+    )
+    .map((snippet) =>
+      snippetCompletion(snippet.body, {
+        label: snippet.label?.trim() || snippet.prefix,
+        detail: snippet.description?.trim() || undefined,
+        type: "snippet",
+      })
+    );
+  if (!options.length) return null;
+  return { from: word.from, options, validFor: /^[\w!#$@-]*$/ };
+}
+
+// A trimmed copy of CodeMirror's basicSetup with typing-oriented tuning.
+// Language packages ship completion sources that otherwise run a query for
+// every word typed; completion stays available on demand with Ctrl+Space.
+const editorSetup = [
+  lineNumbers(),
+  highlightActiveLineGutter(),
+  highlightSpecialChars(),
+  history(),
+  foldGutter(),
+  drawSelection(),
+  dropCursor(),
+  EditorState.allowMultipleSelections.of(true),
+  indentOnInput(),
+  syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+  bracketMatching(),
+  closeBrackets(),
+  autocompletion({
+    activateOnTyping: false,
+    override: [snippetCompletionSource],
+    maxRenderedOptions: 50,
+  }),
+  rectangularSelection(),
+  crosshairCursor(),
+  highlightActiveLine(),
+  highlightSelectionMatches(),
+  // WebKit's spellchecker/autocorrect add input latency and are not useful for
+  // source code, so keep the platform from attaching them to the editor.
+  EditorView.contentAttributes.of({
+    spellcheck: "false",
+    autocorrect: "off",
+    autocapitalize: "off",
+    translate: "no",
+  }),
+  keymap.of([
+    ...closeBracketsKeymap,
+    ...defaultKeymap,
+    ...searchKeymap,
+    ...historyKeymap,
+    ...foldKeymap,
+    ...completionKeymap,
+    ...lintKeymap,
+  ]),
+];
+
+function createEditorState(doc: string, previous?: EditorState): EditorState {
+  return EditorState.create({
+    doc,
+    extensions: [
+      Prec.highest(keymap.of(editorShortcutBindings())),
+      editorSetup,
+      themeCompartment.of(previous ? themeCompartment.get(previous) ?? oneDark : oneDark),
+      wrapCompartment.of(wordWrap ? EditorView.lineWrapping : []),
+      lintGutter(),
+      basicLinter(onDiagnostics),
+      langCompartment.of(previous ? langCompartment.get(previous) ?? [] : []),
+      EditorView.updateListener.of((u) => {
+        if (activeTab) activeTab.state = u.state;
+        if (u.docChanged) {
+          // Only touch the title and tab strip when the dirty flag actually
+          // changes. Rebuilding them on every keystroke adds input latency.
+          const nextDirty = documentIsDirty(u.state.doc);
+          if (nextDirty !== dirty) {
+            dirty = nextDirty;
+            if (activeTab) activeTab.dirty = dirty;
+            refreshTitle();
+            syncActiveTabDirty();
+          }
+          scheduleOutline();
+        }
+        if (u.docChanged || u.selectionSet) {
+          scheduleEditorSessionSave();
+          scheduleEditorChrome();
+        }
+        if (searchPanelOpen(u.state)) {
+          const query = getSearchQuery(u.state);
+          const key = `${query.search}\0${query.caseSensitive}\0${query.wholeWord}\0${query.regexp}`;
+          if (u.docChanged || key !== searchCountKey) scheduleSearchCount();
+          searchCountKey = key;
+        } else {
+          searchCountKey = "";
+        }
+      }),
+    ],
+  });
+}
+
+let undoDisabled: boolean | null = null;
+let redoDisabled: boolean | null = null;
+
+function syncHistoryButtons(state: EditorState) {
+  const nextUndo = undoDepth(state) === 0;
+  if (nextUndo !== undoDisabled) {
+    undoDisabled = nextUndo;
+    ($("btn-undo") as HTMLButtonElement).disabled = nextUndo;
+  }
+  const nextRedo = redoDepth(state) === 0;
+  if (nextRedo !== redoDisabled) {
+    redoDisabled = nextRedo;
+    ($("btn-redo") as HTMLButtonElement).disabled = nextRedo;
+  }
+}
+
+// Cursor position and undo/redo buttons only need to be correct once per
+// frame. Coalescing them keeps fast typing from doing layout work per key.
+let chromeFrame = 0;
+let chromePosition = "";
+
+function scheduleEditorChrome() {
+  if (chromeFrame) return;
+  chromeFrame = window.requestAnimationFrame(() => {
+    chromeFrame = 0;
+    const state = view.state;
+    const pos = state.selection.main.head;
+    const line = state.doc.lineAt(pos);
+    const text = "Ln " + line.number + ", Col " + (pos - line.from + 1);
+    if (text !== chromePosition) {
+      chromePosition = text;
+      $("pos").textContent = text;
+    }
+    syncHistoryButtons(state);
+  });
+}
+
+function replaceDocument(doc: string, saved: boolean) {
+  const state = createEditorState(doc, view.state);
+  savedDoc = saved ? state.doc : null;
+  dirty = !saved;
+  if (activeTab) {
+    activeTab.state = state;
+    activeTab.savedDoc = savedDoc;
+    activeTab.dirty = dirty;
+    activeTab.revision = saved ? diskRevision : null;
+  }
+  view.setState(state);
+  syncHistoryButtons(view.state);
+  renderDocumentTabs();
+  scheduleEditorSessionSave();
+}
+
+registerShortcuts(SHORTCUTS);
+
+view = new EditorView({
+  state: createEditorState(
+    "Welcome to Talos\n\nOpen a file with Ctrl+O, save with Ctrl+S, run with F5.\n"
+  ),
   parent: $("editor"),
 });
+savedDoc = view.state.doc;
+activeTab = {
+  id: nextTabId++,
+  path: null,
+  suggestedName: null,
+  anchor: 0,
+  head: 0,
+  scrollTop: 0,
+  state: view.state,
+  savedDoc,
+  revision: null,
+  dirty: false,
+  languageName: "",
+  problemRows: [],
+};
+tabRegistry.open(activeTab);
+renderDocumentTabs();
+view.scrollDOM.addEventListener("scroll", () => {
+  if (activeTab) activeTab.scrollTop = view.scrollDOM.scrollTop;
+  scheduleEditorSessionSave();
+}, { passive: true });
+syncHistoryButtons(view.state);
 
 // ---------- Buttons ----------
 $("btn-open").addEventListener("click", () => void guard(openFile));
+$("btn-new-window").addEventListener("click", () => void guard(() => openNewWindow()));
+$("btn-open-folder-new").addEventListener("click", () => void guard(openFolderInNewWindow));
+$("btn-open-file-new").addEventListener("click", () => void guard(openFileInNewWindow));
+$("btn-workspace-new").addEventListener("click", () => void guard(openCurrentWorkspaceInNewWindow));
+$("btn-window-switcher").addEventListener("click", () => void guard(showWindowSwitcher));
+($("restore-session-on-startup") as HTMLInputElement).checked =
+  localStorage.getItem("talos.restore-session") === "true" ||
+  localStorage.getItem("talos.restore-last-file") === "true";
+$("restore-session-on-startup").addEventListener("change", (event) => {
+  const enabled = (event.currentTarget as HTMLInputElement).checked;
+  localStorage.setItem("talos.restore-session", String(enabled));
+  if (enabled) scheduleEditorSessionSave();
+  else removeWindowValue("talos.editor-session");
+});
+$("window-dialog-close").addEventListener("click", () =>
+  ($("window-dialog") as HTMLDialogElement).close(),
+);
+$("close-save").addEventListener("click", () =>
+  ($("close-confirm-dialog") as HTMLDialogElement).close("save"),
+);
+$("close-discard").addEventListener("click", () =>
+  ($("close-confirm-dialog") as HTMLDialogElement).close("discard"),
+);
+$("close-cancel").addEventListener("click", () =>
+  ($("close-confirm-dialog") as HTMLDialogElement).close("cancel"),
+);
+$("file-conflict-cancel").addEventListener("click", () =>
+  ($("file-conflict-dialog") as HTMLDialogElement).close("cancel"),
+);
+$("file-conflict-reload").addEventListener("click", () =>
+  ($("file-conflict-dialog") as HTMLDialogElement).close("reload"),
+);
+$("file-conflict-overwrite").addEventListener("click", () =>
+  ($("file-conflict-dialog") as HTMLDialogElement).close("overwrite"),
+);
 $("btn-pdf").addEventListener("click", () => void guard(openPdfDialog));
+$("btn-calc").addEventListener("click", () => void guard(() => openCalcUi(currentSelection())));
+$("calc-dialog").addEventListener("close", () => view.focus());
+$("btn-canvas").addEventListener("click", () => void guard(() => openCanvasUi()));
+document.addEventListener("talos:canvas-close", () => view.focus());
+$("btn-outline").addEventListener("click", () => toggleOutline());
+$("outline-close").addEventListener("click", () => toggleOutline(false));
+$("outline-refresh").addEventListener("click", renderOutline);
+$("outline-search").addEventListener("input", scheduleOutlineFilter);
+$("goto-line-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const input = $("goto-line-input") as HTMLInputElement;
+  const line = parseLineNumber(input.value, view.state.doc.lines);
+  if (line === null) {
+    $("goto-line-status").textContent = `Enter a line from 1 to ${view.state.doc.lines}.`;
+    input.focus();
+    return;
+  }
+  const position = view.state.doc.line(line).from;
+  view.dispatch({ selection: { anchor: position }, scrollIntoView: true });
+  ($("goto-line-dialog") as HTMLDialogElement).close();
+  view.focus();
+});
+for (const dialogId of ["goto-line-dialog", "symbol-dialog"]) {
+  $(dialogId).addEventListener("close", () => view.focus());
+}
+$("symbol-search").addEventListener("input", () => {
+  symbolPickerIndex = 0;
+  scheduleSymbolFilter();
+});
+$("symbol-search").addEventListener("keydown", (event) => {
+  if (!["ArrowDown", "ArrowUp", "Enter"].includes(event.key)) return;
+  flushSymbolFilter();
+  const rows = [...$("symbol-results").querySelectorAll<HTMLButtonElement>(".workspace-result")];
+  if (event.key === "Enter") {
+    event.preventDefault();
+    rows[symbolPickerIndex]?.click();
+    return;
+  }
+  if (!rows.length) return;
+  event.preventDefault();
+  symbolPickerIndex =
+    (symbolPickerIndex + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length;
+  rows.forEach((row, index) => {
+    row.classList.toggle("active", index === symbolPickerIndex);
+    row.setAttribute("aria-selected", String(index === symbolPickerIndex));
+  });
+  rows[symbolPickerIndex].scrollIntoView({ block: "nearest" });
+});
+$("symbol-dialog-close").addEventListener("click", () =>
+  ($("symbol-dialog") as HTMLDialogElement).close(),
+);
+$("btn-undo").addEventListener("click", () => {
+  undo(view);
+  view.focus();
+});
+$("btn-redo").addEventListener("click", () => {
+  redo(view);
+  view.focus();
+});
 $("btn-save").addEventListener("click", () => void guard(() => saveFile()));
 $("btn-saveas").addEventListener("click", () => void guard(() => saveFile(true)));
 $("btn-run").addEventListener("click", () => void guard(runFile));
+$("btn-preview").addEventListener("click", previewHtml);
+$("btn-preview-close").addEventListener("click", closeHtmlPreview);
 $("btn-panel").addEventListener("click", togglePanel);
 $("btn-panel-close").addEventListener("click", () => showPanel(false));
+$("btn-panel-max").addEventListener("click", () =>
+  setPanelMaximized(!$("editor-region").classList.contains("panel-maximized"))
+);
+$("problems-severity").addEventListener("change", () => renderProblems());
+$("theme-select").addEventListener("change", () => {
+  const id = ($("theme-select") as HTMLSelectElement).value as BuiltinThemeId;
+  void clearExtensionThemePreference()
+    .then(() => applyBuiltinTheme(id))
+    .catch((e: unknown) => say("Could not save theme preference: " + String(e)));
+});
+$("editor-font").addEventListener("change", () => {
+  const font = ($("editor-font") as HTMLSelectElement).value;
+  applyEditorFont(font);
+  localStorage.setItem("talos.editor-font", font);
+});
+installGlobalShortcuts();
+initShortcutsUi();
+$("btn-shortcuts").addEventListener("click", openShortcutsDialog);
+void getCurrentWindow()
+  .onCloseRequested(async (event) => {
+    await handleWindowCloseRequest(event);
+  })
+  .catch((error: unknown) => say(`Could not guard window close: ${String(error)}`));
+document.addEventListener("talos:side-pane-change", syncSidePane);
+document.addEventListener("talos:pdf-focus-change", () => view?.requestMeasure?.());
+const storedPanelSize = Number(getWindowValue("talos.panel-size"));
+if (!Number.isFinite(storedPanelSize) || storedPanelSize < 280) {
+  setWindowValue("talos.panel-size", "280");
+}
+installWorkspaceResizers();
+applyBuiltinTheme(activeBuiltinTheme, false);
+applyEditorFont(localStorage.getItem("talos.editor-font") ?? "default");
+applyEditorFontSize(editorFontSize);
 $("btn-fun").addEventListener("click", () => {
   funMode = !funMode;
   $("btn-fun").textContent = funMode ? "Fun mode: on" : "Fun mode: off";
   if (lastReading) renderMeter(lastReading);
 });
 for (const b of document.querySelectorAll<HTMLElement>("[data-tab]")) {
-  b.addEventListener("click", () => showTab(b.dataset.tab === "output" ? "output" : "problems"));
+  b.addEventListener("click", () => {
+    const tab = b.dataset.tab as BottomTab | undefined;
+    if (tab && tab in bottomViews) showTab(tab);
+  });
+}
+initPdfPane();
+initArchitectureExplorer(openAny, (oldPath, newPath) => {
+  if (!currentPath) return;
+  const normalize = (path: string) => path.replace(/\\/g, "/").replace(/\/$/, "");
+  const normalizedOld = normalize(oldPath);
+  const normalizedCurrent = normalize(currentPath);
+  if (normalizedCurrent !== normalizedOld && !normalizedCurrent.startsWith(`${normalizedOld}/`)) return;
+  if (newPath) {
+    currentPath = newPath + normalizedCurrent.slice(normalizedOld.length);
+    if (activeTab) activeTab.path = currentPath;
+  } else {
+    currentPath = null;
+    savedDoc = null;
+    dirty = true;
+    if (activeTab) {
+      activeTab.path = null;
+      activeTab.savedDoc = null;
+      activeTab.dirty = true;
+    }
+  }
+  refreshTitle();
+  renderDocumentTabs();
+}, (path) => {
+  const normalize = (value: string) => value.replace(/\\/g, "/");
+  if (!currentPath || normalize(currentPath) !== normalize(path)) return null;
+  return {
+    modified: dirty,
+    errors: problemRows.filter((row) => row.severity === "error").length,
+    warnings: problemRows.filter((row) => row.severity === "warning").length,
+  };
+});
+function updateWorkspaceLabel() {
+  const workspace = getWindowValue("talos.workspace-root");
+  const label = workspace?.replace(/[\\/]+$/, "").split(/[\\/]/).pop();
+  $("workspace-name").textContent = label ?? "No workspace";
+  $("btn-workspace").title = workspace ? `Workspace: ${workspace}` : "Choose workspace";
 }
 
-initPdfPane();
+function setActiveNav(view: string) {
+  for (const button of document.querySelectorAll<HTMLElement>("#activity-bar [data-view]")) {
+    button.classList.toggle("active", button.dataset.view === view);
+  }
+}
+
+updateWorkspaceLabel();
+document.addEventListener("talos:workspace-change", updateWorkspaceLabel);
+document.addEventListener("talos:open-path", (event) => {
+  const path = (event as CustomEvent<string>).detail;
+  if (typeof path === "string") void guard(() => openAny(path));
+});
+$("btn-workspace").addEventListener("click", () => void guard(() => chooseWorkspace()));
+$("breadcrumb-root").addEventListener("click", () => openObservatory());
+$("btn-command-palette").addEventListener("click", () => openCommandPalette());
+
+const activityBar = $("activity-bar");
+const activityToggle = $("btn-activity-toggle");
+activityBar.classList.toggle("expanded", getWindowValue("talos.activity-bar-expanded") === "true");
+activityToggle.title = activityBar.classList.contains("expanded") ? "Collapse navigation" : "Expand navigation";
+activityToggle.addEventListener("click", () => {
+  const expanded = activityBar.classList.toggle("expanded");
+  setWindowValue("talos.activity-bar-expanded", String(expanded));
+  activityToggle.title = expanded ? "Collapse navigation" : "Expand navigation";
+});
+
+for (const button of document.querySelectorAll<HTMLElement>("#activity-bar [data-view]")) {
+  button.addEventListener("click", () => {
+    const view = button.dataset.view;
+    if (button.getAttribute("aria-disabled") === "true") {
+      say("Source Control is not available in this build.");
+      return;
+    }
+    switch (view) {
+      case "explorer":
+        $("btn-architecture").click();
+        setActiveNav(view);
+        break;
+      case "search":
+        openQuickOpen();
+        setActiveNav(view);
+        break;
+      case "run":
+        showPanel(true);
+        showTab("output");
+        $("btn-run").focus();
+        setActiveNav(view);
+        break;
+      case "extensions":
+        $("btn-ext").click();
+        setActiveNav(view);
+        break;
+      case "chronicle":
+        void guard(() => openChronicleUi());
+        setActiveNav(view);
+        break;
+      case "observatory":
+        openObservatory();
+        setActiveNav(view);
+        break;
+      case "canvas":
+        void openCanvasUi();
+        setActiveNav(view);
+        break;
+      case "calc":
+        void openCalcUi();
+        setActiveNav(view);
+        break;
+    }
+  });
+}
+
+if (getWindowValue("talos.panel-visible") === "false") showPanel(false, false);
+if (
+  getWindowValue("talos.panel-maximized") === "true" &&
+  getWindowValue("talos.panel-visible") !== "false"
+) {
+  setPanelMaximized(true);
+}
+const savedPanelTab = getWindowValue("talos.bottom-panel-tab");
+if (savedPanelTab && savedPanelTab in bottomViews) showTab(savedPanelTab as BottomTab);
+if (getWindowValue("talos.outline-visible") === "true") toggleOutline(true);
+document.addEventListener("talos:workspace-change", refreshTitle);
+void listen<FileSavedNotice>("talos://file-saved", (event) => {
+  if (event.payload.owner !== getCurrentWindow().label) {
+    const changedTab = editorTabs.find((tab) =>
+      tab.path && documentKey(tab.path) === documentKey(event.payload.path) &&
+      tab.revision !== event.payload.revision,
+    );
+    if (changedTab) {
+      say(`${changedTab.path} was saved by another Talos window. Saving here will require confirmation.`);
+    }
+  }
+}).catch((error: unknown) => say(`Could not subscribe to file changes: ${String(error)}`));
+void listen<string>("architecture://changed", (event) => {
+  const normalize = (path: string) => path.replace(/\\/g, "/");
+  const root = normalize(event.payload).replace(/\/$/, "");
+  const changedTabs = editorTabs.filter((tab) => {
+    if (!tab.path) return false;
+    const path = normalize(tab.path);
+    return path === root || path.startsWith(`${root}/`);
+  });
+  if (!changedTabs.length) return;
+  if (externalCheckTimer) window.clearTimeout(externalCheckTimer);
+  externalCheckTimer = window.setTimeout(() => {
+    externalCheckTimer = 0;
+    void Promise.all(changedTabs.map((tab) => checkExternalFileRevision(tab))).catch((error: unknown) => {
+      say(`Could not check open files for external changes: ${String(error)}`);
+    });
+  }, 250);
+}).catch((error: unknown) => say(`Could not subscribe to workspace file changes: ${String(error)}`));
 void initExtensions({
   setTheme: (def: ThemeDef | null) => {
     if (def) {
-      view.dispatch({ effects: themeCompartment.reconfigure(buildTheme(def)) });
+      reconfigureTabThemes(buildTheme(def));
       applyUi(def.ui ?? {});
+      ($("theme-select") as HTMLSelectElement).value = "extension";
+      localStorage.setItem(themeMigrationKey, "2");
     } else {
-      view.dispatch({ effects: themeCompartment.reconfigure(oneDark) });
-      resetUi();
+      applyBuiltinTheme(activeBuiltinTheme, false);
     }
   },
   newFromTemplate: async (filename: string, content: string) => {
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: content } });
     currentPath = null;
+    diskRevision = null;
     suggestedName = filename;
+    showNewUntitledTab(filename, content);
     await setLanguage(filename);
-    dirty = true;
     refreshTitle();
     view.focus();
   },
@@ -354,7 +2377,8 @@ void isAndroid()
     android = isMobile;
     if (android) {
       productName = "Talos Pocket";
-      $("brand").textContent = "TALOS POCKET";
+      $("brand").querySelector(".brand-name")!.textContent = "TALOS POCKET";
+      $("window-controls").classList.add("hidden");
       refreshTitle();
       runButton.textContent = "▶ Run";
       runButton.title = "Run Python, C, C++, or Java locally through Termux.";
@@ -364,6 +2388,32 @@ void isAndroid()
     say("Could not detect platform: " + String(e));
   });
 
-invoke<string | null>("startup_file").then((p) => {
-  if (p) void guard(() => openAny(p));
-});
+async function initializeWindowContext() {
+  try {
+    const context = await invoke<WindowContext>("take_window_context");
+    if (context.workspacePath) openWorkspace(context.workspacePath);
+
+    let path = context.initialPath;
+    if (!path && getCurrentWindow().label === "main") {
+      path = await invoke<string | null>("startup_file");
+    }
+    const restoreEnabled =
+      getCurrentWindow().label === "main" &&
+      ($("restore-session-on-startup") as HTMLInputElement).checked;
+    const restored = restoreEnabled ? await restoreEditorSession() : false;
+    if (!path && restoreEnabled && !restored) {
+      path = getWindowValue("talos.open-file");
+    }
+    if (path) {
+      try {
+        await openAny(path);
+      } catch (error) {
+        say(`Could not restore ${path}: ${String(error)}`);
+      }
+    }
+  } catch (error) {
+    say(`Could not initialize this window: ${String(error)}`);
+  }
+}
+
+void initializeWindowContext();

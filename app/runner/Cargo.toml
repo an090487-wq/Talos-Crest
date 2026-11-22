@@ -1,0 +1,13 @@
+[package]
+name = "tauri-plugin-runner"
+version = "0.1.0"
+edition = "2024"
+links = "tauri-plugin-runner"
+build = "build.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+tauri = "2"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
