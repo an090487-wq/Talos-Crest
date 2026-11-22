@@ -1,0 +1,18 @@
+{
+  "id": "db-migration-template",
+  "name": "Migration Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for migration template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Migration",
+      "filename": "001_add_table.sql",
+      "content": "-- Migration: ${1:name}\n-- Up\nCREATE TABLE ${2:table} (\n  id INTEGER PRIMARY KEY,\n  ${3:column} TEXT NOT NULL\n);\n\n-- Down\n-- DROP TABLE ${2:table};|README.md\n"
+    }
+  ]
+}

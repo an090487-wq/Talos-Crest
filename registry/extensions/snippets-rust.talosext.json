@@ -1,0 +1,100 @@
+{
+  "id": "snippets-rust",
+  "name": "Rust Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Free, MIT-licensed snippets for Rust: functions, structs, impl blocks, matches, tests, and derives.",
+  "license": "MIT",
+  "snippets": [
+    {
+      "prefix": "main",
+      "label": "fn main()",
+      "description": "Rust entry point",
+      "body": "fn main() {\n    ${0:}\n}",
+      "languages": [
+        "rust",
+        "rs",
+        "Rust"
+      ]
+    },
+    {
+      "prefix": "fn",
+      "label": "fn ...",
+      "description": "Function definition",
+      "body": "fn ${1:name}(${2:args})${3: -> ${4:Type}} {\n    ${0:}\n}",
+      "languages": [
+        "rust",
+        "rs",
+        "Rust"
+      ]
+    },
+    {
+      "prefix": "struct",
+      "label": "struct",
+      "description": "Struct definition",
+      "body": "struct ${1:Name} {\n    ${2:field}: ${3:Type},\n}",
+      "languages": [
+        "rust",
+        "rs",
+        "Rust"
+      ]
+    },
+    {
+      "prefix": "impl",
+      "label": "impl",
+      "description": "Impl block",
+      "body": "impl ${1:Name} {\n    fn ${2:new}(${3:args}) -> Self {\n        ${0:Self { ${4:field}: ${5:value} }}\n    }\n}",
+      "languages": [
+        "rust",
+        "rs",
+        "Rust"
+      ]
+    },
+    {
+      "prefix": "match",
+      "label": "match",
+      "description": "Match expression",
+      "body": "match ${1:value} {\n    ${2:Pattern} => ${3:result},\n    _ => ${0:fallback},\n}",
+      "languages": [
+        "rust",
+        "rs",
+        "Rust"
+      ]
+    },
+    {
+      "prefix": "iflet",
+      "label": "if let",
+      "description": "If-let expression",
+      "body": "if let ${1:Some(value)} = ${2:option} {\n    ${0:}\n}",
+      "languages": [
+        "rust",
+        "rs",
+        "Rust"
+      ]
+    },
+    {
+      "prefix": "test",
+      "label": "#[test]",
+      "description": "Unit test",
+      "body": "#[test]\nfn test_${1:name}() {\n    assert_eq!(${2:actual}, ${0:expected});\n}",
+      "languages": [
+        "rust",
+        "rs",
+        "Rust"
+      ]
+    },
+    {
+      "prefix": "derive",
+      "label": "#[derive(...)]",
+      "description": "Derive macro",
+      "body": "#[derive(${1:Debug, Clone})]\n${0:struct ${2:Name};}",
+      "languages": [
+        "rust",
+        "rs",
+        "Rust"
+      ]
+    }
+  ]
+}

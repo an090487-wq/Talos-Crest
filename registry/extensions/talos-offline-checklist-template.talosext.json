@@ -1,0 +1,18 @@
+{
+  "id": "talos-offline-checklist-template",
+  "name": "Offline Checklist",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for offline checklist.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Offline checklist",
+      "filename": "OFFLINE.md",
+      "content": "# Offline checklist\n\n- [ ] Bundled registry loads without network\n- [ ] Language assets and registry are present\n- [ ] No extension requires a remote service to install\n- [ ] External executables are documented\n- [ ] Editor, Canvas, and Calc still work offline\n- [ ] Release bundle contains only local resources\n"
+    }
+  ]
+}

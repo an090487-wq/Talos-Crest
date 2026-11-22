@@ -1,0 +1,18 @@
+{
+  "id": "prod-code-review-template",
+  "name": "Code Review Checklist",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for code review checklist.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Review checklist",
+      "filename": "REVIEW.md",
+      "content": "# Review checklist\n\n- [ ] Change matches the stated goal\n- [ ] No unrelated rewrites\n- [ ] Error paths are handled\n- [ ] Tests cover the behavior\n- [ ] No secrets or credentials\n- [ ] Performance impact is measured\n"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "ai-pytorch-snippets",
+  "name": "PyTorch Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for pytorch snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "tensor",
+      "label": "Tensor",
+      "description": "import torch\\nx = torch.tensor(${1:[1.0, 2.0]})|model",
+      "body": "Linear model",
+      "languages": [
+        "python"
+      ]
+    }
+  ]
+}

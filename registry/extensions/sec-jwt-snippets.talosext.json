@@ -1,0 +1,24 @@
+{
+  "id": "sec-jwt-snippets",
+  "name": "JWT Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for jwt snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "decode",
+      "label": "Decode JWT payload",
+      "description": "const [, payload] = token.split('.');\\nconst claims = JSON.parse(atob(payload));|expiry",
+      "body": "Check expiry",
+      "languages": [
+        "javascript",
+        "typescript",
+        "python"
+      ]
+    }
+  ]
+}

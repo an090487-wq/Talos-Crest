@@ -1,0 +1,18 @@
+{
+  "id": "web-svelte-template",
+  "name": "Svelte Starter",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for svelte starter.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Svelte component",
+      "filename": "App.svelte",
+      "content": "<script lang=\\\"ts\\\">\n  let count = 0;\n</script>\n<button on:click={() => count++}>Count {count}</button>|main.ts\n"
+    }
+  ]
+}

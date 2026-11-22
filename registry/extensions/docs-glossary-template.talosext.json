@@ -1,0 +1,18 @@
+{
+  "id": "docs-glossary-template",
+  "name": "Glossary Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for glossary template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Glossary",
+      "filename": "GLOSSARY.md",
+      "content": "# Glossary\n\n## ${1:Term}\n${2:Definition}\n\n## ${3:Term}\n${4:Definition}\n\nUse plain language and avoid repeating jargon across pages.\n"
+    }
+  ]
+}

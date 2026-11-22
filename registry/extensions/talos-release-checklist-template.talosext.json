@@ -1,0 +1,18 @@
+{
+  "id": "talos-release-checklist-template",
+  "name": "Release Checklist",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for release checklist.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Release checklist",
+      "filename": "RELEASE.md",
+      "content": "# Release checklist\n\n- [ ] npx tsc --noEmit\n- [ ] npm test\n- [ ] npm run build\n- [ ] cargo check -p talos-gui\n- [ ] git diff --check\n- [ ] AppImage built and checksummed\n- [ ] Offline socket/resource check repeated\n- [ ] Installed copy checksum matches\n"
+    }
+  ]
+}

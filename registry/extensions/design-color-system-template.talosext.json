@@ -1,0 +1,18 @@
+{
+  "id": "design-color-system-template",
+  "name": "Color System Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for color system template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Color tokens",
+      "filename": "colors.css",
+      "content": ":root {\n  --color-bg: ${1:#101519};\n  --color-panel: ${2:#1c262c};\n  --color-text: ${3:#e7eef1};\n  --color-muted: ${4:#94a4ad};\n  --color-accent: ${5:#42c7b5};\n  --color-success: ${6:#67c995};\n  --color-warning: ${7:#e5b567};\n  --color-error: ${8:#e47777};\n}|COLORS.md\n"
+    }
+  ]
+}

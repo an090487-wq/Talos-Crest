@@ -1,0 +1,18 @@
+{
+  "id": "prod-issue-template-template",
+  "name": "Issue Template Starter",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for issue template starter.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Issue template",
+      "filename": "ISSUE_TEMPLATE.md",
+      "content": "## Summary\n\n## Steps to reproduce\n\n## Expected behavior\n\n## Actual behavior\n\n## Environment\n- OS:\n- Talos version:\n- Workspace:\n"
+    }
+  ]
+}

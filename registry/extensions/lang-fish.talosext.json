@@ -1,0 +1,21 @@
+{
+  "id": "lang-fish",
+  "name": "Fish script support",
+  "kind": "language",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Adds Run support for Fish script support files (user-approved command).",
+  "license": "MIT",
+  "free": true,
+  "language": {
+    "id": "lang-fish",
+    "name": "Fish script support",
+    "extensions": [
+      ".fish"
+    ],
+    "run": "fish {file}",
+    "build": null,
+    "paths": []
+  }
+}

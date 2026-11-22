@@ -1,0 +1,23 @@
+{
+  "id": "linux-journalctl-snippets",
+  "name": "journalctl Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for journalctl snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "unit",
+      "label": "Unit logs",
+      "description": "journalctl -u ${1:service} -f|since",
+      "body": "Since time",
+      "languages": [
+        "bash",
+        "sh"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "id": "snippets-html",
+  "name": "HTML Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Free, MIT-licensed snippets for HTML5: document skeleton, semantic tags, forms, media, and scripts.",
+  "license": "MIT",
+  "snippets": [
+    {
+      "prefix": "html5",
+      "label": "HTML5 document",
+      "description": "Full HTML5 document skeleton",
+      "body": "<!doctype html>\n<html lang=\"${1:en}\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>${2:Title}</title>\n</head>\n<body>\n  ${0}\n</body>\n</html>",
+      "languages": [
+        "html",
+        "htm",
+        "HTML"
+      ]
+    },
+    {
+      "prefix": "div",
+      "label": "<div>",
+      "description": "Div container",
+      "body": "<div class=\"${1:class}\">\n  ${0}\n</div>",
+      "languages": [
+        "html",
+        "htm",
+        "HTML"
+      ]
+    },
+    {
+      "prefix": "script",
+      "label": "<script>",
+      "description": "Inline script block",
+      "body": "<script>\n  ${0}\n</script>",
+      "languages": [
+        "html",
+        "htm",
+        "HTML"
+      ]
+    },
+    {
+      "prefix": "style",
+      "label": "<style>",
+      "description": "Inline style block",
+      "body": "<style>\n  ${0}\n</style>",
+      "languages": [
+        "html",
+        "htm",
+        "HTML"
+      ]
+    },
+    {
+      "prefix": "form",
+      "label": "<form>",
+      "description": "Form with submit button",
+      "body": "<form action=\"${1:action}\" method=\"${2:post}\">\n  ${3:<!-- fields -->}\n  <button type=\"submit\">${0:Submit}</button>\n</form>",
+      "languages": [
+        "html",
+        "htm",
+        "HTML"
+      ]
+    },
+    {
+      "prefix": "img",
+      "label": "<img>",
+      "description": "Responsive image",
+      "body": "<img src=\"${1:src}\" alt=\"${2:description}\" width=\"${3:640}\" height=\"${4:480}\">",
+      "languages": [
+        "html",
+        "htm",
+        "HTML"
+      ]
+    },
+    {
+      "prefix": "button",
+      "label": "<button>",
+      "description": "Button element",
+      "body": "<button type=\"${1:button}\" id=\"${2:id}\">${0:Label}</button>",
+      "languages": [
+        "html",
+        "htm",
+        "HTML"
+      ]
+    },
+    {
+      "prefix": "table",
+      "label": "<table>",
+      "description": "Basic table",
+      "body": "<table>\n  <thead><tr><th>${1:Header}</th></tr></thead>\n  <tbody><tr><td>${0:Cell}</td></tr></tbody>\n</table>",
+      "languages": [
+        "html",
+        "htm",
+        "HTML"
+      ]
+    }
+  ]
+}

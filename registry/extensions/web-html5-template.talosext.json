@@ -1,0 +1,18 @@
+{
+  "id": "web-html5-template",
+  "name": "HTML5 Starter",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for html5 starter.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "HTML5 page",
+      "filename": "index.html",
+      "content": "<!doctype html>\n<html lang=\\\"en\\\">\n<head>\n  <meta charset=\\\"utf-8\\\">\n  <meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1\\\">\n  <title>New page</title>\n  <link rel=\\\"stylesheet\\\" href=\\\"app.css\\\">\n</head>\n<body>\n  <main>\n    <h1>Hello, Talos</h1>\n  </main>\n  <script src=\\\"app.js\\\" defer></script>\n</body>\n</html>|app.css\n"
+    }
+  ]
+}

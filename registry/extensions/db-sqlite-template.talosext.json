@@ -1,0 +1,18 @@
+{
+  "id": "db-sqlite-template",
+  "name": "SQLite Project Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for sqlite project template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "SQLite schema",
+      "filename": "schema.sql",
+      "content": "PRAGMA foreign_keys = ON;\nCREATE TABLE IF NOT EXISTS ${1:items} (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL,\n  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\n);|queries.sql\n"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "docs-rfc-template",
+  "name": "RFC Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for rfc template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "RFC document",
+      "filename": "RFC.md",
+      "content": "# RFC: ${1:Title}\n\n## Status\n${2:Draft}\n\n## Summary\n${3:Summary}\n\n## Motivation\n${4:Motivation}\n\n## Proposed design\n${5:Design}\n\n## Alternatives\n${6:Alternatives}\n\n## Risks\n${7:Risks}\n\n## Rollout\n${8:Rollout}\n"
+    }
+  ]
+}

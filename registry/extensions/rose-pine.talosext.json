@@ -1,0 +1,39 @@
+{
+  "id": "rose-pine",
+  "kind": "theme",
+  "name": "Rosé Pine",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "A muted dusk palette with rose, iris, and pine accents.",
+  "theme": {
+    "dark": true,
+    "ui": {
+      "--bg": "#191724",
+      "--panel": "#1f1d2e",
+      "--line": "#393552",
+      "--text": "#e0def4",
+      "--muted": "#908caa",
+      "--bronze": "#ebbcba"
+    },
+    "editor": {
+      "background": "#191724",
+      "foreground": "#e0def4",
+      "selection": "#393552",
+      "cursor": "#ebbcba",
+      "gutterBackground": "#191724",
+      "gutterForeground": "#797593",
+      "activeLine": "#1f1d2e"
+    },
+    "syntax": {
+      "keyword": "#c4a7e7",
+      "string": "#f6c177",
+      "comment": "#797593",
+      "number": "#eb6f92",
+      "function": "#9ccfd8",
+      "type": "#3e8fb0",
+      "variable": "#e0def4",
+      "operator": "#c4a7e7",
+      "constant": "#f6c177"
+    }
+  }
+}

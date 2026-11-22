@@ -1,0 +1,18 @@
+{
+  "id": "docs-adr-template",
+  "name": "Architecture Decision Record",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for architecture decision record.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "ADR",
+      "filename": "0001-decision.md",
+      "content": "# ADR 0001: ${1:Title}\n\n- Status: ${2:Accepted}\n- Date: ${3:YYYY-MM-DD}\n\n## Context\n${4:Context}\n\n## Decision\n${5:Decision}\n\n## Consequences\n${6:Consequences}\n\n## Alternatives\n${7:Alternatives}\n"
+    }
+  ]
+}

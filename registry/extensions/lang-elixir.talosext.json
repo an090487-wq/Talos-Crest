@@ -1,0 +1,21 @@
+{
+  "id": "lang-elixir",
+  "name": "Elixir support",
+  "kind": "language",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Adds Run support for Elixir support files (user-approved command).",
+  "license": "MIT",
+  "free": true,
+  "language": {
+    "id": "lang-elixir",
+    "name": "Elixir support",
+    "extensions": [
+      ".exs"
+    ],
+    "run": "elixir {file}",
+    "build": null,
+    "paths": []
+  }
+}

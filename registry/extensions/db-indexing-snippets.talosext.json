@@ -1,0 +1,22 @@
+{
+  "id": "db-indexing-snippets",
+  "name": "Indexing Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for indexing snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "single",
+      "label": "Single-column index",
+      "description": "CREATE INDEX ${1:idx} ON ${2:table} (${3:column});|composite",
+      "body": "Composite index",
+      "languages": [
+        "sql"
+      ]
+    }
+  ]
+}

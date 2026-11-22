@@ -1,0 +1,18 @@
+{
+  "id": "sec-dependency-audit-template",
+  "name": "Dependency Audit Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Checklist for running locally installed dependency-audit tools; Talos does not execute them.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Audit checklist",
+      "filename": "AUDIT.md",
+      "content": "# Dependency audit\n\nRun the commands for the ecosystems present in this project:\n\n- npm: `npm audit --omit=dev`\n- Python: `pip-audit`\n- Rust: `cargo audit`\n\nRecord findings, severity, owner, and remediation date. These tools must be installed separately.\n"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "prod-json-snippets",
+  "name": "JSON Utility Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for json utility snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "parse",
+      "label": "Safe parse",
+      "description": "try { const value = JSON.parse(text); ${0} } catch (error) { console.error(error); }|stringify",
+      "body": "Pretty stringify",
+      "languages": [
+        "json",
+        "javascript",
+        "typescript"
+      ]
+    }
+  ]
+}

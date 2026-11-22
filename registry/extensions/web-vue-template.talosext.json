@@ -1,0 +1,18 @@
+{
+  "id": "web-vue-template",
+  "name": "Vue 3 Starter",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for vue 3 starter.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Vue component",
+      "filename": "App.vue",
+      "content": "<script setup lang=\\\"ts\\\">\nimport { ref } from 'vue';\nconst count = ref(0);\n</script>\n<template>\n  <button @click=\\\"count++\\\">Count {{ count }}</button>\n</template>|main.ts\n"
+    }
+  ]
+}

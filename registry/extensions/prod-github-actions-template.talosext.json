@@ -1,0 +1,18 @@
+{
+  "id": "prod-github-actions-template",
+  "name": "GitHub Actions Starter",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for github actions starter.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "CI workflow",
+      "filename": "ci.yml",
+      "content": "name: CI\non: [push, pull_request]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: ${1:npm ci}\n      - run: ${2:npm test}\n      - run: ${3:npm run build}\n"
+    }
+  ]
+}

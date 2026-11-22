@@ -1,0 +1,18 @@
+{
+  "id": "sec-secure-headers-template",
+  "name": "Security Headers Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for security headers template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Security headers",
+      "filename": "headers.conf",
+      "content": "# Add these at the reverse proxy or web server layer\nadd_header X-Content-Type-Options nosniff always;\nadd_header X-Frame-Options DENY always;\nadd_header Referrer-Policy strict-origin-when-cross-origin always;\nadd_header Permissions-Policy \\\"camera=(), microphone=(), geolocation=()\\\" always;\nadd_header Strict-Transport-Security \\\"max-age=31536000; includeSubDomains\\\" always;\n"
+    }
+  ]
+}

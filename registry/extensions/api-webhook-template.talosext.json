@@ -1,0 +1,18 @@
+{
+  "id": "api-webhook-template",
+  "name": "Webhook Handler Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for webhook handler template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Webhook handler",
+      "filename": "handler.js",
+      "content": "export async function handler(req) {\n  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });\n  const payload = await req.json();\n  console.log('Received event', payload.type);\n  return new Response('ok');\n}|signature.md\n"
+    }
+  ]
+}

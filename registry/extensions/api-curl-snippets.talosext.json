@@ -1,0 +1,23 @@
+{
+  "id": "api-curl-snippets",
+  "name": "curl Request Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for curl request snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "get",
+      "label": "GET request",
+      "description": "curl -fsS '${1:https://api.example.com/items}'|post",
+      "body": "POST JSON",
+      "languages": [
+        "bash",
+        "sh"
+      ]
+    }
+  ]
+}

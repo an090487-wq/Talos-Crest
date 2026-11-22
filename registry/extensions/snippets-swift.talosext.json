@@ -1,0 +1,92 @@
+{
+  "id": "snippets-swift",
+  "name": "Swift Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Free, MIT-licensed snippets for Swift: structs, classes, optionals, guards, control flow, and tests.",
+  "license": "MIT",
+  "snippets": [
+    {
+      "prefix": "main",
+      "label": "@main",
+      "description": "Swift program entry point",
+      "body": "@main\nstruct ${1:App} {\n    static func main() {\n        ${0:}\n    }\n}",
+      "languages": [
+        "swift",
+        "Swift"
+      ]
+    },
+    {
+      "prefix": "func",
+      "label": "func ...",
+      "description": "Function definition",
+      "body": "func ${1:name}(${2:args})${3: -> ${4:Type}} {\n    ${0:}\n}",
+      "languages": [
+        "swift",
+        "Swift"
+      ]
+    },
+    {
+      "prefix": "struct",
+      "label": "struct",
+      "description": "Struct definition",
+      "body": "struct ${1:Name} {\n    ${0:let ${2:property}: ${3:Type}}\n}",
+      "languages": [
+        "swift",
+        "Swift"
+      ]
+    },
+    {
+      "prefix": "class",
+      "label": "class",
+      "description": "Class definition",
+      "body": "class ${1:Name} {\n    init(${2:args}) {\n        ${0:}\n    }\n}",
+      "languages": [
+        "swift",
+        "Swift"
+      ]
+    },
+    {
+      "prefix": "guard",
+      "label": "guard let",
+      "description": "Guard optional binding",
+      "body": "guard let ${1:value} = ${2:optional} else {\n    ${0:return}\n}",
+      "languages": [
+        "swift",
+        "Swift"
+      ]
+    },
+    {
+      "prefix": "iflet",
+      "label": "if let",
+      "description": "Optional binding",
+      "body": "if let ${1:value} = ${2:optional} {\n    ${0:}\n}",
+      "languages": [
+        "swift",
+        "Swift"
+      ]
+    },
+    {
+      "prefix": "for",
+      "label": "for-in",
+      "description": "For-in loop",
+      "body": "for ${1:item} in ${2:items} {\n    ${0:}\n}",
+      "languages": [
+        "swift",
+        "Swift"
+      ]
+    },
+    {
+      "prefix": "test",
+      "label": "XCTest case",
+      "description": "Unit test method",
+      "body": "func test${1:Name}() throws {\n    let ${2:actual} = ${3:call()}\n    XCTAssertEqual(${0:actual}, ${4:expected})\n}",
+      "languages": [
+        "swift",
+        "Swift"
+      ]
+    }
+  ]
+}

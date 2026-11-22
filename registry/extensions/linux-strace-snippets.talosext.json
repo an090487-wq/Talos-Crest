@@ -1,0 +1,23 @@
+{
+  "id": "linux-strace-snippets",
+  "name": "strace Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for strace snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "follow",
+      "label": "Follow process",
+      "description": "strace -f -p ${1:PID}|syscalls",
+      "body": "Summarize syscalls",
+      "languages": [
+        "bash",
+        "sh"
+      ]
+    }
+  ]
+}

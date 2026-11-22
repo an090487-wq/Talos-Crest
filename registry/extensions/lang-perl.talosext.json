@@ -1,0 +1,16 @@
+{
+  "id": "lang-perl",
+  "kind": "language",
+  "name": "Perl support",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "Adds Run support for Perl files (needs perl installed).",
+  "language": {
+    "id": "perl",
+    "name": "Perl",
+    "extensions": [".pl", ".pm"],
+    "run": "perl {file}",
+    "build": null,
+    "paths": []
+  }
+}

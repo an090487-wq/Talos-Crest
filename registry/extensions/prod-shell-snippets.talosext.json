@@ -1,0 +1,24 @@
+{
+  "id": "prod-shell-snippets",
+  "name": "Shell Productivity Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for shell productivity snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "guard",
+      "label": "Script guard",
+      "description": "#!/usr/bin/env bash\\nset -euo pipefail\\n${0}|args",
+      "body": "Required argument",
+      "languages": [
+        "bash",
+        "sh",
+        "zsh"
+      ]
+    }
+  ]
+}

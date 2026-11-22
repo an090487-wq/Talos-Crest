@@ -1,0 +1,42 @@
+{
+  "id": "theme-solarized-light",
+  "name": "Solarized Light",
+  "kind": "theme",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "A calm light palette with low-contrast teal and amber accents.",
+  "license": "MIT",
+  "free": true,
+  "theme": {
+    "dark": false,
+    "ui": {
+      "--bg": "#fdf6e3",
+      "--panel": "#eee8d5",
+      "--line": "#d8d0c0",
+      "--text": "#073642",
+      "--muted": "#657b83",
+      "--bronze": "#268bd2"
+    },
+    "editor": {
+      "background": "#fdf6e3",
+      "foreground": "#073642",
+      "selection": "#d3e6e8",
+      "cursor": "#268bd2",
+      "gutterBackground": "#fdf6e3",
+      "gutterForeground": "#657b83",
+      "activeLine": "#eee8d5"
+    },
+    "syntax": {
+      "keyword": "#859900",
+      "string": "#2aa198",
+      "comment": "#93a1a1",
+      "number": "#d33682",
+      "function": "#268bd2",
+      "type": "#b58900",
+      "variable": "#073642",
+      "operator": "#859900",
+      "constant": "#cb4b16"
+    }
+  }
+}

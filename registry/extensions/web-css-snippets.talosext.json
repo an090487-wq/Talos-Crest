@@ -1,0 +1,85 @@
+{
+  "id": "web-css-snippets",
+  "name": "CSS Layout Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "8 offline CodeMirror snippets for css layout snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "flex",
+      "label": "Flex row",
+      "description": "Flexible row layout",
+      "body": "display: flex;\nalign-items: center;\ngap: ${1:1rem};\n${0}",
+      "languages": [
+        "css"
+      ]
+    },
+    {
+      "prefix": "grid",
+      "label": "CSS grid",
+      "description": "Responsive grid",
+      "body": "display: grid;\ngrid-template-columns: repeat(auto-fit, minmax(${1:16rem}, 1fr));\ngap: ${2:1rem};\n${0}",
+      "languages": [
+        "css"
+      ]
+    },
+    {
+      "prefix": "center",
+      "label": "Center box",
+      "description": "Center child both axes",
+      "body": "display: grid;\nplace-items: center;\n${0}",
+      "languages": [
+        "css"
+      ]
+    },
+    {
+      "prefix": "clamp",
+      "label": "Fluid size",
+      "description": "Fluid type or spacing clamp",
+      "body": "font-size: clamp(${1:1rem}, ${2:2vw}, ${3:2rem});\n${0}",
+      "languages": [
+        "css"
+      ]
+    },
+    {
+      "prefix": "media",
+      "label": "Media query",
+      "description": "Max-width media query",
+      "body": "@media (max-width: ${1:48rem}) {\n  ${0}\n}",
+      "languages": [
+        "css"
+      ]
+    },
+    {
+      "prefix": "root",
+      "label": "Design tokens",
+      "description": "Root custom properties",
+      "body": ":root {\n  --${1:color}: ${2:#42c7b5};\n  ${0}\n}",
+      "languages": [
+        "css"
+      ]
+    },
+    {
+      "prefix": "focus",
+      "label": "Visible focus",
+      "description": "Accessible focus ring",
+      "body": ":focus-visible {\n  outline: 2px solid ${1:#42c7b5};\n  outline-offset: 2px;\n  ${0}\n}",
+      "languages": [
+        "css"
+      ]
+    },
+    {
+      "prefix": "motion",
+      "label": "Reduced motion",
+      "description": "Respect motion preference",
+      "body": "@media (prefers-reduced-motion: reduce) {\n  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }\n  ${0}\n}",
+      "languages": [
+        "css"
+      ]
+    }
+  ]
+}

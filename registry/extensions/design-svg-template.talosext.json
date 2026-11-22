@@ -1,0 +1,18 @@
+{
+  "id": "design-svg-template",
+  "name": "SVG Icon Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for svg icon template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "SVG icon",
+      "filename": "icon.svg",
+      "content": "<svg xmlns=\\\"http://www.w3.org/2000/svg\\\" viewBox=\\\"0 0 24 24\\\" width=\\\"24\\\" height=\\\"24\\\" fill=\\\"none\\\" stroke=\\\"${1:currentColor}\\\" stroke-width=\\\"${2:1.5}\\\">\n  <path d=\\\"${3:M12 2 L20 12 L12 22 L4 12 Z}\\\" />\n</svg>|README.md\n"
+    }
+  ]
+}

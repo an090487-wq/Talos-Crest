@@ -1,0 +1,18 @@
+{
+  "id": "docs-release-notes-template",
+  "name": "Release Notes Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for release notes template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Release notes",
+      "filename": "RELEASE_NOTES.md",
+      "content": "# ${1:Version} release notes\n\n## Highlights\n- ${2:Highlight}\n\n## Improvements\n- ${3:Improvement}\n\n## Fixes\n- ${4:Fix}\n\n## Known issues\n- ${5:Issue}\n\n## Upgrade notes\n${6:Upgrade steps}\n"
+    }
+  ]
+}

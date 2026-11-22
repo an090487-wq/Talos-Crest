@@ -1,0 +1,109 @@
+{
+  "id": "web-accessibility-snippets",
+  "name": "Accessibility Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "8 offline CodeMirror snippets for accessibility snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "label",
+      "label": "Label",
+      "description": "Explicit form label",
+      "body": "<label for=\\\"${1:id}\\\">${2:Label}</label>\n<input id=\\\"${1:id}\\\" />",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "skip",
+      "label": "Skip link",
+      "description": "Skip to main content",
+      "body": "<a class=\\\"sr-only focus:not-sr-only\\\" href=\\\"#main\\\">Skip to main content</a>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "landmark",
+      "label": "Main landmark",
+      "description": "Page main region",
+      "body": "<main id=\\\"main\\\">${0}</main>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "live",
+      "label": "Live region",
+      "description": "Polite announcement region",
+      "body": "<div aria-live=\\\"polite\\\" role=\\\"status\\\">${0}</div>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "alabel",
+      "label": "Accessible name",
+      "description": "Accessible icon button",
+      "body": "<button aria-label=\\\"${1:Close}\\\">${2:×}</button>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "focus",
+      "label": "Focusable element",
+      "description": "Native focusable control",
+      "body": "<button type=\\\"button\\\">${1:Action}</button>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "motionnote",
+      "label": "Reduced motion note",
+      "description": "Comment for reduced motion",
+      "body": "<!-- Keep transitions optional for prefers-reduced-motion users -->",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "table",
+      "label": "Table headers",
+      "description": "Accessible table headers",
+      "body": "<table><thead><tr><th scope=\\\"col\\\">${1:Name}</th></tr></thead><tbody>${0}</tbody></table>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    }
+  ]
+}

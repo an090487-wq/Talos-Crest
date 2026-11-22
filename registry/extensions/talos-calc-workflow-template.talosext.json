@@ -1,0 +1,18 @@
+{
+  "id": "talos-calc-workflow-template",
+  "name": "Calc Workflow Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for calc workflow template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Calc workflow",
+      "filename": "CALC.md",
+      "content": "# Calc workflow\n\n- Choose Scientific or Programmer mode\n- Enter expressions with parentheses for clarity\n- Copy results into the editor when needed\n- Verify programmer bit width and signedness before trusting output\n"
+    }
+  ]
+}

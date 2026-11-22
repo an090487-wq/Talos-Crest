@@ -1,0 +1,18 @@
+{
+  "id": "prod-makefile-template",
+  "name": "Makefile Starter",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for makefile starter.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Basic Makefile",
+      "filename": "Makefile",
+      "content": ".PHONY: help build test clean\n\nhelp:\n\\t@echo 'build  compile the project'\n\\t@echo 'test   run tests'\n\nbuild:\n\\t${1:echo Build}\n\ntest:\n\\t${2:echo Test}\n\nclean:\n\\trm -rf ${3:dist}\n"
+    }
+  ]
+}

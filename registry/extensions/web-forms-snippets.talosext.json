@@ -1,0 +1,85 @@
+{
+  "id": "web-forms-snippets",
+  "name": "HTML Forms Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "8 offline CodeMirror snippets for html forms snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "form",
+      "label": "Form",
+      "description": "Basic form with submit",
+      "body": "<form action=\\\"${1:/submit}\\\" method=\\\"post\\\">\n  ${0}\n  <button type=\\\"submit\\\">Submit</button>\n</form>",
+      "languages": [
+        "html"
+      ]
+    },
+    {
+      "prefix": "input",
+      "label": "Input",
+      "description": "Labeled text input",
+      "body": "<label for=\\\"${1:name}\\\">${2:Name}</label>\n<input id=\\\"${1:name}\\\" name=\\\"${1:name}\\\" type=\\\"text\\\" required />",
+      "languages": [
+        "html"
+      ]
+    },
+    {
+      "prefix": "select",
+      "label": "Select",
+      "description": "Accessible select",
+      "body": "<label for=\\\"${1:choice}\\\">${2:Choice}</label>\n<select id=\\\"${1:choice}\\\" name=\\\"${1:choice}\\\"><option value=\\\"\\\">Choose…</option>${0}</select>",
+      "languages": [
+        "html"
+      ]
+    },
+    {
+      "prefix": "textarea",
+      "label": "Textarea",
+      "description": "Multi-line input",
+      "body": "<label for=\\\"${1:message}\\\">Message</label>\n<textarea id=\\\"${1:message}\\\" rows=\\\"${2:4}\\\"></textarea>",
+      "languages": [
+        "html"
+      ]
+    },
+    {
+      "prefix": "check",
+      "label": "Checkbox",
+      "description": "Labeled checkbox",
+      "body": "<label><input type=\\\"checkbox\\\" name=\\\"${1:agree}\\\" /> ${2:Agree}</label>",
+      "languages": [
+        "html"
+      ]
+    },
+    {
+      "prefix": "radio",
+      "label": "Radio group",
+      "description": "Fieldset radio group",
+      "body": "<fieldset><legend>${1:Option}</legend><label><input type=\\\"radio\\\" name=\\\"${2:choice}\\\" value=\\\"a\\\" /> A</label>${0}</fieldset>",
+      "languages": [
+        "html"
+      ]
+    },
+    {
+      "prefix": "valid",
+      "label": "Validation message",
+      "description": "Constraint validation hint",
+      "body": "<p id=\\\"${1:hint}\\\" class=\\\"hint\\\">${2:Required field}</p>\n<input aria-describedby=\\\"${1:hint}\\\" required />",
+      "languages": [
+        "html"
+      ]
+    },
+    {
+      "prefix": "upload",
+      "label": "File input",
+      "description": "File upload field",
+      "body": "<label for=\\\"${1:file}\\\">File</label>\n<input id=\\\"${1:file}\\\" type=\\\"file\\\" name=\\\"${1:file}\\\" />",
+      "languages": [
+        "html"
+      ]
+    }
+  ]
+}

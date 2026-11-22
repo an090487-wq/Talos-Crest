@@ -1,0 +1,21 @@
+{
+  "id": "lang-clojure",
+  "name": "Clojure support",
+  "kind": "language",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Adds Run support for Clojure support files (user-approved command).",
+  "license": "MIT",
+  "free": true,
+  "language": {
+    "id": "lang-clojure",
+    "name": "Clojure support",
+    "extensions": [
+      ".clj"
+    ],
+    "run": "clojure -M {file}",
+    "build": null,
+    "paths": []
+  }
+}

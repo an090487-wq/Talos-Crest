@@ -1,0 +1,42 @@
+{
+  "id": "theme-monokai-pro",
+  "name": "Monokai Pro",
+  "kind": "theme",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "A high-contrast dark palette with warm amber and magenta accents.",
+  "license": "MIT",
+  "free": true,
+  "theme": {
+    "dark": true,
+    "ui": {
+      "--bg": "#2d2a2e",
+      "--panel": "#37343a",
+      "--line": "#49454d",
+      "--text": "#f4f4f5",
+      "--muted": "#b2abb4",
+      "--bronze": "#ffd166"
+    },
+    "editor": {
+      "background": "#2d2a2e",
+      "foreground": "#f4f4f5",
+      "selection": "#4a454e",
+      "cursor": "#ffd166",
+      "gutterBackground": "#2d2a2e",
+      "gutterForeground": "#b2abb4",
+      "activeLine": "#37343a"
+    },
+    "syntax": {
+      "keyword": "#ff7b9c",
+      "string": "#a6e22e",
+      "comment": "#7d757f",
+      "number": "#ae81ff",
+      "function": "#ffd166",
+      "type": "#66d9ef",
+      "variable": "#f4f4f5",
+      "operator": "#ff7b9c",
+      "constant": "#f97372"
+    }
+  }
+}

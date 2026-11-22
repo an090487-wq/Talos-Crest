@@ -1,0 +1,18 @@
+{
+  "id": "db-schema-template",
+  "name": "Schema Design Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for schema design template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Schema notes",
+      "filename": "schema.md",
+      "content": "# Schema: ${1:name}\n\n## Entities\n- ${2:Entity}: ${3:purpose}\n\n## Relationships\n- ${4:A} has many ${5:B}\n\n## Constraints\n- Unique: ${6:field}\n- Not null: ${7:field}\n- Foreign keys: ${8:field}|migration.sql\n"
+    }
+  ]
+}

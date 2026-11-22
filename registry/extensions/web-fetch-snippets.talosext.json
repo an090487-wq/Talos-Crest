@@ -1,0 +1,109 @@
+{
+  "id": "web-fetch-snippets",
+  "name": "Fetch API Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "8 offline CodeMirror snippets for fetch api snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "get",
+      "label": "GET request",
+      "description": "Fetch JSON from URL",
+      "body": "const res = await fetch('${1:/api/items}');\nif (!res.ok) throw new Error(`HTTP ${res.status}`);\nconst data = await res.json();\n${0}",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "post",
+      "label": "POST JSON",
+      "description": "Send JSON body",
+      "body": "await fetch('${1:/api/items}', {\n  method: 'POST',\n  headers: { 'content-type': 'application/json' },\n  body: JSON.stringify(${2:{}}),\n});",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "json",
+      "label": "Parse JSON",
+      "description": "Safe JSON parse helper",
+      "body": "async function json(res) {\n  if (!res.ok) throw new Error(`HTTP ${res.status}`);\n  return res.json();\n}",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "abort",
+      "label": "Abort controller",
+      "description": "Cancel a fetch",
+      "body": "const controller = new AbortController();\nconst res = await fetch('${1:url}', { signal: controller.signal });\ncontroller.abort();",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "timeout",
+      "label": "Fetch timeout",
+      "description": "Manual timeout wrapper",
+      "body": "const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ${1:5000}));\nconst res = await Promise.race([fetch('${2:url}'), timeout]);",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "error",
+      "label": "Error handling",
+      "description": "Network error guard",
+      "body": "try {\n  ${1:await fetch(url)}\n} catch (error) {\n  console.error('Request failed', error);\n}",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "upload",
+      "label": "Upload file",
+      "description": "FormData upload",
+      "body": "const form = new FormData();\nform.append('file', ${1:file});\nawait fetch('${2:/upload}', { method: 'POST', body: form });",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "retry",
+      "label": "Simple retry",
+      "description": "Retry a request once",
+      "body": "let res = await fetch(url);\nif (!res.ok) res = await fetch(url);\n${0}",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    }
+  ]
+}

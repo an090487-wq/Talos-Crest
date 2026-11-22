@@ -1,0 +1,39 @@
+{
+  "id": "dracula",
+  "kind": "theme",
+  "name": "Dracula",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "A vivid dark theme with purple, pink, and aqua accents.",
+  "theme": {
+    "dark": true,
+    "ui": {
+      "--bg": "#282a36",
+      "--panel": "#343746",
+      "--line": "#44475a",
+      "--text": "#f8f8f2",
+      "--muted": "#a0a3b8",
+      "--bronze": "#bd93f9"
+    },
+    "editor": {
+      "background": "#282a36",
+      "foreground": "#f8f8f2",
+      "selection": "#44475a",
+      "cursor": "#ff79c6",
+      "gutterBackground": "#282a36",
+      "gutterForeground": "#6272a4",
+      "activeLine": "#343746"
+    },
+    "syntax": {
+      "keyword": "#ff79c6",
+      "string": "#f1fa8c",
+      "comment": "#6272a4",
+      "number": "#bd93f9",
+      "function": "#50fa7b",
+      "type": "#8be9fd",
+      "variable": "#f8f8f2",
+      "operator": "#ff79c6",
+      "constant": "#bd93f9"
+    }
+  }
+}

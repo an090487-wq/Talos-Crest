@@ -1,0 +1,18 @@
+{
+  "id": "sec-incident-response-template",
+  "name": "Incident Response Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for incident response template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Incident record",
+      "filename": "INCIDENT.md",
+      "content": "# Incident ${1:ID}\n\n- Detected:\n- Severity:\n- Impact:\n- Timeline:\n- Containment:\n- Root cause:\n- Follow-up actions:\n- Lessons learned:\n"
+    }
+  ]
+}

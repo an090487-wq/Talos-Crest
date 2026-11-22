@@ -1,0 +1,18 @@
+{
+  "id": "linux-systemd-template",
+  "name": "systemd Unit Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for systemd unit template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "systemd service",
+      "filename": "service.unit",
+      "content": "[Unit]\nDescription=${1:My Service}\nAfter=network.target\n\n[Service]\nType=simple\nExecStart=${2:/usr/bin/my-service}\nRestart=on-failure\nWorkingDirectory=${3:/srv/my-service}\n\n[Install]\nWantedBy=multi-user.target|timer.unit\n"
+    }
+  ]
+}

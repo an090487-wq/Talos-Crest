@@ -1,0 +1,21 @@
+{
+  "id": "lang-dart",
+  "name": "Dart support",
+  "kind": "language",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Adds Run support for Dart support files (user-approved command).",
+  "license": "MIT",
+  "free": true,
+  "language": {
+    "id": "lang-dart",
+    "name": "Dart support",
+    "extensions": [
+      ".dart"
+    ],
+    "run": "dart {file}",
+    "build": null,
+    "paths": []
+  }
+}

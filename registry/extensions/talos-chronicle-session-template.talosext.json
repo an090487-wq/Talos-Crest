@@ -1,0 +1,18 @@
+{
+  "id": "talos-chronicle-session-template",
+  "name": "Chronicle Session Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for chronicle session template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Session notes",
+      "filename": "SESSION.md",
+      "content": "# Chronicle session ${1:date}\n\n## Goal\n${2:Goal}\n\n## Decisions\n- ${3:Decision}\n\n## Evidence\n- ${4:File or command}\n\n## Next steps\n- ${5:Step}\n"
+    }
+  ]
+}

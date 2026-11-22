@@ -1,0 +1,18 @@
+{
+  "id": "talos-extension-author-template",
+  "name": "Extension Author Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for extension author template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Author notes",
+      "filename": "README.md",
+      "content": "# Writing a Talos extension\n\n1. Choose one supported kind: theme, language, template, or snippets\n2. Keep the manifest small and self-contained\n3. Declare external requirements honestly\n4. Add a unique id and semantic version\n5. Compute the SHA-256 for the registry entry\n6. Test install, enable, disable, update, and remove\n\nTalos does not execute arbitrary extension code.|TALOS_EXTENSION.talosext.json\n"
+    }
+  ]
+}
