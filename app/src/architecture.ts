@@ -74,23 +74,23 @@ interface ManifestSet {
 let scan: ProjectScan | null = null;
 let selectedPath = "";
 let onOpenFile: ((path: string) => Promise<void>) | undefined;
-let zoom = 1;
+let zoom = storedZoom();
 let busy = false;
 let scanWaiters: (() => void)[] = [];
-let expanded = new Set<string>();
-let mode: "structure" | "dependencies" | "architecture" | InsightMode = "structure";
+let expanded = new Set<string>(storedStringList("talos.arch-expanded"));
+let mode: "structure" | "dependencies" | "architecture" | InsightMode = storedMode();
 let dependencyResult: DependencyResult | null = null;
 let analyzedPaths: string[] = [];
 let components: ArchitectureComponent[] = [];
-let expandedComponents = new Set<string>();
+let expandedComponents = new Set<string>(storedStringList("talos.arch-expanded-components"));
 let selectedComponent = "";
 let analysisBusy = false;
-let focusMode = false;
+let focusMode = getWindowValue("talos.arch-focus") === "true";
 let queuedRoot = "";
 let watchedRoot = "";
 let refreshTimer = 0;
 let treeScrollFrame = 0;
-let explorerOpen = false;
+let explorerOpen = getWindowValue("talos.explorer-open") === "true";
 let exportFullGraph = false;
 let performanceReport: PerformanceMeasurement | null = null;
 let manifestSet: ManifestSet | null = null;
@@ -108,12 +108,49 @@ function positiveStoredNumber(key: string, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+function storedStringList(key: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(getWindowValue(key) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function storedZoom(): number {
+  const value = Number(getWindowValue("talos.arch-zoom"));
+  return Number.isFinite(value) && value >= 0.6 && value <= 1.8 ? value : 1;
+}
+
+function storedMode(): "structure" | "dependencies" | "architecture" | InsightMode {
+  const value = getWindowValue("talos.arch-mode") ?? "";
+  if (value === "structure" || value === "dependencies" || value === "architecture" || isInsightMode(value)) {
+    return value;
+  }
+  return "structure";
+}
+
+let expandedSaveTimer = 0;
+function scheduleExpandedSave(): void {
+  if (expandedSaveTimer) return;
+  expandedSaveTimer = window.setTimeout(() => {
+    expandedSaveTimer = 0;
+    try {
+      setWindowValue("talos.arch-expanded", JSON.stringify([...expanded]));
+      setWindowValue("talos.arch-expanded-components", JSON.stringify([...expandedComponents]));
+    } catch {
+      // Tree expansion is cosmetic; a storage failure must not break rendering.
+    }
+  }, 300);
+}
+
 function isInsightMode(value: string): value is InsightMode {
   return value === "performance" || value === "sandbox" || value === "debt";
 }
 
 function showArchitectureWindow() {
   explorerOpen = true;
+  setWindowValue("talos.explorer-open", "true");
   $("architecture").classList.remove("hidden");
 }
 let panStart: { x: number; y: number; left: number; top: number } | null = null;
@@ -208,7 +245,7 @@ function recentPaths(): string[] {
   }
 }
 
-function rememberRecent(path: string) {
+export function rememberRecent(path: string) {
   try {
     setWindowValue(
       RECENT_PATHS_KEY,
@@ -1385,9 +1422,11 @@ async function loadInsights() {
 }
 
 function render() {
+  scheduleExpandedSave();
   for (const button of document.querySelectorAll<HTMLElement>("[data-arch-mode]")) {
     button.classList.toggle("active", button.dataset.archMode === mode);
   }
+  $("arch-focus").classList.toggle("active", focusMode);
   // Restore the graph panel (and hide the insights panel) on every mode
   // switch, not only when entering an insight tab.
   renderInsights();
@@ -1549,7 +1588,12 @@ async function scanProject(root: string) {
         )
       : [];
     selectedComponent = "";
-    if (changedRoot) mode = "structure";
+    if (changedRoot) {
+      mode = "structure";
+      setWindowValue("talos.arch-mode", mode);
+      focusMode = false;
+      setWindowValue("talos.arch-focus", "false");
+    }
     const directories = new Set(
       result.entries.filter((entry) => entry.kind === "directory").map((entry) => entry.path),
     );
@@ -1645,7 +1689,9 @@ async function analyzeCurrentProject() {
 
 function setMode(next: "structure" | "dependencies" | "architecture" | InsightMode) {
   mode = next;
+  setWindowValue("talos.arch-mode", next);
   focusMode = false;
+  setWindowValue("talos.arch-focus", "false");
   $("arch-focus").classList.remove("active");
   if (next === "architecture" && scan) {
     components = classifyArchitecture(
@@ -1783,6 +1829,7 @@ export function initArchitectureExplorer(
   $("btn-architecture").addEventListener("click", showArchitecture);
   const closeExplorer = () => {
     explorerOpen = false;
+    setWindowValue("talos.explorer-open", "false");
     $("architecture").classList.add("hidden");
     if (refreshTimer) window.clearTimeout(refreshTimer);
     refreshTimer = 0;
@@ -1869,6 +1916,7 @@ export function initArchitectureExplorer(
   $("quick-open-project").addEventListener("click", () => {
     ($("quick-open-dialog") as HTMLDialogElement).close();
     explorerOpen = true;
+    setWindowValue("talos.explorer-open", "true");
     $("architecture").classList.remove("hidden");
     void chooseProject();
   });
@@ -1888,14 +1936,17 @@ export function initArchitectureExplorer(
   }
   $("arch-zoom-in").addEventListener("click", () => {
     zoom = Math.min(1.8, zoom + 0.1);
+    setWindowValue("talos.arch-zoom", String(zoom));
     render();
   });
   $("arch-zoom-out").addEventListener("click", () => {
     zoom = Math.max(0.6, zoom - 0.1);
+    setWindowValue("talos.arch-zoom", String(zoom));
     render();
   });
   $("arch-fit").addEventListener("click", () => {
     zoom = 1;
+    setWindowValue("talos.arch-zoom", String(zoom));
     $("arch-graph-viewport").scrollTo({ top: 0, left: 0 });
     render();
   });
@@ -1905,6 +1956,7 @@ export function initArchitectureExplorer(
   });
   $("arch-focus").addEventListener("click", () => {
     focusMode = !focusMode;
+    setWindowValue("talos.arch-focus", String(focusMode));
     $("arch-focus").classList.toggle("active", focusMode);
     render();
   });
@@ -1975,6 +2027,7 @@ export function initArchitectureExplorer(
   }).catch((error: unknown) => setMessage(`Could not subscribe to watcher errors: ${String(error)}`, true));
   const savedRoot = getWindowValue("talos.workspace-root");
   if (savedRoot) void scanProject(savedRoot);
+  $("architecture").classList.toggle("hidden", !explorerOpen);
   render();
 }
 

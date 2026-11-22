@@ -352,9 +352,11 @@ rules, and IPC surface. No Chronicle work runs on the editor UI thread.
 ## Offline use and portability
 
 Talos Crest does not require an account, cloud service, or network connection.
-The AppImage bundles the frontend and built-in language configs; it does not
-need Node.js or npm on the target machine. Settings and extension state use
-`XDG_CONFIG_HOME` when set (otherwise `~/.config/talos`). Project operations are
+The AppImage bundles the frontend, language configs, and WebKitGTK/GTK runtime;
+it does not need Node.js or npm on the target machine. It still uses the host
+C library, so the current x86_64 build requires glibc 2.38 or newer. Settings
+and extension state use `XDG_CONFIG_HOME` when set (otherwise
+`~/.config/talos`). Project operations are
 validated against the chosen workspace root, and files in read-only directories
 are not modified unless the operating system grants write access.
 

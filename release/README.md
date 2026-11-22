@@ -9,12 +9,18 @@ telemetry, cloud service, or internet connection is required to use Talos.
 File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 
 - For 64-bit x86 desktop Linux only.
-- Needs WebKitGTK/GTK runtime support and either FUSE or
-  `--appimage-extract-and-run`.
-- Not an ARM/Raspberry Pi build.
+- GTK and WebKitGTK are bundled in the AppImage, but it uses the system C
+  library. The current build needs **glibc 2.38 or newer**.
+- Needs either FUSE or `--appimage-extract-and-run`.
+- Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`5323ec7a2a769a32c40604d7407e95dc6681286935092d8b1971c841622bbded`
+`28670eb186846a18524245084f72d7777a9a4693609019c106d27f62b45a8066`
+
+Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
+Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
+EndeavourOS, Gentoo, and Void Linux. Ubuntu 22.04, Debian 12, Linux Mint 21,
+RHEL/AlmaLinux 9, and Alpine are not supported by this particular build.
 
 ## Windows
 
@@ -26,13 +32,14 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`7c0190ad9a3cc502782f4f1d66abcc9d47ab9afa0b27caf2611b84bb92c13ada`
+`9cc903cd65ca8e3fc128ff4c5c07f0cef78d6f154fbc14a5bca1769a43256f9d`
 
 ## GitHub publishing
 
-Upload these as assets on a GitHub Release, not as ordinary repository files:
+Both builds are committed as separate files in this repository:
 
 1. `appimage/TalosCrest-Linux-x86_64.AppImage`
 2. `windows/TalosCrest-Windows-x64-portable.zip`
 
-The timestamped copies in the same folders are the immutable build snapshots.
+Download them with “Download raw file”, or clone the repository. The
+timestamped copies in the same folders are the immutable build snapshots.

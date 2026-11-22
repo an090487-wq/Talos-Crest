@@ -117,3 +117,32 @@ test("session parser rejects invalid data and removes duplicate file tabs", () =
   assert.equal(session.documents[0].anchor, 0);
   assert.equal(session.activeIndex, 1);
 });
+
+test("session parser keeps recently closed tabs and their unsaved contents", () => {
+  const session = parseWindowTabsSession(
+    JSON.stringify({
+      version: 1,
+      activeIndex: 0,
+      documents: [{ path: "/work/open.ts", suggestedName: null, anchor: 0, head: 0, scrollTop: 0 }],
+      closedTabs: [
+        { path: "/work/closed.ts", suggestedName: null, anchor: 2, head: 4, scrollTop: 8, contents: "draft" },
+        { path: "/work/open.ts", suggestedName: null, anchor: 0, head: 0, scrollTop: 0 },
+        { path: 7, suggestedName: null, anchor: 0, head: 0, scrollTop: 0 },
+      ],
+    }),
+  );
+  assert.deepEqual(session.closedTabs.map(({ path }) => path), ["/work/closed.ts"]);
+  assert.equal(session.closedTabs[0].contents, "draft");
+  assert.equal(session.activeIndex, 0);
+
+  const onlyClosed = parseWindowTabsSession(
+    JSON.stringify({
+      version: 1,
+      activeIndex: 0,
+      documents: [],
+      closedTabs: [{ path: "/work/closed.ts", suggestedName: null, anchor: 0, head: 0, scrollTop: 0 }],
+    }),
+  );
+  assert.equal(onlyClosed.documents.length, 0);
+  assert.equal(onlyClosed.closedTabs.length, 1);
+});

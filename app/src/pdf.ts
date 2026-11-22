@@ -106,6 +106,9 @@ export async function openPdf(path: string) {
     }
   }
   $("pdf-name").textContent = fileNameFromPath(path);
+  // The startup path is shared by text and PDF documents; saving it here lets
+  // the last PDF reopen after a restart.
+  setWindowValue("talos.open-file", path);
   $("pdf-pane").classList.remove("hidden");
   // Remember the chosen arrangement; side-by-side is the default so code,
   // Ollama and the PDF can all stay visible together.

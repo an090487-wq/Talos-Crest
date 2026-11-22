@@ -1185,12 +1185,21 @@ fn watch_project(window: tauri::WebviewWindow, root: String) -> Result<(), Strin
 
 #[tauri::command]
 fn stop_project_watch(window: tauri::WebviewWindow) -> Result<(), String> {
-    PROJECT_WATCHERS
+    // Recover from a poisoned lock so cleanup can never block window closing.
+    let mut watchers = PROJECT_WATCHERS
         .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
-        .map_err(|e| format!("project watcher lock failed: {e}"))?
-        .remove(window.label());
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    watchers.remove(window.label());
     Ok(())
+}
+
+/// Absolute last resort for window closing. The renderer calls this from a
+/// watchdog only if destroying the webview fails or times out, so no close
+/// request can leave the application running forever.
+#[tauri::command]
+fn force_quit() {
+    std::process::exit(0);
 }
 
 #[tauri::command]
@@ -2446,6 +2455,7 @@ pub fn run() {
             load_project_manifests,
             watch_project,
             stop_project_watch,
+            force_quit,
             settings_read,
             settings_write,
             chronicle::chronicle_status,

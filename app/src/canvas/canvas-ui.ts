@@ -24,6 +24,7 @@ import {
 
 type FilterName = "grayscale" | "sepia" | "invert" | "blur" | "sharpen";
 type Tool = "select" | "crop" | "pan" | "zoom" | "brush" | "eraser" | "line" | "rect" | "ellipse" | "text";
+const CANVAS_TOOLS: Tool[] = ["select", "crop", "pan", "zoom", "brush", "eraser", "line", "rect", "ellipse", "text"];
 type Axis = "horizontal" | "vertical";
 
 interface Adjustment {
@@ -765,6 +766,7 @@ function canvasPoint(event: PointerEvent): { x: number; y: number } {
 
 function setTool(next: Tool): void {
   tool = next;
+  setWindowValue("talos.canvas.tool", next);
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-canvas-tool]")) {
     button.classList.toggle("active", button.dataset.canvasTool === tool);
   }
@@ -1286,6 +1288,11 @@ function restoreSettings(): void {
   if (Number.isFinite(storedBrush) && storedBrush > 0) brushSize = Math.min(200, storedBrush);
   const storedFont = Number(getWindowValue("talos.canvas.font-size"));
   if (Number.isFinite(storedFont) && storedFont > 0) fontSize = Math.min(200, storedFont);
+  const storedTool = getWindowValue("talos.canvas.tool");
+  if (storedTool && CANVAS_TOOLS.includes(storedTool as Tool)) tool = storedTool as Tool;
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-canvas-tool]")) {
+    button.classList.toggle("active", button.dataset.canvasTool === tool);
+  }
   ($("canvas-color") as HTMLInputElement).value = color;
   ($("canvas-brush-size") as HTMLInputElement).value = String(brushSize);
   ($("canvas-font-size") as HTMLInputElement).value = String(fontSize);

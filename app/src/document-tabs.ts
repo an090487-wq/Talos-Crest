@@ -11,6 +11,7 @@ export interface WindowTabsSession {
   version: 1;
   documents: DocumentTabSession[];
   activeIndex: number;
+  closedTabs?: DocumentTabSession[];
 }
 
 export class DocumentTabRegistry<T extends Pick<DocumentTabSession, "path">> {
@@ -90,6 +91,41 @@ export function nextDocumentIndex(current: number, count: number, direction: -1 
   return (current + direction + count) % count;
 }
 
+function parseTabSessions(value: unknown, limit: number, seen: Set<string>): DocumentTabSession[] {
+  if (!Array.isArray(value) || value.length > limit) return [];
+  const sessions: DocumentTabSession[] = [];
+  for (const candidate of value) {
+    if (typeof candidate !== "object" || candidate === null) continue;
+    const tab = candidate as Record<string, unknown>;
+    if (
+      !(typeof tab.path === "string" || tab.path === null) ||
+      !(typeof tab.suggestedName === "string" || tab.suggestedName === null) ||
+      !Number.isSafeInteger(tab.anchor) ||
+      !Number.isSafeInteger(tab.head) ||
+      typeof tab.scrollTop !== "number" ||
+      !Number.isFinite(tab.scrollTop) ||
+      tab.scrollTop < 0 ||
+      (tab.contents !== undefined && typeof tab.contents !== "string")
+    ) {
+      continue;
+    }
+    if (tab.path !== null) {
+      const key = documentKey(tab.path);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+    }
+    sessions.push({
+      path: tab.path,
+      suggestedName: tab.suggestedName,
+      anchor: Math.max(0, tab.anchor as number),
+      head: Math.max(0, tab.head as number),
+      scrollTop: tab.scrollTop,
+      ...(typeof tab.contents === "string" ? { contents: tab.contents } : {}),
+    });
+  }
+  return sessions;
+}
+
 export function parseWindowTabsSession(value: string | null): WindowTabsSession | null {
   if (!value) return null;
   try {
@@ -100,43 +136,15 @@ export function parseWindowTabsSession(value: string | null): WindowTabsSession 
       return null;
     }
 
-    const documents: DocumentTabSession[] = [];
     const seen = new Set<string>();
-    for (const candidate of record.documents) {
-      if (typeof candidate !== "object" || candidate === null) continue;
-      const tab = candidate as Record<string, unknown>;
-      if (
-        !(typeof tab.path === "string" || tab.path === null) ||
-        !(typeof tab.suggestedName === "string" || tab.suggestedName === null) ||
-        !Number.isSafeInteger(tab.anchor) ||
-        !Number.isSafeInteger(tab.head) ||
-        typeof tab.scrollTop !== "number" ||
-        !Number.isFinite(tab.scrollTop) ||
-        tab.scrollTop < 0 ||
-        (tab.contents !== undefined && typeof tab.contents !== "string")
-      ) {
-        continue;
-      }
-      if (tab.path !== null) {
-        const key = documentKey(tab.path);
-        if (!key || seen.has(key)) continue;
-        seen.add(key);
-      }
-      documents.push({
-        path: tab.path,
-        suggestedName: tab.suggestedName,
-        anchor: Math.max(0, tab.anchor as number),
-        head: Math.max(0, tab.head as number),
-        scrollTop: tab.scrollTop,
-        ...(typeof tab.contents === "string" ? { contents: tab.contents } : {}),
-      });
-    }
-    if (!documents.length) return null;
+    const documents = parseTabSessions(record.documents, 200, seen);
+    const closedTabs = parseTabSessions(record.closedTabs, 20, seen);
+    if (!documents.length && !closedTabs.length) return null;
     const activeIndex =
       typeof record.activeIndex === "number" && Number.isInteger(record.activeIndex)
-        ? Math.min(Math.max(record.activeIndex, 0), documents.length - 1)
+        ? Math.min(Math.max(record.activeIndex, 0), Math.max(documents.length - 1, 0))
         : 0;
-    return { version: 1, documents, activeIndex };
+    return { version: 1, documents, activeIndex, closedTabs };
   } catch {
     return null;
   }

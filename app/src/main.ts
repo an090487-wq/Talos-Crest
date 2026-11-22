@@ -62,7 +62,7 @@ import { measure, LABEL, FUN } from "./meter";
 import type { Reading } from "./meter";
 import { openPdf, isPdfFocused, initPdfPane } from "./pdf";
 import { clearExtensionThemePreference, initExtensions, installedSnippets } from "./extensions";
-import { chooseWorkspace, initArchitectureExplorer, openQuickOpen, openObservatory, openWorkspace } from "./architecture";
+import { chooseWorkspace, initArchitectureExplorer, openQuickOpen, openObservatory, openWorkspace, rememberRecent } from "./architecture";
 import { initCommandPalette, openCommandPalette } from "./command-palette";
 import { collectOutline } from "./outline";
 import type { OutlineSymbol } from "./outline";
@@ -124,7 +124,7 @@ let activeTab: EditorTab | null = null;
 let nextTabId = 1;
 let tabSessionTimer = 0;
 let view: EditorView;
-let funMode = false;
+let funMode = getWindowValue("talos.fun-mode") === "true";
 let lastReading: Reading | null = null;
 let android = false;
 let productName = "Talos Crest";
@@ -583,19 +583,18 @@ async function restoreEditorSession(): Promise<boolean> {
     say("The saved editor session is invalid and was not restored.");
     return false;
   }
-  const restored: EditorTab[] = [];
-  for (const saved of session.documents) {
+  const restore = async (saved: DocumentTabSession): Promise<EditorTab | null> => {
     try {
       let snapshot: Awaited<ReturnType<typeof readFileSnapshot>> = null;
       if (saved.path) snapshot = await readFileSnapshot(saved.path);
       if (saved.path && !snapshot && saved.contents === undefined) {
         say(`Skipped inaccessible session file: ${saved.path}`);
-        continue;
+        return null;
       }
       const contents = saved.contents ?? snapshot?.contents ?? "";
       if (snapshot?.binary && saved.contents === undefined) {
         say(`Skipped binary session file: ${saved.path}`);
-        continue;
+        return null;
       }
       if (snapshot?.binary) say(`Restored unsaved text for ${saved.path}; the disk file is now binary.`);
       const state = createEditorState(contents, view.state).update({
@@ -608,7 +607,7 @@ async function restoreEditorSession(): Promise<boolean> {
       const savedState = snapshot && !snapshot.binary
         ? EditorState.create({ doc: snapshot.contents }).doc
         : null;
-      restored.push({
+      return {
         id: nextTabId++,
         path: saved.path,
         suggestedName: saved.suggestedName,
@@ -621,13 +620,26 @@ async function restoreEditorSession(): Promise<boolean> {
         dirty: dirtyBuffer,
         languageName: "",
         problemRows: [],
-      });
+      };
     } catch (error) {
       say(`Could not restore ${saved.path ?? saved.suggestedName ?? "an untitled document"}: ${String(error)}`);
+      return null;
     }
+  };
+
+  const restored: EditorTab[] = [];
+  for (const saved of session.documents) {
+    const tab = await restore(saved);
+    if (tab) restored.push(tab);
   }
-  if (!restored.length) return false;
+  const restoredClosed: EditorTab[] = [];
+  for (const saved of session.closedTabs ?? []) {
+    const tab = await restore(saved);
+    if (tab) restoredClosed.push(tab);
+  }
   tabRegistry.replace(restored);
+  recentlyClosedTabs.push(...restoredClosed);
+  if (!restored.length) return false;
   activeTab = null;
   const selected = restored[session.activeIndex] ?? restored[0];
   activateEditorTab(selected);
@@ -1013,6 +1025,7 @@ function togglePanel() {
 }
 
 function sidePaneSizeKey(id: string): string {
+  if (id === "panel") return "talos.panel-size";
   if (id === "pdf-pane") return "talos.pdf-pane-size";
   if (id === "html-preview") return "talos.html-preview-size";
   return "talos.side-pane-size";
@@ -1150,21 +1163,22 @@ function installWorkspaceResizers() {
 
 function persistEditorTabs() {
   if (!($("restore-session-on-startup") as HTMLInputElement).checked) return;
-  const session: DocumentTabSession[] = editorTabs.map((tab) => ({
+  const serialize = (tab: EditorTab): DocumentTabSession => ({
     path: tab.path,
     suggestedName: tab.suggestedName,
     anchor: tab.state.selection.main.anchor,
     head: tab.state.selection.main.head,
     scrollTop: tab === activeTab ? view.scrollDOM.scrollTop : tab.scrollTop,
     ...(tab.dirty ? { contents: tab.state.doc.toString() } : {}),
-  }));
+  });
   try {
     setWindowValue(
       "talos.editor-session",
       JSON.stringify({
         version: 1,
-        documents: session,
+        documents: editorTabs.map(serialize),
         activeIndex: Math.max(0, editorTabs.indexOf(activeTab!)),
+        closedTabs: recentlyClosedTabs.map(serialize),
       }),
     );
   } catch (error) {
@@ -1465,6 +1479,7 @@ async function loadPath(path: string) {
 }
 
 async function openAny(path: string) {
+  rememberRecent(path);
   const name = fileNameFromPath(path).toLowerCase();
   if (name.endsWith(".pdf")) {
     closeHtmlPreview();
@@ -1516,6 +1531,15 @@ async function askFileConflict(path: string): Promise<"reload" | "overwrite" | "
 async function askUnsavedChanges(message: string): Promise<"save" | "discard" | "cancel"> {
   $("close-confirm-message").textContent = message;
   const dialog = $("close-confirm-dialog") as HTMLDialogElement;
+  if (dialog.open) {
+    // Reuse a stale dialog safely: let its pending close event settle first so
+    // it cannot resolve this call with the previous return value.
+    const settled = new Promise<void>((resolve) => {
+      dialog.addEventListener("close", () => resolve(), { once: true });
+    });
+    dialog.close("cancel");
+    await settled;
+  }
   dialog.showModal();
   return new Promise((resolve) => {
     dialog.addEventListener(
@@ -1780,6 +1804,30 @@ async function checkExternalFileRevision(tab: EditorTab | null = activeTab) {
   }
 }
 
+// A close request must always finish. Cleanup is best-effort, the in-progress
+// flag is always released, and a watchdog can terminate the process if the
+// webview itself refuses to go away.
+const CLOSE_WATCHDOG_MS = 3000;
+let closeInProgress = false;
+
+function emergencyExit(): void {
+  void invoke("force_quit").catch(() => {
+    // No renderer-side recovery is left if the backend cannot be reached.
+  });
+}
+
+async function destroyCurrentWindow(): Promise<void> {
+  const watchdog = window.setTimeout(emergencyExit, CLOSE_WATCHDOG_MS);
+  try {
+    await getCurrentWindow().destroy();
+  } catch (error) {
+    emergencyExit();
+    throw error;
+  } finally {
+    window.clearTimeout(watchdog);
+  }
+}
+
 async function finishWindowClose(discardUnsaved = false) {
   if (discardUnsaved) {
     for (const tab of editorTabs) {
@@ -1789,60 +1837,73 @@ async function finishWindowClose(discardUnsaved = false) {
       }
     }
   }
-  persistEditorTabs();
-  await invoke("stop_project_watch");
-  await getCurrentWindow().destroy();
+  try {
+    persistEditorTabs();
+  } catch (error) {
+    say(`Could not save the editor session: ${String(error)}`);
+  }
+  try {
+    await invoke("stop_project_watch");
+  } catch (error) {
+    say(`Could not stop the project watcher: ${String(error)}`);
+  }
+  await destroyCurrentWindow();
 }
-
-let closePromptOpen = false;
 
 async function handleWindowCloseRequest(event: { preventDefault: () => void }) {
   event.preventDefault();
-  if (closePromptOpen) return;
-  closePromptOpen = true;
+  if (closeInProgress) return;
+  closeInProgress = true;
 
-  if (!editorTabs.some((tab) => tab.dirty)) {
-    try {
+  try {
+    if (!editorTabs.some((tab) => tab.dirty)) {
       await finishWindowClose();
-    } catch (error) {
-      say(`Could not close the window cleanly: ${String(error)}`);
-      closePromptOpen = false;
+      return;
     }
-    return;
-  }
 
-  const dirtyCount = editorTabs.filter((tab) => tab.dirty).length;
-  const choice = await askUnsavedChanges(
-    `Save changes in ${dirtyCount} open document${dirtyCount === 1 ? "" : "s"} before closing this window?`,
-  );
-  if (choice === "save") {
+    const dirtyCount = editorTabs.filter((tab) => tab.dirty).length;
+    let choice: "save" | "discard" | "cancel" = "cancel";
     try {
-      const activeId = activeTab?.id;
+      choice = await askUnsavedChanges(
+        `Save changes in ${dirtyCount} open document${dirtyCount === 1 ? "" : "s"} before closing this window?`,
+      );
+    } catch (error) {
+      // A broken modal must never trap the window. Nothing is silently
+      // discarded: the message tells the user what happened.
+      say(`Could not show the save dialog; closing without saving: ${String(error)}`);
+      choice = "discard";
+    }
+    if (choice === "cancel") return;
+    if (choice === "discard") {
+      await finishWindowClose(true);
+      return;
+    }
+
+    const activeId = activeTab?.id;
+    try {
       for (const tab of [...editorTabs]) {
         if (!tab.dirty) continue;
         activateEditorTab(tab);
         await saveFile();
         if (tab.dirty) {
-          if (activeId !== undefined) activateEditorTab(editorTabs.find((item) => item.id === activeId));
-          closePromptOpen = false;
+          say(`Could not save ${fileNameFromPath(tab.path ?? tab.suggestedName ?? "Untitled")}. Close cancelled; no changes were discarded.`);
           return;
         }
       }
-      if (activeId !== undefined) activateEditorTab(editorTabs.find((item) => item.id === activeId));
-      await finishWindowClose();
-    } catch (error) {
-      say(`Could not save before closing: ${String(error)}`);
-      closePromptOpen = false;
+    } finally {
+      if (activeId !== undefined) {
+        const previous = editorTabs.find((item) => item.id === activeId);
+        if (previous) activateEditorTab(previous);
+      }
     }
-  } else if (choice === "discard") {
-    try {
-      await finishWindowClose(true);
-    } catch (error) {
-      say(`Could not close the window cleanly: ${String(error)}`);
-      closePromptOpen = false;
-    }
-  } else {
-    closePromptOpen = false;
+    await finishWindowClose();
+  } catch (error) {
+    say(`Could not close the window cleanly: ${String(error)}`);
+    await destroyCurrentWindow().catch(() => emergencyExit());
+  } finally {
+    // Release the guard on every path, including errors. A later close request
+    // is therefore never ignored because an earlier one failed.
+    closeInProgress = false;
   }
 }
 
@@ -2182,8 +2243,10 @@ installWorkspaceResizers();
 applyBuiltinTheme(activeBuiltinTheme, false);
 applyEditorFont(localStorage.getItem("talos.editor-font") ?? "default");
 applyEditorFontSize(editorFontSize);
+$("btn-fun").textContent = funMode ? "Fun mode: on" : "Fun mode: off";
 $("btn-fun").addEventListener("click", () => {
   funMode = !funMode;
+  setWindowValue("talos.fun-mode", String(funMode));
   $("btn-fun").textContent = funMode ? "Fun mode: on" : "Fun mode: off";
   if (lastReading) renderMeter(lastReading);
 });
@@ -2303,6 +2366,16 @@ for (const button of document.querySelectorAll<HTMLElement>("#activity-bar [data
   });
 }
 
+function restoreSelect(id: string, key: string): void {
+  const select = $(id) as HTMLSelectElement;
+  const saved = getWindowValue(key);
+  const values = new Set(Array.from(select.options, (option) => option.value));
+  if (saved && values.has(saved)) select.value = saved;
+  select.addEventListener("change", () => setWindowValue(key, select.value));
+}
+
+restoreSelect("problems-severity", "talos.problems-severity");
+restoreSelect("run-language", "talos.run-language");
 if (getWindowValue("talos.panel-visible") === "false") showPanel(false, false);
 if (
   getWindowValue("talos.panel-maximized") === "true" &&

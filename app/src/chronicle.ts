@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { chooseWorkspace } from "./architecture";
-import { getWindowValue } from "./window-state";
+import { getWindowValue, setWindowValue } from "./window-state";
 
 interface ChronicleSettings {
   enabled: boolean;
@@ -65,7 +65,9 @@ const dialog = () => el("chronicle-dialog") as HTMLDialogElement;
 
 let currentRoot = "";
 let currentProjectId = "";
-let activeView: ChronicleView = "timeline";
+const storedView = getWindowValue("talos.chronicle-view");
+let activeView: ChronicleView =
+  storedView === "timeline" || storedView === "decisions" || storedView === "search" ? storedView : "timeline";
 let listenersReady: Promise<void> | null = null;
 let indexing = false;
 
@@ -198,6 +200,7 @@ async function loadView() {
 
 function setView(view: ChronicleView) {
   activeView = view;
+  setWindowValue("talos.chronicle-view", view);
   for (const button of document.querySelectorAll<HTMLElement>("#chronicle-dialog [data-chronicle-view]")) {
     button.classList.toggle("active", button.dataset.chronicleView === view);
   }
@@ -258,6 +261,7 @@ function wire() {
   el("chronicle-close").addEventListener("click", () => dialog().close());
   for (const button of document.querySelectorAll<HTMLElement>("#chronicle-dialog [data-chronicle-view]")) {
     button.addEventListener("click", () => setView(button.dataset.chronicleView as ChronicleView));
+    button.classList.toggle("active", button.dataset.chronicleView === activeView);
   }
   let searchTimer = 0;
   el("chronicle-search").addEventListener("input", () => {
