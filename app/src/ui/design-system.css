@@ -76,6 +76,23 @@
   background: color-mix(in srgb, var(--tc-accent) 18%, var(--tc-surface));
 }
 
+.tc-button:focus-visible,
+.tc-icon-button:focus-visible,
+.tc-input:focus-visible,
+.tc-select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.tc-button:disabled,
+.tc-icon-button:disabled,
+.tc-input:disabled,
+.tc-select:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  filter: none;
+}
+
 .tc-button--primary {
   border-color: var(--tc-accent);
   background: var(--tc-accent);
