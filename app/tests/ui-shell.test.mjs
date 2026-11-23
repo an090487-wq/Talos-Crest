@@ -9,6 +9,8 @@ const html = readFileSync(resolve(appDir, "index.html"), "utf8");
 const css = readFileSync(resolve(appDir, "src/ui/design-system.css"), "utf8");
 const main = readFileSync(resolve(appDir, "src/main.ts"), "utf8");
 const architecture = readFileSync(resolve(appDir, "src/architecture.ts"), "utf8");
+const tauriConfig = readFileSync(resolve(appDir, "src-tauri/tauri.conf.json"), "utf8");
+const canvas = readFileSync(resolve(appDir, "src/canvas/canvas-ui.ts"), "utf8");
 
 test("native controls keep their own chrome", () => {
   assert.match(html, /input\[type="checkbox"\], input\[type="radio"\], input\[type="range"\], input\[type="color"\]/);
@@ -43,6 +45,30 @@ test("design-system controls keep focus and empty states readable", () => {
   assert.match(css, /\.tc-activity-bar \{[^}]*overflow-y: auto;/);
   assert.match(css, /\.tc-command-search input:focus-visible \{[\s\S]*?outline: 2px solid var\(--tc-focus\);/);
   assert.match(css, /@media \(max-width: 700px\) \{[\s\S]*?\.tc-nav-item \{\s*padding: 0 8px;\s*\}/);
+});
+
+test("adaptive layout uses width and height, with a user override and safe clamping", () => {
+  assert.match(html, /html\[data-layout-mode="compact"\]/);
+  assert.match(html, /id="btn-layout-mode"/);
+  assert.match(main, /resolveLayoutMode\(layoutPreference/);
+  assert.match(main, /clampPanelSize\(/);
+  assert.match(main, /clampSidePaneSize\(/);
+  assert.match(main, /ResizeObserver/);
+  assert.match(main, /requestAnimationFrame\(\(\) => \{\s*layoutSyncFrame = 0;\s*syncLayout\(reason\);/);
+  assert.match(main, /scheduleEditorMeasure/);
+  assert.doesNotMatch(main, /storedPanelSize < 280/);
+  assert.match(tauriConfig, /"minWidth": 480/);
+  assert.match(tauriConfig, /"minHeight": 360/);
+  assert.match(canvas, /fitToViewport/);
+  assert.match(canvas, /addEventListener\("resize"/);
+});
+
+test("compact layout exposes secondary toolbar actions through an overflow menu", () => {
+  assert.match(html, /id="btn-toolbar-overflow"/);
+  assert.match(html, /id="toolbar-overflow-menu"/);
+  assert.match(main, /function openToolbarOverflow/);
+  assert.match(main, /function refreshToolbarOverflow/);
+  assert.match(html, /html\[data-layout-mode="compact"\] #btn-toolbar-overflow \{ display: inline-flex; \}/);
 });
 
 test("closing tool overlays restores the default navigation state", () => {

@@ -113,7 +113,7 @@ export async function openPdf(path: string) {
   // Remember the chosen arrangement; side-by-side is the default so code,
   // Ollama and the PDF can all stay visible together.
   setPdfFocused(getWindowValue("talos.pdf-focus") === "true", false);
-  document.dispatchEvent(new Event("talos:side-pane-change"));
+  document.dispatchEvent(new CustomEvent("talos:side-pane-change", { detail: "pdf-pane" }));
   requestAnimationFrame(() => (fitMode ? fitToPane() : schedule()));
 }
 
@@ -122,7 +122,7 @@ export function closePdf() {
   doc = null;
   setPdfFocused(false, false);
   $("pdf-pane").classList.add("hidden");
-  document.dispatchEvent(new Event("talos:side-pane-change"));
+  document.dispatchEvent(new CustomEvent("talos:side-pane-change", { detail: null }));
 }
 
 export function initPdfPane() {

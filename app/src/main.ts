@@ -1,4 +1,15 @@
 import "./ui/design-system.css";
+import {
+  clampPanelSize,
+  clampSidePaneSize,
+  layoutModeLabel,
+  nextLayoutPreference,
+  parseLayoutPreference,
+  resolveLayoutMode,
+  type LayoutAxis,
+  type LayoutMode,
+  type LayoutPreference,
+} from "./layout";
 import { EditorView } from "codemirror";
 import { Compartment, EditorState, Prec } from "@codemirror/state";
 import type { Text } from "@codemirror/state";
@@ -133,6 +144,11 @@ let lastReading: Reading | null = null;
 let android = false;
 let productName = "Talos Crest";
 let lastNativeTitle = "";
+let layoutPreference: LayoutPreference = parseLayoutPreference(getWindowValue("talos.layout-mode"));
+let activeLayoutMode: LayoutMode = "medium";
+let layoutSyncFrame = 0;
+let editorMeasureFrame = 0;
+let layoutSignature = "";
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -146,6 +162,73 @@ function whenIdle(callback: () => void, timeout = 500) {
   const idle = (window as IdleWindow).requestIdleCallback;
   if (typeof idle === "function") idle(callback, { timeout });
   else window.setTimeout(callback, 0);
+}
+
+// Layout work is coalesced into one animation frame. It must never run from the
+// CodeMirror update listener, which is the keystroke-critical path.
+function scheduleEditorMeasure() {
+  if (editorMeasureFrame) return;
+  editorMeasureFrame = requestAnimationFrame(() => {
+    editorMeasureFrame = 0;
+    view?.requestMeasure?.();
+  });
+}
+
+function currentAppSize() {
+  const bounds = $("app").getBoundingClientRect();
+  return {
+    width: bounds.width || window.innerWidth,
+    height: bounds.height || window.innerHeight,
+  };
+}
+
+function chromeHeightExcludingPanel(): number {
+  const appHeight = currentAppSize().height;
+  const mainHeight = $("main").getBoundingClientRect().height;
+  const panel = $("panel");
+  const panelVisible = !panel.classList.contains("hidden") &&
+    !$("editor-region").classList.contains("panel-maximized");
+  const panelHeight = panelVisible ? panel.getBoundingClientRect().height : 0;
+  const splitterHeight = panelVisible ? $("panel-splitter").getBoundingClientRect().height : 0;
+  return Math.max(0, appHeight - mainHeight - panelHeight - splitterHeight);
+}
+
+function visibleSidePanes(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>("#main > .side-pane:not(.hidden)"));
+}
+
+function preferredSidePane(): HTMLElement | null {
+  const panes = visibleSidePanes();
+  if (panes.length <= 1) return panes[0] ?? null;
+  const marked = panes.find((pane) => pane.id === $("main").dataset.activeSidePane);
+  const chosen = marked ?? panes[panes.length - 1];
+  for (const pane of panes) {
+    if (pane !== chosen) pane.classList.add("hidden");
+  }
+  return chosen;
+}
+
+function sidePaneAxis(): LayoutAxis {
+  return window.matchMedia("(max-width: 700px)").matches ? "y" : "x";
+}
+
+function applyPanelSize(mode: LayoutMode) {
+  const panel = $("panel");
+  const splitter = $("panel-splitter");
+  if (panel.classList.contains("hidden") || $("editor-region").classList.contains("panel-maximized")) return;
+  const stored = Number(getWindowValue("talos.panel-size"));
+  const preferred = Number.isFinite(stored) && stored > 0 ? stored : 280;
+  const viewportHeight = currentAppSize().height;
+  const chrome = chromeHeightExcludingPanel();
+  const min = clampPanelSize(0, viewportHeight, chrome, mode);
+  const max = clampPanelSize(Number.MAX_SAFE_INTEGER, viewportHeight, chrome, mode);
+  const next = clampPanelSize(preferred, viewportHeight, chrome, mode);
+  const current = Number.parseFloat(panel.style.flexBasis) || panel.getBoundingClientRect().height;
+  if (!Number.isFinite(current) || Math.abs(current - next) >= 1) panel.style.flexBasis = `${next}px`;
+  splitter.setAttribute("aria-valuemin", String(min));
+  splitter.setAttribute("aria-valuemax", String(max));
+  splitter.setAttribute("aria-valuenow", String(next));
+  splitter.setAttribute("aria-orientation", "horizontal");
 }
 
 const themeIds = Object.keys(builtinThemes) as BuiltinThemeId[];
@@ -200,6 +283,7 @@ function applyEditorFont(font: string) {
   const selected = editorFonts[font] ? font : "default";
   document.documentElement.style.setProperty("--editor-font", editorFonts[selected]);
   ($("editor-font") as HTMLSelectElement).value = selected;
+  scheduleEditorMeasure();
 }
 
 const MIN_EDITOR_FONT_SIZE = 9;
@@ -214,6 +298,7 @@ function applyEditorFontSize(size: number) {
   editorFontSize = next;
   document.documentElement.style.setProperty("--editor-font-size", `${next}px`);
   localStorage.setItem("talos.editor-font-size", String(next));
+  scheduleEditorMeasure();
 }
 
 function adjustEditorFontSize(delta: number) {
@@ -1045,11 +1130,8 @@ function setPanelMaximized(maximized: boolean) {
   button.setAttribute("aria-label", title);
   button.title = title;
   button.textContent = maximized ? "Restore" : "Max";
-  if (!maximized) {
-    const stored = Number(getWindowValue("talos.panel-size"));
-    if (Number.isFinite(stored) && stored > 0) $("panel").style.flexBasis = `${stored}px`;
-    view?.requestMeasure?.();
-  }
+  scheduleLayoutSync(maximized ? "panel-maximize" : "panel-restore");
+  scheduleEditorMeasure();
 }
 
 function showPanel(show: boolean, persist = true) {
@@ -1059,13 +1141,17 @@ function showPanel(show: boolean, persist = true) {
   if (show && !$("problems").classList.contains("hidden")) renderProblems();
   if (show && !$("channel-terminal").classList.contains("hidden")) void ensureTerminal();
   if (persist) setWindowValue("talos.panel-visible", String(show));
+  scheduleLayoutSync(show ? "panel-open" : "panel-close");
+  scheduleEditorMeasure();
 }
 
 function previewHtml() {
   toggleOutline(false);
   const preview = $("html-preview");
   preview.classList.remove("hidden");
+  $("main").dataset.activeSidePane = preview.id;
   syncSidePane();
+  scheduleEditorMeasure();
   ($("html-preview-frame") as HTMLIFrameElement).srcdoc = view.state.doc.toString();
 }
 
@@ -1073,6 +1159,7 @@ function closeHtmlPreview() {
   ($("html-preview-frame") as HTMLIFrameElement).srcdoc = "";
   $("html-preview").classList.add("hidden");
   syncSidePane();
+  scheduleEditorMeasure();
 }
 
 function togglePanel() {
@@ -1087,29 +1174,34 @@ function sidePaneSizeKey(id: string): string {
 }
 
 function syncSidePane() {
-  const pane = document.querySelector<HTMLElement>("#main > .side-pane:not(.hidden)");
+  const pane = preferredSidePane();
   const open = pane !== null;
   $("main").classList.toggle("side-pane-open", open);
   $("side-splitter").classList.toggle("hidden", !open);
   if (!pane) return;
-  const mobile = window.matchMedia("(max-width: 700px)").matches;
+  const axis = sidePaneAxis();
   const bounds = $("main").getBoundingClientRect();
-  const min = mobile ? 160 : 240;
-  const max = mobile ? Math.max(min, bounds.height - 120) : Math.max(min, bounds.width - 280);
+  const containerSize = axis === "x" ? bounds.width : bounds.height;
   const sizeKey = sidePaneSizeKey(pane.id);
-  const storedSize = getWindowValue(sizeKey);
-  const preferredSize = Number.parseFloat(pane.style.flexBasis) || Number(storedSize);
-  if (Number.isFinite(preferredSize) && preferredSize > 0) {
-    // Clamp only the applied size. Persisting the clamped value would destroy
-    // the user's preferred width whenever the window happens to be narrow.
-    const size = Math.round(Math.min(Math.max(preferredSize, min), max));
-    pane.style.flexBasis = `${size}px`;
-  }
-  const axisSize = mobile ? pane.getBoundingClientRect().height : pane.getBoundingClientRect().width;
+  const storedSize = Number(getWindowValue(sizeKey));
+  const inlineSize = Number.parseFloat(pane.style.flexBasis);
+  const measuredSize = pane.getBoundingClientRect()[axis === "x" ? "width" : "height"];
+  const preferredSize = Number.isFinite(inlineSize) && inlineSize > 0
+    ? inlineSize
+    : Number.isFinite(storedSize) && storedSize > 0
+      ? storedSize
+      : measuredSize;
+  const min = clampSidePaneSize(0, containerSize, activeLayoutMode, axis);
+  const max = clampSidePaneSize(Number.MAX_SAFE_INTEGER, containerSize, activeLayoutMode, axis);
+  // Clamp only the applied size. The stored preference is kept so a larger
+  // window can restore the user's preferred pane size later.
+  const size = clampSidePaneSize(preferredSize, containerSize, activeLayoutMode, axis);
+  if (Number.isFinite(preferredSize) && preferredSize > 0) pane.style.flexBasis = `${size}px`;
+  const axisSize = pane.getBoundingClientRect()[axis === "x" ? "width" : "height"];
   $("side-splitter").setAttribute("aria-valuemin", String(min));
   $("side-splitter").setAttribute("aria-valuemax", String(max));
   $("side-splitter").setAttribute("aria-valuenow", String(Math.round(axisSize)));
-  $("side-splitter").setAttribute("aria-orientation", mobile ? "horizontal" : "vertical");
+  $("side-splitter").setAttribute("aria-orientation", axis === "x" ? "vertical" : "horizontal");
 }
 
 function toggleOutline(force?: boolean) {
@@ -1120,9 +1212,11 @@ function toggleOutline(force?: boolean) {
     if (!$("pdf-pane").classList.contains("hidden")) ($("pdf-close") as HTMLButtonElement).click();
   }
   pane.classList.toggle("hidden", !shouldOpen);
+  if (shouldOpen) $("main").dataset.activeSidePane = pane.id;
   $("btn-outline").classList.toggle("active", shouldOpen);
   setWindowValue("talos.outline-visible", String(shouldOpen));
   syncSidePane();
+  scheduleEditorMeasure();
   if (shouldOpen) renderOutline();
 }
 
@@ -1137,20 +1231,30 @@ function installResizeHandle(
   const resizeTo = (target: HTMLElement, size: number, dimension: "x" | "y") => {
     const bounds = target.parentElement?.getBoundingClientRect();
     const sidePane = handle.id === "side-splitter";
-    const min = dimension === "x" ? 240 : sidePane ? 160 : 96;
-    const max = dimension === "x"
-      ? Math.max(min, (bounds?.width ?? window.innerWidth) - 280)
-      : sidePane
-        ? Math.max(min, (bounds?.height ?? window.innerHeight) - 120)
-        : Math.max(min, Math.min(window.innerHeight - 180, window.innerHeight * 0.65));
-    const next = Math.round(Math.min(Math.max(size, min), max));
+    const containerSize = dimension === "x"
+      ? bounds?.width ?? window.innerWidth
+      : bounds?.height ?? window.innerHeight;
+    const min = sidePane
+      ? clampSidePaneSize(0, containerSize, activeLayoutMode, dimension)
+      : clampPanelSize(0, currentAppSize().height, chromeHeightExcludingPanel(), activeLayoutMode);
+    const max = sidePane
+      ? clampSidePaneSize(Number.MAX_SAFE_INTEGER, containerSize, activeLayoutMode, dimension)
+      : clampPanelSize(Number.MAX_SAFE_INTEGER, currentAppSize().height, chromeHeightExcludingPanel(), activeLayoutMode);
+    const next = sidePane
+      ? clampSidePaneSize(size, containerSize, activeLayoutMode, dimension)
+      : clampPanelSize(size, currentAppSize().height, chromeHeightExcludingPanel(), activeLayoutMode);
+    const requested = Math.max(1, Math.min(4096, Math.round(size)));
     target.style.flexBasis = `${next}px`;
     if (sidePane) document.dispatchEvent(new Event("talos:side-pane-resize"));
+    else document.dispatchEvent(new Event("talos:panel-resize"));
     handle.setAttribute("aria-valuemin", String(min));
     handle.setAttribute("aria-valuemax", String(max));
     handle.setAttribute("aria-valuenow", String(next));
     handle.setAttribute("aria-orientation", dimension === "x" ? "vertical" : "horizontal");
-    setWindowValue(sidePaneSizeKey(target.id), String(next));
+    // Store the requested size, not the clamped size, so shrinking a window
+    // temporarily does not destroy the user's preferred pane dimensions.
+    setWindowValue(sidePaneSizeKey(target.id), String(requested));
+    scheduleEditorMeasure();
   };
 
   const targetId = getTarget()?.id;
@@ -1179,6 +1283,7 @@ function installResizeHandle(
       handle.removeEventListener("pointermove", move);
       handle.removeEventListener("pointerup", finish);
       handle.removeEventListener("pointercancel", finish);
+      scheduleLayoutSync("resize-end");
     };
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", finish, { once: true });
@@ -1200,19 +1305,146 @@ function installResizeHandle(
   });
 }
 
+function updateLayoutButton() {
+  const button = $("btn-layout-mode") as HTMLButtonElement;
+  const current = layoutPreference === "auto"
+    ? `Auto (${layoutModeLabel(activeLayoutMode)})`
+    : layoutModeLabel(layoutPreference);
+  button.textContent = `Layout: ${current}`;
+  button.title = `Layout mode: ${current}. Click to cycle Auto, Large, Medium and Compact.`;
+  button.setAttribute("aria-label", button.title);
+}
+
+const overflowActionIds = [
+  "btn-open",
+  "btn-quick-open",
+  "btn-architecture",
+  "btn-outline",
+  "btn-pdf",
+  "btn-preview",
+  "btn-calc",
+  "btn-canvas",
+  "btn-undo",
+  "btn-redo",
+  "btn-save",
+  "btn-saveas",
+  "btn-run",
+  "btn-ext",
+  "btn-tpl",
+];
+
+function closeToolbarOverflow() {
+  $("toolbar-overflow-menu").classList.add("hidden");
+  $("btn-toolbar-overflow").setAttribute("aria-expanded", "false");
+}
+
+function refreshToolbarOverflow() {
+  const menu = $("toolbar-overflow-menu");
+  menu.replaceChildren();
+  for (const id of overflowActionIds) {
+    const source = document.getElementById(id) as HTMLButtonElement | null;
+    if (!source) continue;
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "toolbar-overflow-item";
+    item.textContent = source.textContent?.trim() || id;
+    item.disabled = source.disabled;
+    item.title = source.title || item.textContent || id;
+    item.setAttribute("role", "menuitem");
+    item.addEventListener("click", () => {
+      closeToolbarOverflow();
+      source.click();
+    });
+    menu.appendChild(item);
+  }
+}
+
+function openToolbarOverflow() {
+  const button = $("btn-toolbar-overflow");
+  const menu = $("toolbar-overflow-menu");
+  refreshToolbarOverflow();
+  const rect = button.getBoundingClientRect();
+  menu.style.top = `${Math.round(rect.bottom + 4)}px`;
+  menu.style.right = `${Math.max(8, Math.round(window.innerWidth - rect.right))}px`;
+  menu.classList.remove("hidden");
+  button.setAttribute("aria-expanded", "true");
+  (menu.querySelector<HTMLButtonElement>("button:not(:disabled)") ?? menu.querySelector<HTMLButtonElement>("button"))?.focus();
+}
+
+function installToolbarOverflow() {
+  $("btn-toolbar-overflow").addEventListener("click", () => {
+    if ($("toolbar-overflow-menu").classList.contains("hidden")) openToolbarOverflow();
+    else closeToolbarOverflow();
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if ($("toolbar-overflow-menu").classList.contains("hidden")) return;
+    const target = event.target as Node | null;
+    if ($("toolbar-overflow-menu").contains(target) || $("btn-toolbar-overflow").contains(target)) return;
+    closeToolbarOverflow();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeToolbarOverflow();
+  });
+  window.addEventListener("resize", closeToolbarOverflow);
+}
+
+function syncLayout(reason: string) {
+  const size = currentAppSize();
+  const mode = resolveLayoutMode(layoutPreference, size);
+  if (mode !== activeLayoutMode || document.documentElement.dataset.layoutMode !== mode) {
+    activeLayoutMode = mode;
+    document.documentElement.dataset.layoutMode = mode;
+  }
+  if (mode !== "compact") closeToolbarOverflow();
+  applyPanelSize(mode);
+  syncSidePane();
+  updateLayoutButton();
+  const panel = $("panel");
+  const sidePane = preferredSidePane();
+  const signature = [
+    reason,
+    mode,
+    Math.round(size.width),
+    Math.round(size.height),
+    panel.classList.contains("hidden") ? "panel-hidden" : panel.style.flexBasis,
+    $("editor-region").classList.contains("panel-maximized") ? "maximized" : "normal",
+    sidePane ? `${sidePane.id}:${sidePane.style.flexBasis}` : "no-side",
+  ].join("|");
+  if (signature !== layoutSignature) {
+    layoutSignature = signature;
+    scheduleEditorMeasure();
+  }
+}
+
+function scheduleLayoutSync(reason = "resize") {
+  if (layoutSyncFrame) return;
+  layoutSyncFrame = requestAnimationFrame(() => {
+    layoutSyncFrame = 0;
+    syncLayout(reason);
+  });
+}
+
+function installLayoutObserver() {
+  if (typeof ResizeObserver === "undefined") return;
+  const observer = new ResizeObserver(() => scheduleLayoutSync("observer"));
+  observer.observe($("app"));
+  observer.observe($("main"));
+}
+
 function installWorkspaceResizers() {
   installResizeHandle(
     $("side-splitter"),
-    () => document.querySelector<HTMLElement>("#main > .side-pane:not(.hidden)"),
+    () => preferredSidePane(),
     "x"
   );
   installResizeHandle($("panel-splitter"), () => $("panel"), "y");
-  window.addEventListener("resize", () => {
-    syncSidePane();
-    $("side-splitter").setAttribute(
-      "aria-orientation",
-      window.matchMedia("(max-width: 700px)").matches ? "horizontal" : "vertical"
-    );
+  window.addEventListener("resize", () => scheduleLayoutSync("window"));
+  installLayoutObserver();
+  $("btn-layout-mode").addEventListener("click", () => {
+    layoutPreference = nextLayoutPreference(layoutPreference);
+    setWindowValue("talos.layout-mode", layoutPreference);
+    scheduleLayoutSync("preference");
+    say(`Layout mode: ${layoutPreference === "auto" ? "Auto" : layoutModeLabel(layoutPreference)}`);
   });
 }
 
@@ -2318,13 +2550,18 @@ void getCurrentWindow()
     await handleWindowCloseRequest(event);
   })
   .catch((error: unknown) => say(`Could not guard window close: ${String(error)}`));
-document.addEventListener("talos:side-pane-change", syncSidePane);
-document.addEventListener("talos:pdf-focus-change", () => view?.requestMeasure?.());
-const storedPanelSize = Number(getWindowValue("talos.panel-size"));
-if (!Number.isFinite(storedPanelSize) || storedPanelSize < 280) {
-  setWindowValue("talos.panel-size", "280");
-}
+document.addEventListener("talos:side-pane-change", (event) => {
+  const id = (event as CustomEvent<string | null>).detail;
+  if (id) $("main").dataset.activeSidePane = id;
+  syncSidePane();
+  scheduleEditorMeasure();
+});
+document.addEventListener("talos:pdf-focus-change", () => {
+  scheduleLayoutSync("pdf-focus");
+  scheduleEditorMeasure();
+});
 installWorkspaceResizers();
+installToolbarOverflow();
 applyBuiltinTheme(activeBuiltinTheme, false);
 applyEditorFont(localStorage.getItem("talos.editor-font") ?? "default");
 applyEditorFontSize(editorFontSize);
@@ -2471,6 +2708,7 @@ if (
 const savedPanelTab = getWindowValue("talos.bottom-panel-tab");
 if (savedPanelTab && savedPanelTab in bottomViews) showTab(savedPanelTab as BottomTab);
 if (getWindowValue("talos.outline-visible") === "true") toggleOutline(true);
+syncLayout("init");
 document.addEventListener("talos:workspace-change", refreshTitle);
 void listen<FileSavedNotice>("talos://file-saved", (event) => {
   if (event.payload.owner !== getCurrentWindow().label) {

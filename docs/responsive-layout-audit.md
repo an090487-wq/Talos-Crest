@@ -263,11 +263,36 @@ These are proposals only; none are implemented by this audit.
 6. **Testing.** Real GUI resize matrix at maximised, windowed, narrow, short,
    high-DPI/scaled, panel-open, multi-tab, Canvas, Calc, and restart states.
 
-## Explicit limitations of this audit
+## Implementation status
 
-- Static source review cannot verify actual rendering, font metrics, display
-  scaling, or high-DPI behavior.
-- No packaged-app resize test, screenshot comparison, or timing measurement was
-  performed.
-- The proposed modes and overflow surfaces are not yet implemented.
-- This audit does not claim the interface is fully responsive or bug-free.
+The first adaptive-layout increment is implemented:
+
+- `app/src/layout.ts` derives Large/Medium/Compact from both width and height,
+  validates the per-window override, and clamps panel and side-pane sizes while
+  reserving editor space.
+- The status-bar **Layout** control cycles Auto/Large/Medium/Compact. Auto is the
+  default and the preference is stored per window.
+- Panel and side-pane sizes are clamped on restore, window resize, panel toggle,
+  and pointer/keyboard resize. The requested size is stored separately from the
+  temporarily clamped size, so shrinking a window does not destroy the preferred
+  arrangement.
+- A single `ResizeObserver` plus a rAF-coalesced window resize path drives layout
+  changes. CodeMirror remeasurement is coalesced and is not called from the
+  keystroke update listener.
+- Compact mode wraps the terminal toolbar, relaxes Chronicle's fixed height,
+  exposes Architecture Explorer exclusions, tightens chrome, and puts secondary
+  toolbar actions in a **More** menu.
+- Canvas now re-fits its stage on resize while it is in fit mode; manual zoom is
+  preserved.
+- The Tauri desktop window declares a 480x360 minimum so the compact layout has a
+  defined lower bound.
+
+Remaining limitations:
+
+- Canvas, Calc, Architecture Explorer, and Chronicle still have view-specific
+  layout constraints that were not fully redesigned.
+- The new modes and overflow menu have unit/static coverage but no packaged-app
+  GUI resize matrix or high-DPI measurement yet.
+- No screenshot comparison, screen-reader session, or physical Windows resize
+  test was performed.
+- This increment does not claim complete responsiveness or bug-free behavior.

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-layout-mode="medium">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -33,6 +33,10 @@
         --font-xs: 10px; --font-sm: 11px; --font-md: 13px; --font-lg: 16px;
         --radius-sm: 4px; --radius-md: 6px; --radius-lg: 9px; --radius-xl: 12px;
         --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px;
+        --control-height: 30px; --control-height-sm: 26px; --icon-size: 18px;
+        --toolbar-height: 38px; --toolbar-gap: 6px; --panel-tab-height: 29px;
+        --surface-1: var(--panel); --surface-2: var(--panel-2); --surface-3: var(--surface-raised);
+        --border-subtle: var(--line); --border-strong: var(--line-strong);
         --panel-size: 280px; --side-pane-size: 56%;
         --transition-fast: 120ms ease;
         font-family: var(--ui-font);
@@ -77,6 +81,10 @@
       html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font: var(--font-size)/1.45 var(--ui-font); }
       #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
       .hidden { display: none !important; }
+      #btn-toolbar-overflow { display: none; }
+      .toolbar-overflow-menu { position: fixed; z-index: 70; display: flex; flex-direction: column; gap: 2px; width: min(240px, calc(100vw - 16px)); padding: 5px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
+      .toolbar-overflow-item { width: 100%; min-height: var(--control-height-sm); border-color: transparent; background: transparent; color: var(--text); text-align: left; }
+      .toolbar-overflow-item:hover:not(:disabled) { border-color: var(--line); background: var(--surface-raised); }
       .spacer { flex: 1; }
       .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
       .panel-title { display: flex; align-items: center; gap: var(--space-2); min-height: 32px; padding: 0 var(--space-3); color: var(--text); font-size: var(--font-sm); font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
@@ -94,15 +102,15 @@
       .toolbar-group { display: inline-flex; align-items: center; gap: 2px; padding-right: var(--space-2); border-right: 1px solid var(--line); }
       .toolbar-group:last-of-type { border-right: 0; }
       button, select, input { color: var(--text); font: inherit; }
-      button { min-height: 30px; background: color-mix(in srgb, var(--surface-raised) 55%, transparent); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 4px 10px; cursor: pointer; transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast); }
+      button { min-height: var(--control-height); background: color-mix(in srgb, var(--surface-raised) 55%, transparent); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 4px 10px; cursor: pointer; transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast); }
       button:hover { border-color: color-mix(in srgb, var(--accent) 68%, var(--line)); color: var(--text); background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised)); }
       button:active { background: color-mix(in srgb, var(--accent) 16%, transparent); }
       .toolbar-group button:not(.accent) { background: transparent; border-color: transparent; color: var(--muted); }
       .toolbar-group button:not(.accent):hover { color: var(--text); border-color: var(--line); background: var(--surface-raised); }
       button.accent { border-color: var(--accent); color: var(--accent-ink); background: var(--accent); font-weight: 700; }
       button.accent:hover { background: color-mix(in srgb, var(--accent) 86%, white); color: var(--accent-ink); }
-      button.mini { min-height: 26px; padding: 2px 8px; font-size: var(--font-sm); }
-      select, input { min-height: 30px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 4px 8px; }
+      button.mini { min-height: var(--control-height-sm); padding: 2px 8px; font-size: var(--font-sm); }
+      select, input { min-height: var(--control-height); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 4px 8px; }
       input[type="checkbox"], input[type="radio"], input[type="range"], input[type="color"] {
         min-height: 0;
         padding: 0;
@@ -179,7 +187,7 @@
       #html-preview-title { flex: 1; color: var(--muted); }
       #html-preview-frame { flex: 1 1 0; min-height: 0; width: 100%; border: 0; background: #fff; }
 
-      #panel { height: var(--panel-size); flex: 0 0 var(--panel-size); border-top: 1px solid var(--line); display: flex; flex-direction: column; background: var(--bg); }
+      #panel { height: var(--panel-size); flex: 0 0 var(--panel-size); min-height: 0; overflow: hidden; border-top: 1px solid var(--line); display: flex; flex-direction: column; background: var(--bg); }
       #tabs { display: flex; align-items: center; gap: 5px; padding: 5px 10px; overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; background: var(--panel); border-bottom: 1px solid var(--line); }
       #tabs .tab { flex: 0 0 auto; min-height: 29px; border: 1px solid transparent; border-radius: var(--radius-sm); padding: 4px 10px; color: var(--muted); background: transparent; white-space: nowrap; }
       #tabs .tab.active { color: var(--text); border-color: color-mix(in srgb, var(--accent) 32%, var(--line)); background: color-mix(in srgb, var(--accent) 11%, var(--panel)); box-shadow: inset 0 -2px 0 var(--accent); }
@@ -621,6 +629,46 @@
         #arch-message { flex: 0 0 auto; max-height: 42px; overflow: auto; }
       }
 
+      html[data-layout-mode="large"] {
+        --space-3: 14px;
+        --control-height: 32px;
+      }
+      html[data-layout-mode="medium"] {
+        --space-3: 10px;
+        --control-height: 29px;
+      }
+      html[data-layout-mode="compact"] {
+        --space-2: 6px; --space-3: 8px; --space-4: 12px;
+        --control-height: 28px; --control-height-sm: 25px;
+        --toolbar-gap: 4px;
+      }
+      html[data-layout-mode="compact"] header { padding: 6px 8px; }
+      html[data-layout-mode="compact"] .tc-app-header { column-gap: 6px; row-gap: 4px; }
+      html[data-layout-mode="compact"] #btn-toolbar-overflow { display: inline-flex; }
+      html[data-layout-mode="compact"] .tc-header-actions .toolbar-group[aria-label="File actions"],
+      html[data-layout-mode="compact"] .tc-header-actions .toolbar-group[aria-label="Extensions"] { display: none; }
+      html[data-layout-mode="compact"] #breadcrumbs { min-height: 24px; padding: 0 8px; }
+      html[data-layout-mode="compact"] #document-tabs { min-height: 32px; }
+      html[data-layout-mode="compact"] .document-tab { min-height: 31px; }
+      html[data-layout-mode="compact"] #panel { max-height: 42vh; min-height: 0; overflow: hidden; }
+      html[data-layout-mode="compact"] #problems-toolbar { flex-wrap: wrap; padding: 4px 8px; }
+      html[data-layout-mode="compact"] footer { gap: 4px; padding: 4px 8px max(5px, env(safe-area-inset-bottom)); }
+      html[data-layout-mode="compact"] #workspace-status { max-width: 132px; }
+      html[data-layout-mode="compact"] #meter-label { display: none; }
+      html[data-layout-mode="compact"] #gauge { width: 56px; }
+      html[data-layout-mode="compact"] .tc-activity-bar:not(.expanded) { flex-basis: 44px; width: 44px; }
+      html[data-layout-mode="compact"] .tc-nav-item { min-height: 34px; }
+      html[data-layout-mode="compact"] .tc-terminal-toolbar { flex-wrap: wrap; }
+      html[data-layout-mode="compact"] .tc-terminal-toolbar input { width: min(150px, 100%); }
+      html[data-layout-mode="compact"] .tc-chronicle-stats,
+      html[data-layout-mode="compact"] .tc-chronicle-toolbar { flex-wrap: wrap; }
+      html[data-layout-mode="compact"] .tc-chronicle-results { min-height: 140px; max-height: none; }
+      html[data-layout-mode="compact"] .calc-body { max-height: min(620px, calc(100vh - 104px)); }
+      html[data-layout-mode="compact"] #canvas-header { flex: 0 0 auto; min-height: 44px; flex-wrap: wrap; padding: 6px 8px; }
+      html[data-layout-mode="compact"] #arch-excludes { display: inline-flex; flex: 1 0 100%; }
+      html[data-layout-mode="compact"] #arch-details-pane { flex-basis: 190px; }
+      html[data-layout-mode="compact"] #arch-message { max-height: 52px; }
+
       /* Read-only binary preview and custom error rules */
       dialog.binary-dialog { width: min(980px, calc(100vw - 24px)); max-height: min(820px, calc(100vh - 24px)); }
       #binary-dialog > header { align-items: center; gap: 6px; }
@@ -717,10 +765,12 @@
         </div>
         <span id="file">Untitled</span>
         <div id="window-controls" class="toolbar-group" role="toolbar" aria-label="Windows">
+          <button id="btn-toolbar-overflow" class="mini" title="More toolbar actions" aria-haspopup="menu" aria-expanded="false">More</button>
           <button id="btn-new-window" title="New Window (Ctrl+Shift+N)">New Window</button>
           <button id="btn-window-switcher" title="Switch between open Talos windows">Windows…</button>
         </div>
       </header>
+      <div id="toolbar-overflow-menu" class="toolbar-overflow-menu hidden" role="menu" aria-label="More toolbar actions"></div>
 
       <div id="workspace-body">
         <nav id="activity-bar" class="tc-activity-bar" aria-label="Workspace navigation">
@@ -785,7 +835,7 @@
             </aside>
           </div>
 
-          <div id="panel-splitter" class="hidden" role="separator" aria-label="Resize bottom panel" aria-controls="panel" aria-orientation="horizontal" aria-valuemin="96" aria-valuenow="190" tabindex="0"></div>
+          <div id="panel-splitter" class="hidden" role="separator" aria-label="Resize bottom panel" aria-controls="panel" aria-orientation="horizontal" aria-valuemin="136" aria-valuemax="400" aria-valuenow="280" tabindex="0"></div>
           <section id="panel" class="hidden">
             <div id="tabs" class="tc-tabs">
               <button class="tab active" data-tab="problems">Problems <span id="count">0</span></button>
@@ -852,6 +902,7 @@
           <span id="gauge"><i id="gauge-fill"></i></span>
           <span id="meter-text"></span>
         </span>
+        <button id="btn-layout-mode" class="mini" title="Layout mode: Auto">Layout: Auto</button>
         <button id="btn-panel" class="mini">Panel</button>
       </footer>
     </div>

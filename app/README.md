@@ -33,6 +33,16 @@ rail can collapse to icons only, and that preference is window-scoped. Drag the
 divider beside the PDF/HTML pane or above the bottom panel to resize it, or
 focus a divider and use the arrow keys (Shift+arrow for larger steps).
 
+The shell selects **Large**, **Medium**, or **Compact** from both the available
+window width and height. Compact mode tightens the header and status bar,
+reduces panel chrome, wraps the terminal toolbar, and moves secondary toolbar
+actions into a **More** menu. The status-bar **Layout** control cycles Auto,
+Large, Medium, and Compact; the choice is stored per window. Panel and side-pane
+sizes are clamped against the live window so a restored size cannot consume the
+editor. The editor asks CodeMirror to remeasure after panel, side-pane, font, and
+layout changes, while resize work is coalesced into animation frames and stays
+off the typing path.
+
 Press **Ctrl+K** or choose the search field in the top bar to open the command
 palette. It searches the existing action registry, groups results by category,
 remembers recent commands for the window, and supports arrow keys, Enter, and
@@ -217,8 +227,8 @@ tab. Closing a dirty tab or window prompts to save, discard, or cancel.
 The optional **Restore this window's open tabs and editor positions on startup**
 setting restores the main window's tabs and cursor/scroll positions. Dirty
 buffers are stored in that window's local session storage for recovery. This
-does not yet restore multiple windows, split editor groups, native window
-geometry, or per-window panel dimensions.
+does not yet restore multiple windows, split editor groups, or native window
+geometry. Per-window panel dimensions and visibility are restored separately.
 
 ## Diagnostics and code outline
 

@@ -67,6 +67,7 @@ let activeIndex = 0;
 let sourcePath: string | null = null;
 let svgSource: string | null = null;
 let zoom = 1;
+let fitToViewport = true;
 let tool: Tool = "select";
 let dragTool: Tool | null = null;
 let color = "#59c7d4";
@@ -274,6 +275,7 @@ function setZoom(next: number, anchor?: Point): void {
   const imageX = anchor ? Math.max(0, Math.min(width, (anchor.x - before.left) / scaleX())) : null;
   const imageY = anchor ? Math.max(0, Math.min(height, (anchor.y - before.top) / scaleY())) : null;
   zoom = target;
+  fitToViewport = false;
   applyZoom();
   if (anchor && imageX !== null && imageY !== null) {
     const viewport = $("canvas-viewport");
@@ -292,6 +294,7 @@ function fitZoom(): void {
   const availableWidth = Math.max(120, viewport.clientWidth - 64);
   const availableHeight = Math.max(120, viewport.clientHeight - 64);
   zoom = Math.max(0.05, Math.min(4, Math.min(availableWidth / width, availableHeight / height)));
+  fitToViewport = true;
   applyZoom();
   viewport.scrollLeft = 0;
   viewport.scrollTop = 0;
@@ -1830,7 +1833,10 @@ function canvasVisible(): boolean {
 
 function restoreSettings(): void {
   const storedZoom = Number(getWindowValue("talos.canvas.zoom"));
-  if (Number.isFinite(storedZoom) && storedZoom > 0) zoom = Math.min(4, Math.max(0.05, storedZoom));
+  if (Number.isFinite(storedZoom) && storedZoom > 0) {
+    zoom = Math.min(4, Math.max(0.05, storedZoom));
+    fitToViewport = false;
+  }
   color = normalizeColor(getWindowValue("talos.canvas.color"));
   fillColor = normalizeColor(getWindowValue("talos.canvas.fill-color"), color);
   const storedBrush = Number(getWindowValue("talos.canvas.brush-size"));
@@ -1955,6 +1961,15 @@ function initialize(): void {
     event.preventDefault();
     setZoom(zoom * (event.deltaY < 0 ? 1.1 : 1 / 1.1), { x: event.clientX, y: event.clientY });
   }, { passive: false });
+
+  let fitResizeFrame = 0;
+  window.addEventListener("resize", () => {
+    if (!canvasVisible() || !fitToViewport || !width || !height || fitResizeFrame) return;
+    fitResizeFrame = requestAnimationFrame(() => {
+      fitResizeFrame = 0;
+      if (canvasVisible() && fitToViewport) fitZoom();
+    });
+  });
 
   input("canvas-text-input").addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
