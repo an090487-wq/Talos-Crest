@@ -327,6 +327,9 @@
       .arch-tree-row { position: absolute; right: 0; left: 0; display: flex; align-items: center; gap: 8px; height: 32px; border: 0; border-radius: 0; background: transparent; text-align: left; }
       .arch-tree-row:hover, .arch-tree-row:focus-visible { background: var(--surface-raised); }
       .arch-tree-row.selected { background: color-mix(in srgb, var(--accent) 15%, var(--bg)); }
+      .arch-tree-row[draggable="true"] { cursor: grab; }
+      .arch-tree-row.dragging { opacity: .45; }
+      .arch-tree-row.drop-target { outline: 2px solid var(--accent); outline-offset: -2px; background: color-mix(in srgb, var(--accent) 22%, var(--bg)); }
       .arch-tree-row[aria-expanded] .arch-tree-chevron { color: var(--accent); }
       .arch-tree-chevron, .arch-tree-icon { flex: 0 0 24px; color: var(--muted); font: 10px var(--mono-font); text-align: center; }
       .arch-tree-icon.directory { color: var(--accent); }

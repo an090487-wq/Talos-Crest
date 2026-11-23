@@ -56,6 +56,11 @@ interface ProjectScan {
   truncated: boolean;
 }
 
+interface DuplicatedEntry {
+  path: string;
+  skipped: number;
+}
+
 interface RecentWorkspace {
   id: string;
   path: string;
@@ -226,6 +231,7 @@ let cachedArchitectureRows: {
   rows: ArchitectureRow[];
 } | null = null;
 let entryByPath = new Map<string, ProjectEntry>();
+let draggedEntryPath = "";
 let showHidden = getWindowValue("talos.show-hidden-files") === "true";
 let quickOpenIndex = 0;
 let quickOpenWorker: Worker | null = null;
@@ -438,6 +444,9 @@ function renderDetails() {
     copyRelative.addEventListener("click", () => void copyPath(relativePath(entry.path)));
     actions.append(copyAbsolute, copyRelative);
     if (entry.path !== scan?.root) {
+      const duplicate = document.createElement("button");
+      duplicate.textContent = "Duplicate";
+      duplicate.addEventListener("click", () => void duplicateSelected(entry));
       const rename = document.createElement("button");
       rename.textContent = "Rename";
       rename.addEventListener("click", () => void renameSelected());
@@ -445,7 +454,7 @@ function renderDetails() {
       remove.textContent = "Delete";
       remove.className = "danger";
       remove.addEventListener("click", () => void deleteSelected());
-      actions.append(rename, remove);
+      actions.append(duplicate, rename, remove);
     }
     details.appendChild(actions);
   }
@@ -521,13 +530,10 @@ async function renameSelected() {
   }
 }
 
-async function moveSelected() {
+async function performMove(entry: ProjectEntry, to: string) {
   if (!scan) return;
-  const entry = selectedEntry();
-  if (!entry || entry.path === scan.root || entry.kind === "link") return;
   const from = relativePath(entry.path);
-  const to = validWorkspaceRelativePath(window.prompt(`Move "${entry.name}" to a new workspace-relative path:`, from));
-  if (!to || to === from) return;
+  if (to === from) return;
   const root = scan.root;
   const descendants = scan.entries
     .filter((candidate) => candidate.path === entry.path || candidate.path.startsWith(`${entry.path}/`))
@@ -537,7 +543,9 @@ async function moveSelected() {
     const movedRoot = absolutePath(to);
     for (const oldPath of descendants) {
       const suffix = oldPath.slice(entry.path.length);
-      onWorkspacePathChange?.(oldPath, `${movedRoot}${suffix}`);
+      const newPath = `${movedRoot}${suffix}`;
+      onWorkspacePathChange?.(oldPath, newPath);
+      if (expanded.delete(oldPath)) expanded.add(newPath);
     }
     await scanProject(root);
     selectedPath = movedRoot;
@@ -546,6 +554,64 @@ async function moveSelected() {
   } catch (error) {
     setMessage(`Could not move ${entry.name}: ${String(error)}`, true);
   }
+}
+
+async function moveSelected() {
+  if (!scan) return;
+  const entry = selectedEntry();
+  if (!entry || entry.path === scan.root || entry.kind === "link") return;
+  const from = relativePath(entry.path);
+  const to = validWorkspaceRelativePath(window.prompt(`Move "${entry.name}" to a new workspace-relative path:`, from));
+  if (!to) return;
+  await performMove(entry, to);
+}
+
+async function duplicateSelected(entryOverride?: ProjectEntry) {
+  if (!scan) return;
+  const entry = entryOverride ?? selectedEntry();
+  if (!entry || entry.path === scan.root || entry.kind === "link") return;
+  const root = scan.root;
+  const path = relativePath(entry.path);
+  try {
+    const result = await invoke<DuplicatedEntry>("duplicate_project_entry", {
+      root,
+      path,
+      exclusions: currentExclusions(),
+      showHidden,
+    });
+    await scanProject(root);
+    const createdPath = absolutePath(result.path);
+    selectedPath = createdPath;
+    render();
+    const skipped = result.skipped
+      ? ` · ${result.skipped} ignored, sensitive, or symbolic child item(s) skipped`
+      : "";
+    setMessage(`Duplicated ${path} to ${result.path}${skipped}`);
+    if (entry.kind === "file" && onOpenFile) {
+      try {
+        await onOpenFile(createdPath);
+        rememberRecent(createdPath);
+        $("architecture").classList.add("hidden");
+      } catch (error) {
+        setMessage(`Duplicated to ${result.path}, but could not open it: ${String(error)}`, true);
+      }
+    }
+  } catch (error) {
+    setMessage(`Could not duplicate ${path}: ${String(error)}`, true);
+  }
+}
+
+async function dropEntryOn(sourcePath: string, target: ProjectEntry) {
+  if (!scan || target.kind !== "directory") return;
+  const source = entryByPath.get(sourcePath);
+  if (!source || source.path === scan.root || source.kind === "link") return;
+  if (target.path === source.path || target.path.startsWith(`${source.path}/`)) {
+    setMessage("A folder cannot be moved inside itself.", true);
+    return;
+  }
+  const to = [relativePath(target.path), source.name].filter(Boolean).join("/");
+  expanded.add(target.path);
+  await performMove(source, to);
 }
 
 async function deleteSelected() {
@@ -644,6 +710,12 @@ function focusTreeRow(index: number) {
   ($("arch-tree").querySelector(`[data-index="${index}"]`) as HTMLElement | null)?.focus();
 }
 
+function clearDropTargets() {
+  for (const row of document.querySelectorAll("#arch-tree .arch-tree-row.drop-target")) {
+    row.classList.remove("drop-target");
+  }
+}
+
 function renderFileTree() {
   const viewport = $("arch-graph-viewport");
   const tree = $("arch-tree");
@@ -670,11 +742,25 @@ function renderFileTree() {
     row.setAttribute("aria-level", String(entry.depth + 1));
     row.setAttribute("aria-label", `${entry.kind}: ${entry.name}`);
     row.title = entry.kind === "file"
-      ? `${entry.name} — double-click or press Enter to open`
-      : `${entry.name} — double-click or press Enter to ${expanded.has(entry.path) ? "collapse" : "expand"}`;
+      ? `${entry.name} — double-click or press Enter to open; drag to move`
+      : `${entry.name} — double-click or press Enter to ${expanded.has(entry.path) ? "collapse" : "expand"}; drop files here to move`;
     row.dataset.index = String(index);
     row.style.top = `${index * rowHeight}px`;
     row.style.paddingInlineStart = `${8 + entry.depth * 18}px`;
+    if (entry.path !== scan?.root && entry.kind !== "link") {
+      row.draggable = true;
+      row.addEventListener("dragstart", (event) => {
+        draggedEntryPath = entry.path;
+        event.dataTransfer?.setData("text/plain", entry.path);
+        if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+        row.classList.add("dragging");
+      });
+      row.addEventListener("dragend", () => {
+        draggedEntryPath = "";
+        row.classList.remove("dragging");
+        clearDropTargets();
+      });
+    }
     if (entry.kind === "directory") {
       const isExpanded = expanded.has(entry.path) || !!($("arch-search") as HTMLInputElement).value.trim();
       row.setAttribute("aria-expanded", String(isExpanded));
@@ -693,6 +779,23 @@ function renderFileTree() {
         focusTreeRow(index);
       });
       row.appendChild(toggle);
+      row.addEventListener("dragover", (event) => {
+        if (!event.dataTransfer) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        clearDropTargets();
+        row.classList.add("drop-target");
+      });
+      row.addEventListener("dragleave", (event) => {
+        if (!row.contains(event.relatedTarget as Node | null)) row.classList.remove("drop-target");
+      });
+      row.addEventListener("drop", (event) => {
+        event.preventDefault();
+        row.classList.remove("drop-target");
+        const sourcePath = event.dataTransfer?.getData("text/plain") || draggedEntryPath;
+        draggedEntryPath = "";
+        if (sourcePath) void dropEntryOn(sourcePath, entry);
+      });
     } else {
       const spacer = document.createElement("span");
       spacer.className = "arch-tree-chevron";
@@ -825,6 +928,7 @@ function showEntryContextMenu(event: MouseEvent, entry: ProjectEntry) {
   actions.push(["Copy Path", () => void copyPath(entry.path)]);
   actions.push(["Copy Relative Path", () => void copyPath(relativePath(entry.path))]);
   if (entry.path !== scan?.root && entry.kind !== "link") {
+    actions.push(["Duplicate", () => void duplicateSelected(entry)]);
     actions.push(["Rename", () => void renameSelected()]);
     actions.push(["Move…", () => void moveSelected()]);
     actions.push(["Delete", () => void deleteSelected()]);

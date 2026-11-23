@@ -81,9 +81,10 @@ Additional Phase 2 defect fixes:
 - Preserved the existing 750 ms emit interval and idle/deferred UI updates.
 - Added Rust test `workspace_change_queue_is_bounded_and_requests_rescan_on_overflow` and static frontend wiring checks.
 
-### Phase 5 — Explorer and project intelligence
+### Phase 5 — Explorer and project intelligence (in progress)
 
-- Add lazy child loading, copy/duplicate, drag/drop, inline create/rename, and a project overview panel.
+- Completed in this increment: **duplicate** and **drag-to-move**. Duplicate is available from the context menu and details pane, chooses a unique `name (copy)` destination, and is bounded to 10,000 entries, 64 MiB, and 64 levels. Ignored, sensitive, special, and symbolic children are skipped and counted. All paths are validated against the canonical root and the live workspace policy before any write. Drag-and-drop reuses the existing root-bound move command, rejects dropping a folder into itself, maps open tab paths/expanded folders to their new locations, and refreshes the snapshot. Virtualized rows gained drag/drop affordances and a drop-target highlight.
+- Still remaining: lazy per-directory child loading, inline create/rename, and a project overview panel.
 - Keep virtualized rendering and expansion/selection persistence.
 
 ### Phase 6 — Constellation and ecosystem integration

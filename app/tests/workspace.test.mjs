@@ -155,3 +155,25 @@ test("watcher registration reuses snapshot directories with a fallback", () => {
   assert.match(libRs, /directories: Option<Vec<String>>/);
   assert.match(libRs, /_ => collect_watch_dirs\(&root, &policy\)/);
 });
+
+test("Explorer duplicate is wired through menu, details, and a bounded backend command", () => {
+  assert.match(architecture, /interface DuplicatedEntry/);
+  assert.match(architecture, /actions\.push\(\["Duplicate", \(\) => void duplicateSelected\(entry\)\]\)/);
+  assert.match(architecture, /duplicate\.textContent = "Duplicate"/);
+  assert.match(architecture, /invoke<DuplicatedEntry>\("duplicate_project_entry"/);
+  assert.match(architecture, /exclusions: currentExclusions\(\),\s*showHidden/);
+  assert.match(libRs, /fn duplicate_project_entry_at\(/);
+  assert.match(libRs, /MAX_DUPLICATE_ENTRIES/);
+  assert.match(libRs, /MAX_DUPLICATE_BYTES/);
+  assert.match(libRs, /duplicate_project_entry,/);
+});
+
+test("tree rows support drag-to-move with containment checks", () => {
+  assert.match(architecture, /row\.draggable = true/);
+  assert.match(architecture, /addEventListener\("dragstart"/);
+  assert.match(architecture, /addEventListener\("dragover"/);
+  assert.match(architecture, /addEventListener\("drop"/);
+  assert.match(architecture, /dropEntryOn\(sourcePath, entry\)/);
+  assert.match(architecture, /A folder cannot be moved inside itself/);
+  assert.match(html, /arch-tree-row\.drop-target/);
+});

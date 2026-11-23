@@ -859,6 +859,14 @@ struct ProjectSources {
     warnings: Vec<String>,
 }
 
+#[derive(serde::Serialize)]
+struct DuplicatedEntry {
+    /// Workspace-relative path of the new copy.
+    path: String,
+    /// Ignored, sensitive, special, or symbolic children that were not copied.
+    skipped: usize,
+}
+
 fn scan_project_tree(
     root: &str,
     exclusions: &[String],
@@ -1163,6 +1171,231 @@ fn delete_project_entry_at(root: &str, relative: &str) -> Result<(), String> {
     .map_err(|error| format!("could not delete {}: {error}", path.display()))
 }
 
+const MAX_DUPLICATE_ENTRIES: usize = 10_000;
+const MAX_DUPLICATE_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_DUPLICATE_DEPTH: usize = 64;
+const MAX_DUPLICATE_NAME_ATTEMPTS: usize = 1_000;
+
+#[derive(Default)]
+struct DuplicateBudget {
+    entries: usize,
+    bytes: u64,
+    skipped: usize,
+}
+
+fn duplicate_name_parts(name: &str) -> (String, String) {
+    let extension = Path::new(name)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .filter(|extension| !extension.is_empty());
+    match extension {
+        Some(extension) => {
+            let suffix = format!(".{extension}");
+            let stem = name.strip_suffix(&suffix).unwrap_or(name).to_string();
+            (stem, suffix)
+        }
+        None => (name.to_string(), String::new()),
+    }
+}
+
+fn duplicate_destination(
+    root: &Path,
+    relative: &str,
+    policy: &workspace::WorkspacePolicy,
+    is_dir: bool,
+) -> Result<(String, PathBuf), String> {
+    let source = Path::new(relative);
+    let parent = source.parent().and_then(|parent| parent.to_str()).unwrap_or("");
+    let name = source
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or("duplicate source must have a UTF-8 file name")?;
+    let (stem, extension) = duplicate_name_parts(name);
+
+    for attempt in 1..=MAX_DUPLICATE_NAME_ATTEMPTS {
+        let candidate_name = if attempt == 1 {
+            format!("{stem} (copy){extension}")
+        } else {
+            format!("{stem} (copy {attempt}){extension}")
+        };
+        let candidate_relative = if parent.is_empty() {
+            candidate_name.clone()
+        } else {
+            format!("{parent}/{candidate_name}")
+        };
+        if workspace::WorkspacePolicy::is_sensitive_name(&candidate_name)
+            || policy.is_ignored(Path::new(&candidate_relative), is_dir)
+        {
+            continue;
+        }
+        match project_entry_path(root, &candidate_relative, false) {
+            Ok(destination) => return Ok((candidate_relative, destination)),
+            Err(error) if error.contains("already exists") => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(format!(
+        "could not find an available duplicate name for '{name}'"
+    ))
+}
+
+fn copy_file_bounded(source: &Path, destination: &Path, budget: &mut DuplicateBudget) -> Result<(), String> {
+    let metadata = fs::symlink_metadata(source)
+        .map_err(|error| format!("could not inspect {}: {error}", source.display()))?;
+    if !metadata.is_file() {
+        return Err(format!("not a regular file: {}", source.display()));
+    }
+    if budget
+        .bytes
+        .checked_add(metadata.len())
+        .map(|total| total > MAX_DUPLICATE_BYTES)
+        .unwrap_or(true)
+    {
+        return Err("duplicate would exceed the 64 MiB copy budget".into());
+    }
+    let mut input = fs::File::open(source)
+        .map_err(|error| format!("could not open {}: {error}", source.display()))?;
+    let mut output = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(destination)
+        .map_err(|error| format!("could not create {}: {error}", destination.display()))?;
+    let copied = std::io::copy(&mut input, &mut output)
+        .map_err(|error| format!("could not copy {}: {error}", source.display()))?;
+    budget.bytes = budget.bytes.saturating_add(copied);
+    Ok(())
+}
+
+fn copy_entry_tree(
+    source: &Path,
+    destination: &Path,
+    policy: &workspace::WorkspacePolicy,
+    source_relative: &Path,
+    destination_relative: &Path,
+    budget: &mut DuplicateBudget,
+    depth: usize,
+) -> Result<(), String> {
+    if depth > MAX_DUPLICATE_DEPTH {
+        return Err(format!("duplicate exceeded the {MAX_DUPLICATE_DEPTH}-level depth limit"));
+    }
+    budget.entries += 1;
+    if budget.entries > MAX_DUPLICATE_ENTRIES {
+        return Err(format!(
+            "duplicate exceeded the {MAX_DUPLICATE_ENTRIES}-item limit"
+        ));
+    }
+
+    let metadata = fs::symlink_metadata(source)
+        .map_err(|error| format!("could not inspect {}: {error}", source.display()))?;
+    if metadata.file_type().is_symlink() {
+        budget.skipped += 1;
+        return Ok(());
+    }
+    if metadata.is_dir() {
+        fs::create_dir(destination)
+            .map_err(|error| format!("could not create {}: {error}", destination.display()))?;
+        let children = fs::read_dir(source)
+            .map_err(|error| format!("could not list {}: {error}", source.display()))?;
+        for child in children {
+            let child = child
+                .map_err(|error| format!("could not read an entry in {}: {error}", source.display()))?;
+            let name = child.file_name();
+            let name_text = name.to_string_lossy();
+            let child_source_relative = source_relative.join(&name);
+            let child_destination_relative = destination_relative.join(&name);
+            let file_type = child.file_type()
+                .map_err(|error| format!("could not inspect {}: {error}", child.path().display()))?;
+            if workspace::WorkspacePolicy::is_sensitive_name(&name_text)
+                || policy.is_ignored(&child_source_relative, file_type.is_dir())
+                || file_type.is_symlink()
+            {
+                budget.skipped += 1;
+                continue;
+            }
+            copy_entry_tree(
+                &child.path(),
+                &destination.join(&name),
+                policy,
+                &child_source_relative,
+                &child_destination_relative,
+                budget,
+                depth + 1,
+            )?;
+        }
+        Ok(())
+    } else if metadata.is_file() {
+        copy_file_bounded(source, destination, budget)
+    } else {
+        budget.skipped += 1;
+        Ok(())
+    }
+}
+
+fn remove_partial_duplicate(path: &Path, is_dir: bool) -> Result<(), String> {
+    let result = if is_dir {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    };
+    match result {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!(
+            "could not remove partial duplicate {}: {error}",
+            path.display()
+        )),
+    }
+}
+
+fn duplicate_project_entry_at(
+    root: &str,
+    relative: &str,
+    exclusions: &[String],
+    show_hidden: bool,
+) -> Result<DuplicatedEntry, String> {
+    let root = canonical_project_root(root)?;
+    let policy = workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?;
+    let source = project_entry_path(&root, relative, true)?;
+    let metadata = fs::symlink_metadata(&source)
+        .map_err(|error| format!("could not inspect {}: {error}", source.display()))?;
+    if metadata.file_type().is_symlink() {
+        return Err("cannot duplicate a symbolic link".into());
+    }
+    let is_dir = metadata.is_dir();
+    let source_name = Path::new(relative)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or("duplicate source must have a UTF-8 file name")?;
+    if workspace::WorkspacePolicy::is_sensitive_name(source_name)
+        || policy.is_ignored(Path::new(relative), is_dir)
+    {
+        return Err(format!("'{relative}' is excluded by the workspace policy"));
+    }
+
+    let (destination_relative, destination) =
+        duplicate_destination(&root, relative, &policy, is_dir)?;
+    let mut budget = DuplicateBudget::default();
+    if let Err(error) = copy_entry_tree(
+        &source,
+        &destination,
+        &policy,
+        Path::new(relative),
+        Path::new(&destination_relative),
+        &mut budget,
+        0,
+    ) {
+        let cleanup = remove_partial_duplicate(&destination, is_dir);
+        return Err(match cleanup {
+            Ok(()) => error,
+            Err(cleanup_error) => format!("{error}; {cleanup_error}"),
+        });
+    }
+    Ok(DuplicatedEntry {
+        path: destination_relative,
+        skipped: budget.skipped,
+    })
+}
+
 #[tauri::command]
 async fn create_project_file(root: String, path: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || create_project_file_at(&root, &path))
@@ -1196,6 +1429,20 @@ async fn delete_project_entry(root: String, path: String) -> Result<(), String> 
     tauri::async_runtime::spawn_blocking(move || delete_project_entry_at(&root, &path))
         .await
         .map_err(|error| format!("deletion task failed: {error}"))?
+}
+
+#[tauri::command]
+async fn duplicate_project_entry(
+    root: String,
+    path: String,
+    exclusions: Vec<String>,
+    show_hidden: bool,
+) -> Result<DuplicatedEntry, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        duplicate_project_entry_at(&root, &path, &exclusions, show_hidden)
+    })
+    .await
+    .map_err(|error| format!("duplicate task failed: {error}"))?
 }
 
 fn workspace_entry_metadata_at(
@@ -3055,6 +3302,63 @@ mod tests {
         fs::remove_dir_all(parent).unwrap();
     }
 
+    #[test]
+    fn duplicate_project_entry_creates_unique_copies_and_skips_ignored_children() {
+        let root = temp_workspace("duplicate-entry");
+        fs::create_dir_all(root.join("src/nested")).unwrap();
+        fs::write(root.join(".gitignore"), "generated.txt\n").unwrap();
+        fs::write(root.join("src/main.py"), "print(1)\n").unwrap();
+        fs::write(root.join("src/nested/data.txt"), "data").unwrap();
+        fs::write(root.join("src/generated.txt"), "skip").unwrap();
+        fs::write(root.join("src/.hidden.txt"), "skip").unwrap();
+        let root_text = root.to_string_lossy().into_owned();
+
+        let first = duplicate_project_entry_at(&root_text, "src/main.py", &[], false).unwrap();
+        assert_eq!(first.path, "src/main (copy).py");
+        assert_eq!(first.skipped, 0);
+        assert_eq!(
+            fs::read_to_string(root.join("src/main (copy).py")).unwrap(),
+            "print(1)\n"
+        );
+
+        let second = duplicate_project_entry_at(&root_text, "src/main.py", &[], false).unwrap();
+        assert_eq!(second.path, "src/main (copy 2).py");
+
+        let folder = duplicate_project_entry_at(&root_text, "src", &[], false).unwrap();
+        assert_eq!(folder.path, "src (copy)");
+        assert_eq!(folder.skipped, 2);
+        assert!(root.join("src (copy)/nested/data.txt").is_file());
+        assert!(!root.join("src (copy)/generated.txt").exists());
+        assert!(!root.join("src (copy)/.hidden.txt").exists());
+
+        let second_folder = duplicate_project_entry_at(&root_text, "src", &[], false).unwrap();
+        assert_eq!(second_folder.path, "src (copy 2)");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn duplicate_project_entry_rejects_escapes_and_sensitive_sources() {
+        let parent = temp_workspace("duplicate-invalid");
+        let root = parent.join("workspace");
+        let outside = parent.join("outside.txt");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(&outside, "outside").unwrap();
+        fs::write(root.join("private.key"), "secret").unwrap();
+        let root_text = root.to_string_lossy().into_owned();
+
+        assert!(duplicate_project_entry_at(&root_text, "../outside.txt", &[], false).is_err());
+        assert!(duplicate_project_entry_at(&root_text, "private.key", &[], false).is_err());
+        assert!(duplicate_project_entry_at(&root_text, "missing.txt", &[], false).is_err());
+        assert!(!root.join("private (copy).key").exists());
+
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&outside, root.join("linked.txt")).unwrap();
+            assert!(duplicate_project_entry_at(&root_text, "linked.txt", &[], false).is_err());
+        }
+        fs::remove_dir_all(parent).unwrap();
+    }
+
     #[cfg(unix)]
     #[test]
     fn project_operations_reject_symlinked_parent_directories() {
@@ -3375,6 +3679,7 @@ pub fn run() {
             rename_project_entry,
             move_project_entry,
             delete_project_entry,
+            duplicate_project_entry,
             load_project_sources,
             measure_project_components,
             load_project_manifests,

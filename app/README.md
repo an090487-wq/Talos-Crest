@@ -272,8 +272,9 @@ Workspace** focuses the project selector, and the status bar shows the active
 workspace, watcher state, and Chronicle indexing activity.
 
 The tree supports expand/collapse, filename filtering, refresh, and contextual
-**New file**, **New folder**, **Rename**, **Move…**, **Delete**, and **Copy
-path** actions. Rust validates every workspace-relative path, refuses traversal
+**New file**, **New folder**, **Duplicate**, **Rename**, **Move…**, **Delete**,
+and **Copy path** actions. Rows can also be dragged onto a folder to move them.
+Rust validates every workspace-relative path, refuses traversal
 and moves into a directory's own subtree, rejects symlinked parents, and never
 overwrites a file when creating one. Hidden files are off by default; ignore
 rules come from the Explorer exclusions plus local `.gitignore`, `.ignore`, and
@@ -282,8 +283,12 @@ Sensitive paths such as keys and credentials stay excluded. Large scans are
 bounded and run off the UI thread; the view renders visible rows only. The
 file-change queue is bounded and automatically requests a full refresh during
 very large bursts; if the native watcher fails, Talos retries reconnection up
-to three times before asking you to use Refresh. Hovering a tree row shows
-whether double-click or Enter opens a file or expands a folder.
+to three times before asking you to use Refresh. Duplicates use unique
+`(copy)` names, stay inside the workspace, and skip ignored, sensitive, or
+symbolic children with a visible skipped count. Dragging a row onto a folder
+uses the same validated move operation as **Move…** and refuses to place a
+folder inside itself. Hovering a tree row shows whether double-click or Enter
+opens a file or expands a folder and whether the row can be dragged.
 
 To preview frontend changes in the desktop app, run `npm run tauri dev` from
 this directory. An installed Linux app does not update when source files

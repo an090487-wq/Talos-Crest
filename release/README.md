@@ -18,7 +18,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`88c9e3cd710c8d09b3757b1461c710e8a56ad8ef957637068ad04e51c6e65331`
+`9050bb0ba611e669c0c29b5e82d78238c72e5bb4a6efc8e0078893304b3615bf`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -35,7 +35,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`c5ecd92f9d30fbb1c11d34fd70aa1cbd9a5ade44c5d66acbe97fc746a385f703`
+`b7f596c8ee719b0a2d34cc68a443d278751d1adba2fc60092d0a83d43f2cbb7d`
 
 ## Optional GitHub access
 
@@ -52,7 +52,9 @@ structured file-change updates with bounded queueing and watcher recovery, one
 shared ignore/security policy for Explorer, watcher, and Chronicle, and bounded
 Chronicle project memory. Find in Files and watcher registration reuse the
 current Explorer scan instead of walking the tree again, with backend
-revalidation and a fallback for truncated scans. No workspace content is
+revalidation and a fallback for truncated scans. The Explorer can duplicate
+files/folders with bounded, policy-aware copying and drag items onto folders to
+move them through the same validated path checks. No workspace content is
 uploaded or analyzed remotely.
 
 The editor includes a local Custom Error Detection engine with built-in rules
