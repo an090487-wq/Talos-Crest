@@ -117,6 +117,10 @@
       #editor-font { max-width: 138px; }
       header select { min-height: 30px; border-color: color-mix(in srgb, var(--line) 75%, transparent); font-size: var(--font-sm); }
       #msg { color: var(--danger); }
+      #workspace-status { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #workspace-status[data-state="opening"] { color: var(--accent); }
+      #workspace-status[data-state="error"], #workspace-status[data-watcher="error"] { color: var(--danger); }
+      #workspace-status[data-indexing="indexing"]::after { content: " •"; }
 
       #main { display: flex; flex: 1; min-height: 0; position: relative; }
       #editor { flex: 1; min-width: 0; }
@@ -808,6 +812,7 @@
       <footer>
         <span id="lang">Plain text</span>
         <span id="pos">Ln 1, Col 1</span>
+        <button id="workspace-status" class="mini" data-state="closed" data-watcher="idle" data-indexing="idle" title="No workspace">No workspace</button>
         <span id="msg"></span>
         <span class="spacer"></span>
         <button id="btn-fun" class="mini">Fun mode: off</button>
@@ -837,7 +842,7 @@
             <button class="arch-mode" data-arch-mode="debt" role="tab">Technical Debt</button>
             <button class="arch-mode" data-arch-mode="github" role="tab">GitHub</button>
           </div>
-          <button id="arch-open-project" class="accent">Open Project</button>
+          <button id="arch-open-project" class="accent" title="Open a project folder">Open Folder</button>
           <select id="arch-recent" aria-label="Recent projects" title="Reopen a recent project">
             <option value="">Recent projects</option>
           </select>

@@ -5,6 +5,16 @@ import { closeOtherDialogs, closeTopmostDialog } from "./ui/dialogs";
 import { initGitHubPanel, renderGitHubPanel } from "./github-ui";
 import { getWindowValue, setWindowValue } from "./window-state";
 import {
+  markWorkspaceError,
+  markWorkspaceIndexing,
+  markWorkspaceOpening,
+  markWorkspaceReady,
+  markWorkspaceWatcher,
+  rememberWorkspaceRoot,
+  workspaceRestoreCandidates,
+  workspaceRoot,
+} from "./workspace";
+import {
   analyzeDependencies,
   classifyArchitecture,
   type ArchitectureComponent,
@@ -122,6 +132,7 @@ let analysisBusy = false;
 let focusMode = getWindowValue("talos.arch-focus") === "true";
 let queuedRoot = "";
 let watchedRoot = "";
+let watcherFailed = false;
 let watchedDirectories = new Set<string>();
 let watcherPolicyKey = "";
 let refreshTimer = 0;
@@ -1710,14 +1721,15 @@ export function openQuickOpen() {
   input.focus();
 }
 
-async function scanProject(root: string, forceWatch = false) {
+async function scanProject(root: string, forceWatch = false): Promise<boolean> {
   if (busy) {
     queuedRoot = root;
     await new Promise<void>((resolve) => scanWaiters.push(resolve));
-    return;
+    return false;
   }
   busy = true;
   const generation = ++scanGeneration;
+  markWorkspaceOpening(root);
   setMessage("Scanning project…");
   $("arch-refresh").setAttribute("disabled", "true");
   try {
@@ -1728,10 +1740,10 @@ async function scanProject(root: string, forceWatch = false) {
       exclusions: currentExclusions(),
       showHidden: showHidden,
     });
-    if (generation !== scanGeneration) return;
+    if (generation !== scanGeneration) return false;
     scan = result;
     try {
-      setWindowValue("talos.workspace-root", result.root);
+      rememberWorkspaceRoot(result.root);
     } catch (error) {
       setMessage(`Project opened, but its location could not be remembered: ${String(error)}`, true);
     }
@@ -1778,6 +1790,7 @@ async function scanProject(root: string, forceWatch = false) {
     selectedPath = result.root;
     $("arch-root").textContent = result.root;
     let watcherWarning = "";
+    let watcherStatus: "idle" | "active" | "error" = "idle";
     const policyKey = JSON.stringify([currentExclusions(), showHidden]);
     const newDirectories = [...directories].some((path) => !watchedDirectories.has(path));
     if (forceWatch || watchedRoot !== result.root || newDirectories || watcherPolicyKey !== policyKey) {
@@ -1790,10 +1803,17 @@ async function scanProject(root: string, forceWatch = false) {
         watchedRoot = result.root;
         watchedDirectories = directories;
         watcherPolicyKey = policyKey;
+        watcherFailed = false;
+        watcherStatus = "active";
       } catch (error) {
         watcherWarning = `Could not watch workspace changes: ${String(error)}`;
+        watcherFailed = true;
+        watcherStatus = "error";
       }
+    } else if (watchedRoot === result.root && !watcherFailed) {
+      watcherStatus = "active";
     }
+    markWorkspaceReady(result, watcherStatus);
     const warnings = result.warnings.slice(0, 3).join(" · ");
     setMessage(
       `${result.entries.length.toLocaleString()} entries scanned${result.truncated ? " (limit reached)" : ""}${warnings ? ` · ${warnings}` : ""}${watcherWarning ? ` · ${watcherWarning}` : ""}`,
@@ -1804,11 +1824,14 @@ async function scanProject(root: string, forceWatch = false) {
     if (($("quick-open-dialog") as HTMLDialogElement).open) renderQuickOpen();
     if (mode === "dependencies") void analyzeCurrentProject();
     if (isInsightMode(mode)) void loadInsights();
+    return true;
   } catch (error) {
+    markWorkspaceError(root, error);
     setMessage(`Project scan failed: ${String(error)}`, true);
     if (($("quick-open-dialog") as HTMLDialogElement).open) {
       $("quick-open-status").textContent = `Project scan failed: ${String(error)}`;
     }
+    return false;
   } finally {
     busy = false;
     $("arch-refresh").removeAttribute("disabled");
@@ -2002,6 +2025,7 @@ function notifyWorkspaceFilesChanged(root: string, paths: string[]) {
     void invoke<ChronicleIndexJob>("chronicle_index_on_workspace_change", { root })
       .then((job) => {
         if (!job?.accepted || typeof job.jobId !== "number") return;
+        markWorkspaceIndexing("indexing");
         document.dispatchEvent(new CustomEvent("talos:chronicle-index-queued", { detail: job }));
       })
       .catch(() => undefined);
@@ -2069,6 +2093,16 @@ async function applyWorkspaceChanges(payload: WorkspaceChangeEvent) {
   render();
   if (($("quick-open-dialog") as HTMLDialogElement).open) renderQuickOpen();
   notifyWorkspaceFilesChanged(root, paths);
+}
+
+async function restoreWorkspace(): Promise<void> {
+  const candidates = await workspaceRestoreCandidates();
+  for (const root of candidates) {
+    if (await scanProject(root)) return;
+  }
+  if (candidates.length > 0) {
+    setMessage("No saved workspace could be opened. Choose a project folder.", true);
+  }
 }
 
 export function initArchitectureExplorer(
@@ -2305,10 +2339,11 @@ export function initArchitectureExplorer(
     }, 180);
   }).catch((error: unknown) => setMessage(`Could not subscribe to project changes: ${String(error)}`, true));
   void listen<string>("architecture://watch-error", (event) => {
+    watcherFailed = true;
+    markWorkspaceWatcher("error");
     setMessage(`Project watcher error: ${event.payload}`, true);
   }).catch((error: unknown) => setMessage(`Could not subscribe to watcher errors: ${String(error)}`, true));
-  const savedRoot = getWindowValue("talos.workspace-root");
-  if (savedRoot) void scanProject(savedRoot);
+  void restoreWorkspace();
   $("architecture").classList.toggle("hidden", !explorerOpen);
   render();
 }
@@ -2318,11 +2353,16 @@ export function openWorkspace(root: string) {
   void scanProject(root);
 }
 
+export function openRecentWorkspace() {
+  showArchitectureWindow();
+  window.setTimeout(() => ($("arch-recent") as HTMLSelectElement | null)?.focus(), 0);
+}
+
 export function openObservatory() {
   setMode("dependencies");
   showArchitectureWindow();
   if (!scan) {
-    const savedRoot = getWindowValue("talos.workspace-root");
+    const savedRoot = workspaceRoot();
     if (savedRoot) void scanProject(savedRoot);
     else void chooseProject();
   }

@@ -62,7 +62,8 @@ import { measure, LABEL, FUN } from "./meter";
 import type { Reading } from "./meter";
 import { openPdf, isPdfFocused, initPdfPane } from "./pdf";
 import { clearExtensionThemePreference, initExtensions, installedSnippets } from "./extensions";
-import { chooseWorkspace, initArchitectureExplorer, openQuickOpen, openObservatory, openWorkspace, rememberRecent } from "./architecture";
+import { chooseWorkspace, initArchitectureExplorer, openQuickOpen, openObservatory, openRecentWorkspace, openWorkspace, rememberRecent } from "./architecture";
+import { currentWorkspace, markWorkspaceIndexing, subscribeWorkspace } from "./workspace";
 import { initCommandPalette, openCommandPalette } from "./command-palette";
 import { collectOutline } from "./outline";
 import type { OutlineSymbol } from "./outline";
@@ -429,11 +430,19 @@ const paletteCommands = SHORTCUTS
 paletteCommands.push(
   {
     id: "workspace.choose",
-    label: "Choose workspace",
+    label: "Open Folder",
     category: "Workspace",
     keys: "",
-    description: "Select the project folder used by the workspace tools",
+    description: "Open a project folder; Talos reopens it automatically next time",
     run: () => void guard(() => chooseWorkspace()),
+  },
+  {
+    id: "workspace.open-recent",
+    label: "Open Recent Workspace",
+    category: "Workspace",
+    keys: "",
+    description: "Choose a previously opened project folder",
+    run: () => openRecentWorkspace(),
   },
   {
     id: "view.chronicle",
@@ -498,6 +507,26 @@ async function runOllamaInTerminal(): Promise<void> {
 function say(text: string) {
   $("msg").textContent = text;
 }
+
+function renderWorkspaceStatus() {
+  const state = currentWorkspace();
+  const status = $("workspace-status");
+  status.textContent = state.status === "opening" ? "Opening…" : (state.name ?? "No workspace");
+  status.title = [
+    state.message,
+    state.status === "ready" ? `Watcher: ${state.watcher}` : "",
+    state.indexing === "indexing" ? "Chronicle: indexing" : "",
+  ].filter(Boolean).join(" · ");
+  status.dataset.state = state.status;
+  status.dataset.watcher = state.watcher;
+  status.dataset.indexing = state.indexing;
+}
+
+subscribeWorkspace(renderWorkspaceStatus);
+$("workspace-status").addEventListener("click", () => void guard(() => chooseWorkspace()));
+void listen<{ phase: string }>("chronicle://progress", ({ payload }) => {
+  if (["done", "error", "cancelled"].includes(payload.phase)) markWorkspaceIndexing("idle");
+}).catch(() => undefined);
 
 function updateBreadcrumbs() {
   const source = currentPath ?? suggestedName ?? "Untitled";

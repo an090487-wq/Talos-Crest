@@ -247,6 +247,13 @@ counts, and a bounded set of warnings. Missing manifests are not errors, and
 unknown languages remain browsable as text rather than being assigned invented
 semantics.
 
+Use the top-bar workspace button, **Open Folder** in the Explorer toolbar, or
+the command palette's **Open Folder** command to choose a project once. Talos
+remembers the canonical root per window and rescans it on startup; if that folder
+was moved or removed, it falls back to the newest recent project. **Open Recent
+Workspace** focuses the project selector, and the status bar shows the active
+workspace, watcher state, and Chronicle indexing activity.
+
 The tree supports expand/collapse, filename filtering, refresh, and contextual
 **New file**, **New folder**, **Rename**, **Move…**, **Delete**, and **Copy
 path** actions. Rust validates every workspace-relative path, refuses traversal
