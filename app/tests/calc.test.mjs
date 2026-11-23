@@ -104,3 +104,26 @@ test("expressions have bounded length and nesting", () => {
   assert.throws(() => scientific("1+".repeat(300)), /exceeds 512 characters/);
   assert.throws(() => scientific(`${"(".repeat(100)}1${")".repeat(100)}`), /nesting exceeds/);
 });
+
+test("programmer octal literals are parsed in base 8", () => {
+  assert.equal(programmer("0o77").formatted, "63");
+  assert.equal(programmer("0o10").formatted, "8");
+  assert.equal(programmer("0o777", { bitWidth: 8, unsigned: true }).formatted, "255");
+});
+
+test("expression-safe programmer formatting stays re-evaluable", () => {
+  const safe = formatValue(-1n, "programmer", { bitWidth: 8, base: 16, unsigned: false }, true);
+  assert.equal(safe, "0xFF");
+  assert.equal(programmer(safe, { bitWidth: 8, base: 16 }).formatted, "0xFF (two's complement)");
+});
+
+test("Calc UI avoids stale state and invalid programmer controls", async () => {
+  const ui = await readFile(resolve(appDir, "src/calc/calc-ui.ts"), "utf8");
+  const markup = await readFile(resolve(appDir, "index.html"), "utf8");
+  assert.match(ui, /group === "functions" \|\| group === "scientific"/);
+  assert.match(ui, /state\.fromUnit !== previousFrom \|\| state\.toUnit !== previousTo/);
+  assert.match(ui, /if \(!raw\) \{/);
+  assert.match(ui, /formatValue\(lastResult, state\.mode, calcOptions\(\), true\)/);
+  assert.match(ui, /expressionInput\(\)\.classList\.remove\("calc-invalid"\)/);
+  assert.match(markup, /data-calc-group="scientific" data-calc-insert="\^"/);
+});

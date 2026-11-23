@@ -95,6 +95,28 @@ function calcOptions() {
   return { bitWidth: state.bitWidth, base: state.base, unsigned: state.unsigned };
 }
 
+function displayValue(): string {
+  if (lastResult === null) return "0";
+  try {
+    return formatValue(lastResult, state.mode, calcOptions());
+  } catch {
+    return state.mode === "programmer" ? "Not a whole number" : "—";
+  }
+}
+
+function expressionValue(): string | null {
+  if (lastResult === null) {
+    setStatus("Evaluate an expression first.", "error");
+    return null;
+  }
+  try {
+    return formatValue(lastResult, state.mode, calcOptions(), true);
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : "Result cannot be represented in this mode.", "error");
+    return null;
+  }
+}
+
 function expressionInput(): HTMLInputElement {
   return $("calc-expression") as HTMLInputElement;
 }
@@ -106,16 +128,7 @@ function setStatus(text: string, level: "info" | "error" = "info"): void {
 }
 
 function renderResult(): void {
-  const result = $("calc-result");
-  if (lastResult === null) {
-    result.textContent = "0";
-    return;
-  }
-  try {
-    result.textContent = formatValue(lastResult, state.mode, calcOptions());
-  } catch (error) {
-    result.textContent = String(error instanceof Error ? error.message : error);
-  }
+  $("calc-result").textContent = displayValue();
 }
 
 function renderMode(): void {
@@ -128,7 +141,9 @@ function renderMode(): void {
   for (const button of document.querySelectorAll<HTMLElement>("[data-calc-group]")) {
     const group = button.dataset.calcGroup;
     const isHex = /^[0-9A-F]$/.test(button.textContent?.trim() ?? "") && /^[A-F]$/.test(button.textContent?.trim() ?? "");
-    const visible = group === "functions" ? state.mode === "scientific" : state.mode === "programmer" && (!isHex || state.base === 16);
+    const visible = group === "functions" || group === "scientific"
+      ? state.mode === "scientific"
+      : state.mode === "programmer" && (!isHex || state.base === 16);
     button.classList.toggle("calc-hidden", !visible);
   }
   ($("calc-bit-width") as HTMLSelectElement).value = String(state.bitWidth);
@@ -231,8 +246,17 @@ function populateUnits(): void {
 }
 
 function runUnitConversion(): void {
-  const value = Number(($("calc-unit-value") as HTMLInputElement).value);
+  const raw = ($("calc-unit-value") as HTMLInputElement).value.trim();
   const result = $("calc-unit-result");
+  if (!raw) {
+    result.textContent = "";
+    return;
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    result.textContent = "Enter a number";
+    return;
+  }
   try {
     const converted = convertUnit(value, state.fromUnit, state.toUnit);
     result.textContent = formatValue(converted, "scientific");
@@ -243,21 +267,21 @@ function runUnitConversion(): void {
 }
 
 function applySettings(): void {
+  const previousFrom = state.fromUnit;
+  const previousTo = state.toUnit;
   state.bitWidth = Number(($("calc-bit-width") as HTMLSelectElement).value);
   state.base = Number(($("calc-base") as HTMLSelectElement).value) as IntegerBase;
   state.unsigned = ($("calc-unsigned") as HTMLInputElement).checked;
   state.fromUnit = ($("calc-unit-from") as HTMLSelectElement).value;
   state.toUnit = ($("calc-unit-to") as HTMLSelectElement).value;
   renderMode();
+  if (state.fromUnit !== previousFrom || state.toUnit !== previousTo) runUnitConversion();
   saveState();
 }
 
 async function copyResult(): Promise<void> {
-  const text = lastResult === null ? "" : formatValue(lastResult, state.mode, calcOptions());
-  if (!text) {
-    setStatus("Evaluate an expression before copying.", "error");
-    return;
-  }
+  const text = expressionValue();
+  if (text === null) return;
   try {
     await navigator.clipboard.writeText(text);
     setStatus(`Copied ${text}`);
@@ -275,11 +299,8 @@ async function copyResult(): Promise<void> {
 }
 
 function insertResult(): void {
-  if (lastResult === null) {
-    setStatus("Evaluate an expression before inserting.", "error");
-    return;
-  }
-  const text = formatValue(lastResult, state.mode, calcOptions());
+  const text = expressionValue();
+  if (text === null) return;
   ($("calc-dialog") as HTMLDialogElement).close();
   options.onInsertResult?.(text);
 }
@@ -410,6 +431,14 @@ export function openCalc(initialExpression?: string, nextOptions: CalcUiOptions 
   if (initialExpression !== undefined && initialExpression.trim()) {
     expressionInput().value = initialExpression.trim();
     evaluateAndRender();
+  } else {
+    // Reopening Calc should not bring back an invalid expression or error state.
+    expressionInput().value = "";
+    expressionInput().classList.remove("calc-invalid");
+    lastResult = null;
+    historyCursor = -1;
+    renderResult();
+    setStatus("Enter an expression, then press Enter or =.");
   }
   expressionInput().focus();
 }

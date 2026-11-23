@@ -309,9 +309,7 @@ function tokenText(token: Token): string {
 }
 
 function parseIntegerLiteral(text: string): bigint {
-  if (/^0[xX]/.test(text)) return BigInt(text);
-  if (/^0[oO]/.test(text)) return BigInt(`0${text.slice(2)}`);
-  if (/^0[bB]/.test(text)) return BigInt(`0b${text.slice(2)}`);
+  if (/^0[xXoObB]/.test(text)) return BigInt(text);
   return BigInt(text);
 }
 
@@ -421,7 +419,13 @@ function formatScientific(value: number): string {
   return Number.parseFloat(value.toPrecision(12)).toString();
 }
 
-function formatInteger(value: bigint, bitWidth: number, base: IntegerBase, unsigned: boolean): string {
+function formatInteger(
+  value: bigint,
+  bitWidth: number,
+  base: IntegerBase,
+  unsigned: boolean,
+  expressionSafe = false,
+): string {
   const bits = BigInt(bitWidth);
   const modulus = 1n << bits;
   const masked = ((value % modulus) + modulus) % modulus;
@@ -432,7 +436,9 @@ function formatInteger(value: bigint, bitWidth: number, base: IntegerBase, unsig
   if (base === 10) return magnitude.toString();
   const prefix = base === 2 ? "0b" : base === 8 ? "0o" : "0x";
   const digits = masked.toString(base).toUpperCase();
-  return `${prefix}${digits}${isNegative ? " (two's complement)" : ""}`;
+  // Display annotations are helpful in the UI but make the text invalid as an
+  // expression. Insert/Copy must always produce something re-evaluable.
+  return `${prefix}${digits}${!expressionSafe && isNegative ? " (two's complement)" : ""}`;
 }
 
 export function evaluate(input: string, mode: CalcMode, options: CalcOptions = {}): CalcResult {
@@ -455,10 +461,15 @@ export function evaluate(input: string, mode: CalcMode, options: CalcOptions = {
   return { value, formatted: formatInteger(value, bitWidth, base, unsigned) };
 }
 
-export function formatValue(value: number | bigint, mode: CalcMode, options: CalcOptions = {}): string {
+export function formatValue(
+  value: number | bigint,
+  mode: CalcMode,
+  options: CalcOptions = {},
+  expressionSafe = false,
+): string {
   if (mode === "scientific") return formatScientific(toNumber(value));
   const bitWidth = normalizeBitWidth(options.bitWidth);
-  return formatInteger(toBigInt(value), bitWidth, options.base ?? 10, options.unsigned ?? false);
+  return formatInteger(toBigInt(value), bitWidth, options.base ?? 10, options.unsigned ?? false, expressionSafe);
 }
 
 const UNIT_FACTORS: Record<string, { group: string; factor: number }> = {
