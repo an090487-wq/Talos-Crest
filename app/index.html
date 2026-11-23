@@ -103,6 +103,13 @@
       button.accent:hover { background: color-mix(in srgb, var(--accent) 86%, white); color: var(--accent-ink); }
       button.mini { min-height: 26px; padding: 2px 8px; font-size: var(--font-sm); }
       select, input { min-height: 30px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 4px 8px; }
+      input[type="checkbox"], input[type="radio"], input[type="range"], input[type="color"] {
+        min-height: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        accent-color: var(--accent);
+      }
       button:focus-visible, select:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
       button:disabled { opacity: .58; cursor: not-allowed; }
       #file { margin-left: auto; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 100px; max-width: 260px; padding: 5px 10px; border-left: 2px solid var(--accent); background: color-mix(in srgb, var(--surface-raised) 65%, transparent); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font: var(--font-sm)/1.3 var(--mono-font); }
@@ -115,7 +122,7 @@
       #editor { flex: 1; min-width: 0; }
       #document-tabs { display: flex; align-items: stretch; gap: 2px; min-height: 36px; overflow-x: auto; overflow-y: hidden; background: var(--panel); border-bottom: 1px solid var(--line); scrollbar-width: thin; }
       .document-tab { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; min-width: 90px; max-width: 220px; min-height: 35px; padding: 0 9px; border: 0; border-right: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--muted); cursor: pointer; }
-      .document-tab.active { color: var(--text); background: var(--bg); box-shadow: inset 0 2px 0 var(--accent); }
+      .document-tab.active { color: var(--text); background: var(--bg); box-shadow: none; }
       .document-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
       .document-tab-dirty { color: var(--accent); font-size: 15px; line-height: 1; }
       .document-tab-close { display: grid; place-items: center; flex: 0 0 18px; width: 18px; height: 18px; min-height: 18px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); }
@@ -151,9 +158,9 @@
       #editor-region.panel-maximized #panel { flex: 1 1 auto !important; height: auto !important; }
 
       #pdf-pane { width: var(--side-pane-size); min-width: 240px; border-left: 1px solid var(--line); display: flex; flex-direction: column; background: var(--bg); }
-      #pdf-bar { display: flex; align-items: center; gap: 4px; padding: 7px 9px; background: var(--panel); border-bottom: 1px solid var(--line); }
+      #pdf-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 7px 9px; background: var(--panel); border-bottom: 1px solid var(--line); }
       #pdf-bar button { min-width: 30px; padding: 2px 8px; }
-      #pdf-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 12px; }
+      #pdf-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 12px; }
       #pdf-page { width: 42px; text-align: center; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 2px; }
       #pdf-view { flex: 1; min-height: 0; overflow: auto; padding: var(--space-3); display: flex; justify-content: flex-start; align-items: flex-start; background: var(--bg); }
       #pdf-canvas { display: block; margin: 0 auto; background: #fff; box-shadow: var(--shadow-sm); }
@@ -169,10 +176,10 @@
       #html-preview-frame { flex: 1 1 0; min-height: 0; width: 100%; border: 0; background: #fff; }
 
       #panel { height: var(--panel-size); flex: 0 0 var(--panel-size); border-top: 1px solid var(--line); display: flex; flex-direction: column; background: var(--bg); }
-      #tabs { display: flex; align-items: center; gap: 5px; padding: 5px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
-      #tabs .tab { min-height: 29px; border: 1px solid transparent; border-radius: var(--radius-sm); padding: 4px 10px; color: var(--muted); background: transparent; }
+      #tabs { display: flex; align-items: center; gap: 5px; padding: 5px 10px; overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; background: var(--panel); border-bottom: 1px solid var(--line); }
+      #tabs .tab { flex: 0 0 auto; min-height: 29px; border: 1px solid transparent; border-radius: var(--radius-sm); padding: 4px 10px; color: var(--muted); background: transparent; white-space: nowrap; }
       #tabs .tab.active { color: var(--text); border-color: color-mix(in srgb, var(--accent) 32%, var(--line)); background: color-mix(in srgb, var(--accent) 11%, var(--panel)); box-shadow: inset 0 -2px 0 var(--accent); }
-      #count { background: var(--line); border-radius: 8px; padding: 0 6px; font-size: 11px; }
+      #count { background: var(--surface-raised); border: 1px solid var(--line); border-radius: 8px; padding: 0 6px; color: var(--text); font-size: 11px; }
       #problems, #output { flex: 1; overflow: auto; margin: 0; padding: 8px 12px; font: 12px/1.6 var(--mono-font); }
       #problems-toolbar { display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; }
       #problems-severity { min-height: 25px; padding: 2px 6px; font-size: 11px; }
@@ -470,7 +477,8 @@
       #canvas-text-input { position: absolute; z-index: 4; display: none; min-height: 28px; border: 1px solid var(--accent); background: var(--bg); font: 14px var(--ui-font); }
       #canvas-inspector { display: flex; flex-direction: column; min-width: 0; overflow-y: auto; border-left: 1px solid var(--line); background: var(--panel); }
       .canvas-section { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-bottom: 1px solid var(--line); }
-      .canvas-section > header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+      .canvas-section > header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: 0; background: transparent; }
+      .canvas-section > header::after { display: none; }
       .canvas-section h3 { margin: 0; color: var(--muted); font-size: var(--font-sm); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
       .canvas-section .muted { color: var(--muted); }
       .canvas-section label { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); color: var(--muted); font-size: var(--font-sm); }
@@ -546,8 +554,10 @@
         #main { flex-direction: column; }
         #editor { min-height: 0; }
         #document-tabs { flex: 0 0 36px; }
+        #canvas-header { flex: 0 0 auto; min-height: 48px; flex-wrap: wrap; padding: 8px; }
         .cm-editor { font-size: var(--editor-font-size, 15px); }
         #main.side-pane-open > .side-pane { min-width: 0; min-height: 160px; }
+        #outline-pane { width: 100%; min-width: 0; border-left: 0; border-top: 1px solid var(--line); }
         #side-splitter { width: auto; height: 5px; cursor: row-resize; }
         #pdf-pane {
           width: 100%;
@@ -565,7 +575,7 @@
           border-left: 0;
           border-top: 1px solid var(--line);
         }
-        #panel { height: var(--panel-size); flex: 0 0 var(--panel-size); }
+        #panel { height: min(var(--panel-size), 32vh); flex: 0 0 min(var(--panel-size), 32vh); }
         #theme-select { max-width: 130px; }
         #editor-font { max-width: 145px; }
         footer {

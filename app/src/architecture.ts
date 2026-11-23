@@ -2090,6 +2090,7 @@ export function initArchitectureExplorer(
     explorerOpen = false;
     setWindowValue("talos.explorer-open", "false");
     $("architecture").classList.add("hidden");
+    document.dispatchEvent(new Event("talos:explorer-close"));
     if (refreshTimer) window.clearTimeout(refreshTimer);
     refreshTimer = 0;
   };

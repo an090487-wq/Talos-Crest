@@ -2155,7 +2155,19 @@ $("file-conflict-overwrite").addEventListener("click", () =>
 );
 $("btn-pdf").addEventListener("click", () => void guard(openPdfDialog));
 $("btn-calc").addEventListener("click", () => void guard(() => openCalcUi(currentSelection())));
-$("calc-dialog").addEventListener("close", () => view.focus());
+$("calc-dialog").addEventListener("close", () => {
+  setActiveNav("explorer");
+  view.focus();
+});
+$("chronicle-dialog").addEventListener("close", () => {
+  setActiveNav("explorer");
+  view.focus();
+});
+$("quick-open-dialog").addEventListener("close", () => setActiveNav("explorer"));
+document.addEventListener("talos:explorer-close", () => {
+  setActiveNav("explorer");
+  view.focus();
+});
 $("btn-canvas").addEventListener("click", () => void guard(() => openCanvasUi()));
 document.addEventListener("talos:canvas-close", () => {
   setActiveNav("explorer");

@@ -259,6 +259,7 @@
   padding: var(--tc-space-4);
   color: var(--tc-muted);
   text-align: center;
+  font-size: var(--font-sm, 11px);
 }
 
 .tc-empty strong {
@@ -452,7 +453,8 @@ input:focus-visible,
   gap: 2px;
   width: 52px;
   padding: 6px 4px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   border-right: 1px solid var(--tc-border);
   background: var(--tc-panel-2);
   transition: flex-basis var(--tc-motion-fast), width var(--tc-motion-fast);
@@ -626,6 +628,11 @@ dialog.tc-chronicle-dialog {
   color: var(--tc-text);
   font-size: var(--font-md, 13px);
   outline: none;
+}
+
+.tc-command-search input:focus-visible {
+  outline: 2px solid var(--tc-focus);
+  outline-offset: -1px;
 }
 
 .tc-command-search input::placeholder {
@@ -904,6 +911,9 @@ dialog.tc-chronicle-dialog {
   .tc-activity-bar.expanded {
     flex-basis: 150px;
     width: 150px;
+  }
+  .tc-nav-item {
+    padding: 0 8px;
   }
 }
 
