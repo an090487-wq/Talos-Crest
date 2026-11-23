@@ -306,6 +306,10 @@ rules come from the Explorer exclusions plus local `.gitignore`, `.ignore`, and
 `.talosignore` files, and the same policy is used by the watcher and Chronicle.
 Sensitive paths such as keys and credentials stay excluded. Large scans are
 bounded and run off the UI thread; the view renders visible rows only. The
+initial Explorer view now loads folders one level at a time, with children loaded
+when a folder is expanded; full scans remain the fallback for Quick Open, Find
+in Files, dependency analysis, architecture classification, Observatory insights,
+and watcher recovery. The
 file-change queue is bounded and automatically requests a full refresh during
 very large bursts; if the native watcher fails, Talos retries reconnection up
 to three times before asking you to use Refresh. Duplicates use unique
