@@ -1183,28 +1183,38 @@ fn workspace_entry_metadata_at(
 ) -> Result<Option<ProjectEntry>, String> {
     let root = canonical_project_root(root)?;
     let candidate = PathBuf::from(path);
-    let canonical = match candidate.canonicalize() {
-        Ok(canonical) => canonical,
+    let candidate = if candidate.is_absolute() {
+        candidate
+    } else {
+        root.join(candidate)
+    };
+    // Inspect the link itself, not its target, so symlinks keep reporting as
+    // links even when they point outside the workspace.
+    let metadata = match fs::symlink_metadata(&candidate) {
+        Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(format!("could not inspect {path}: {error}")),
     };
-    if !canonical.starts_with(&root) {
+    let parent = candidate.parent().unwrap_or(&root);
+    let canonical_parent = parent
+        .canonicalize()
+        .map_err(|error| format!("could not inspect {path}: {error}"))?;
+    if !canonical_parent.starts_with(&root) {
         return Err(format!("workspace path escapes the project: {path}"));
     }
-    let relative = canonical.strip_prefix(&root).unwrap_or(&canonical);
+    let file_name = candidate
+        .file_name()
+        .ok_or_else(|| format!("workspace path has no file name: {path}"))?;
+    let relative = canonical_parent
+        .strip_prefix(&root)
+        .unwrap_or(&canonical_parent)
+        .join(file_name);
     let policy = workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?;
-    if policy.is_ignored(relative, canonical.is_dir())
-        || workspace::WorkspacePolicy::is_sensitive_name(
-            &canonical
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or(""),
-        )
+    if policy.is_ignored(&relative, metadata.is_dir())
+        || workspace::WorkspacePolicy::is_sensitive_name(&file_name.to_string_lossy())
     {
         return Ok(None);
     }
-    let metadata = fs::symlink_metadata(&canonical)
-        .map_err(|error| format!("could not inspect {path}: {error}"))?;
     let kind = if metadata.file_type().is_symlink() {
         "link"
     } else if metadata.file_type().is_dir() {
@@ -1213,7 +1223,7 @@ fn workspace_entry_metadata_at(
         "file"
     };
     let extension = if kind == "file" {
-        canonical
+        candidate
             .extension()
             .and_then(|extension| extension.to_str())
             .unwrap_or("")
@@ -1223,19 +1233,15 @@ fn workspace_entry_metadata_at(
     };
     let depth = relative.components().count();
     Ok(Some(ProjectEntry {
-        path: canonical.to_string_lossy().into_owned(),
-        parent: canonical
+        path: candidate.to_string_lossy().into_owned(),
+        parent: candidate
             .parent()
             .map(|parent| parent.to_string_lossy().into_owned())
             .unwrap_or_default(),
-        name: canonical
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("")
-            .to_string(),
+        name: file_name.to_string_lossy().into_owned(),
         kind: kind.into(),
         extension,
-        language: language_for_path(&canonical, registry),
+        language: language_for_path(&candidate, registry),
         size: metadata.len(),
         modified_ms: modified_ms(&metadata),
         depth,
@@ -1452,6 +1458,8 @@ async fn load_project_manifests(
 
 const WATCHED_DIR_LIMIT: usize = 2000;
 const WATCH_EMIT_INTERVAL_MS: u64 = 750;
+const MAX_PENDING_CHANGES: usize = 10_000;
+const RESCAN_KIND: &str = "__talos_rescan__";
 
 #[derive(Clone, serde::Serialize)]
 struct WorkspaceChange {
@@ -1467,11 +1475,17 @@ struct WorkspaceChangeEvent {
 
 fn record_workspace_change(
     pending: &mut HashMap<String, String>,
-    path: impl Into<String>,
+    path: impl AsRef<str> + Into<String>,
     kind: &str,
 ) -> bool {
     // notify delivers events in order; keep the last state for each path.
-    // Create→delete stays a delete, while delete→create stays a create.
+    if pending.len() >= MAX_PENDING_CHANGES && !pending.contains_key(path.as_ref()) {
+        // Bounded queue: collapse a burst into one rescan request instead of
+        // growing without limit or silently dropping changes.
+        pending.clear();
+        pending.insert(String::new(), RESCAN_KIND.to_string());
+        return true;
+    }
     pending.insert(path.into(), kind.to_string());
     true
 }
@@ -2991,6 +3005,18 @@ mod tests {
             pending.get("/work/a.txt").map(String::as_str),
             Some("create")
         );
+    }
+
+    #[test]
+    fn workspace_change_queue_is_bounded_and_requests_rescan_on_overflow() {
+        let mut pending = HashMap::new();
+        for index in 0..MAX_PENDING_CHANGES {
+            record_workspace_change(&mut pending, format!("/work/{index}.txt"), "create");
+        }
+        assert_eq!(pending.len(), MAX_PENDING_CHANGES);
+        record_workspace_change(&mut pending, "/work/overflow.txt", "create");
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending.get("").map(String::as_str), Some(RESCAN_KIND));
     }
 
     fn temp_workspace(name: &str) -> PathBuf {

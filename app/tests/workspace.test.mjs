@@ -30,6 +30,8 @@ const {
 const architecture = readFileSync(resolve(appDir, "src/architecture.ts"), "utf8");
 const main = readFileSync(resolve(appDir, "src/main.ts"), "utf8");
 const html = readFileSync(resolve(appDir, "index.html"), "utf8");
+const libRs = readFileSync(resolve(appDir, "src-tauri/src/lib.rs"), "utf8");
+const chronicleRs = readFileSync(resolve(appDir, "src-tauri/src/chronicle.rs"), "utf8");
 
 test("workspace names handle POSIX, Windows, and trailing separators", () => {
   assert.equal(workspaceNameFromRoot("/work/my project/"), "my project");
@@ -110,4 +112,31 @@ test("shell exposes Open Folder, Open Recent, and workspace status", () => {
   assert.match(main, /chronicle:\/\/progress/);
   assert.match(html, /id="workspace-status"/);
   assert.match(html, /id="arch-open-project"[^>]*>Open Folder</);
+});
+
+test("Chronicle uses the shared workspace policy instead of a private parser", () => {
+  assert.match(chronicleRs, /use crate::workspace::\{WorkspacePolicy, WorkspacePolicyOptions\}/);
+  assert.match(chronicleRs, /WorkspacePolicy::load_with_options/);
+  assert.doesNotMatch(chronicleRs, /struct IgnoreMatcher/);
+  assert.doesNotMatch(chronicleRs, /fn is_always_excluded/);
+});
+
+test("watcher queue is bounded and frontend handles rescan and recovery", () => {
+  assert.match(libRs, /const MAX_PENDING_CHANGES: usize = 10_000;/);
+  assert.match(libRs, /RESCAN_KIND/);
+  assert.match(architecture, /change\.kind === "__talos_rescan__"/);
+  assert.match(architecture, /watcherRecoveryAttempts >= 3/);
+  assert.match(architecture, /watcherRecoveryTimer/);
+});
+
+test("stale analysis caches are invalidated on file changes", () => {
+  assert.match(architecture, /dependencyResult = null;/);
+  assert.match(architecture, /performanceReport = null;/);
+  assert.match(architecture, /manifestSet = null;/);
+  assert.match(architecture, /debtReport = null;/);
+});
+
+test("symlink metadata inspects the link itself", () => {
+  assert.match(libRs, /fs::symlink_metadata\(&candidate\)/);
+  assert.match(libRs, /Inspect the link itself, not its target/);
 });

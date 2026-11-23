@@ -65,7 +65,7 @@ interface RecentWorkspace {
 
 interface WorkspaceChange {
   path: string;
-  kind: "create" | "modify" | "delete";
+  kind: "create" | "modify" | "delete" | "__talos_rescan__";
 }
 
 interface WorkspaceChangeEvent {
@@ -133,6 +133,8 @@ let focusMode = getWindowValue("talos.arch-focus") === "true";
 let queuedRoot = "";
 let watchedRoot = "";
 let watcherFailed = false;
+let watcherRecoveryTimer = 0;
+let watcherRecoveryAttempts = 0;
 let watchedDirectories = new Set<string>();
 let watcherPolicyKey = "";
 let refreshTimer = 0;
@@ -667,6 +669,9 @@ function renderFileTree() {
     row.setAttribute("role", "treeitem");
     row.setAttribute("aria-level", String(entry.depth + 1));
     row.setAttribute("aria-label", `${entry.kind}: ${entry.name}`);
+    row.title = entry.kind === "file"
+      ? `${entry.name} — double-click or press Enter to open`
+      : `${entry.name} — double-click or press Enter to ${expanded.has(entry.path) ? "collapse" : "expand"}`;
     row.dataset.index = String(index);
     row.style.top = `${index * rowHeight}px`;
     row.style.paddingInlineStart = `${8 + entry.depth * 18}px`;
@@ -1804,6 +1809,11 @@ async function scanProject(root: string, forceWatch = false): Promise<boolean> {
         watchedDirectories = directories;
         watcherPolicyKey = policyKey;
         watcherFailed = false;
+        watcherRecoveryAttempts = 0;
+        if (watcherRecoveryTimer) {
+          window.clearTimeout(watcherRecoveryTimer);
+          watcherRecoveryTimer = 0;
+        }
         watcherStatus = "active";
       } catch (error) {
         watcherWarning = `Could not watch workspace changes: ${String(error)}`;
@@ -2037,6 +2047,10 @@ async function applyWorkspaceChanges(payload: WorkspaceChangeEvent) {
   const root = scan.root;
   const generation = scanGeneration;
   const paths = payload.changes.map((change) => change.path);
+  if (payload.changes.some((change) => change.kind === "__talos_rescan__")) {
+    void scanProject(root, true);
+    return;
+  }
   if (payload.changes.some((change) => entryByPath.get(change.path)?.kind === "directory")) {
     notifyWorkspaceFilesChanged(root, paths);
     void scanProject(root, true);
@@ -2088,6 +2102,17 @@ async function applyWorkspaceChanges(payload: WorkspaceChangeEvent) {
   if (!changed) return;
   scan = { ...scan, entries };
   entryByPath = new Map(entries.map((entry) => [entry.path, entry]));
+  dependencyResult = null;
+  analyzedPaths = [];
+  components = mode === "architecture"
+    ? classifyArchitecture(
+        root,
+        entries.filter((entry) => entry.kind === "file").map((entry) => entry.path),
+      )
+    : [];
+  performanceReport = null;
+  manifestSet = null;
+  debtReport = null;
   cachedTreeRows = null;
   updateQuickOpenIndex();
   render();
@@ -2342,6 +2367,31 @@ export function initArchitectureExplorer(
     watcherFailed = true;
     markWorkspaceWatcher("error");
     setMessage(`Project watcher error: ${event.payload}`, true);
+    const root = scan?.root;
+    if (!root || watcherRecoveryTimer || watcherRecoveryAttempts >= 3) {
+      if (watcherRecoveryAttempts >= 3) {
+        setMessage("Project watcher stopped after repeated errors. Use Refresh to resume.", true);
+      }
+      return;
+    }
+    watcherRecoveryAttempts++;
+    const delay = 1000 * 2 ** (watcherRecoveryAttempts - 1);
+    watcherRecoveryTimer = window.setTimeout(() => {
+      watcherRecoveryTimer = 0;
+      if (scan?.root !== root) return;
+      void invoke("watch_project", {
+        root,
+        exclusions: currentExclusions(),
+        showHidden,
+      }).then(() => {
+        watcherFailed = false;
+        watcherRecoveryAttempts = 0;
+        markWorkspaceWatcher("active");
+        setMessage("Project watcher reconnected.");
+      }).catch((error: unknown) => {
+        setMessage(`Could not reconnect project watcher: ${String(error)}`, true);
+      });
+    }, delay);
   }).catch((error: unknown) => setMessage(`Could not subscribe to watcher errors: ${String(error)}`, true));
   void restoreWorkspace();
   $("architecture").classList.toggle("hidden", !explorerOpen);

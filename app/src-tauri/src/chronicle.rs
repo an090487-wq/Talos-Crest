@@ -15,10 +15,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use ignore::gitignore::GitignoreBuilder;
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction};
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter};
+
+use crate::workspace::{WorkspacePolicy, WorkspacePolicyOptions};
 
 const SCHEMA_VERSION: i64 = 2;
 
@@ -1948,60 +1949,6 @@ struct ExtractedFact {
     redacted: bool,
 }
 
-struct IgnoreMatcher {
-    matchers: Vec<ignore::gitignore::Gitignore>,
-}
-
-impl IgnoreMatcher {
-    fn new(root: &Path, settings: &ChronicleSettings) -> Result<Self, String> {
-        let mut matchers = Vec::new();
-        let rules = [
-            (".gitignore", settings.respect_gitignore),
-            (".ignore", settings.respect_ignore),
-            (".talosignore", settings.respect_talos_ignore),
-        ];
-
-        for (name, enabled) in rules {
-            if !enabled {
-                continue;
-            }
-            let path = root.join(name);
-            if !path.is_file() {
-                continue;
-            }
-            let mut builder = GitignoreBuilder::new(root);
-            if let Some(error) = builder.add(&path) {
-                return Err(format!("could not read {}: {error}", path.display()));
-            }
-            matchers.push(
-                builder
-                    .build()
-                    .map_err(|e| format!("could not compile {}: {e}", path.display()))?,
-            );
-        }
-
-        let mut user_builder = GitignoreBuilder::new(root);
-        for pattern in &settings.exclude_patterns {
-            user_builder
-                .add_line(None, pattern)
-                .map_err(|e| format!("invalid Chronicle exclude pattern {pattern:?}: {e}"))?;
-        }
-        matchers.push(
-            user_builder
-                .build()
-                .map_err(|e| format!("could not compile Chronicle exclude patterns: {e}"))?,
-        );
-
-        Ok(Self { matchers })
-    }
-
-    fn is_ignored(&self, relative: &Path, is_dir: bool) -> bool {
-        self.matchers
-            .iter()
-            .any(|matcher| matcher.matched(relative, is_dir).is_ignore())
-    }
-}
-
 fn index_project(
     root: &Path,
     project_id: &str,
@@ -2060,7 +2007,13 @@ fn index_project_in(
 ) -> Result<ChronicleStatus, String> {
     let mut store = ChronicleStore::open_in(data_dir, root)?;
     let settings = store.settings()?;
-    let matcher = IgnoreMatcher::new(root, &settings)?;
+    let policy = WorkspacePolicy::load_with_options(root, WorkspacePolicyOptions {
+        exclusions: &settings.exclude_patterns,
+        show_hidden: settings.index_hidden_files,
+        respect_gitignore: settings.respect_gitignore,
+        respect_ignore: settings.respect_ignore,
+        respect_talos_ignore: settings.respect_talos_ignore,
+    })?;
 
     let report = |counters: &IndexCounters, phase: &str, message: Option<String>| {
         if let Some(callback) = progress {
@@ -2084,7 +2037,7 @@ fn index_project_in(
         Some("collecting project files".to_string()),
     );
 
-    let files = collect_files(root, &matcher, &settings, is_current)?;
+    let files = collect_files(root, &policy, &settings, is_current)?;
     let mut counters = IndexCounters::default();
 
     {
@@ -2311,7 +2264,7 @@ fn index_project_in(
 
 fn collect_files(
     root: &Path,
-    matcher: &IgnoreMatcher,
+    policy: &WorkspacePolicy,
     settings: &ChronicleSettings,
     is_current: &dyn Fn() -> bool,
 ) -> Result<Vec<FileCandidate>, String> {
@@ -2378,10 +2331,7 @@ fn collect_files(
             }
 
             let is_dir = metadata.is_dir();
-            if is_always_excluded(&relative)
-                || matcher.is_ignored(&relative, is_dir)
-                || (!settings.index_hidden_files && has_hidden_component(&relative))
-            {
+            if policy.is_ignored(&relative, is_dir) {
                 continue;
             }
 
@@ -2400,43 +2350,6 @@ fn collect_files(
     }
 
     Ok(files)
-}
-
-fn is_always_excluded(relative: &Path) -> bool {
-    for component in relative.components() {
-        if component.as_os_str() == ".git" {
-            return true;
-        }
-    }
-
-    let Some(name) = relative.file_name().map(|value| value.to_string_lossy()) else {
-        return false;
-    };
-    let lower = name.to_lowercase();
-    if lower == ".env" || lower.starts_with(".env.") {
-        return true;
-    }
-    if lower.ends_with(".pem")
-        || lower.ends_with(".key")
-        || lower.ends_with(".p12")
-        || lower.ends_with(".pfx")
-    {
-        return true;
-    }
-    matches!(
-        lower.as_str(),
-        "id_rsa"
-            | "id_ed25519"
-            | "credentials.json"
-            | "service-account.json"
-            | "service-account-key.json"
-    )
-}
-
-fn has_hidden_component(relative: &Path) -> bool {
-    relative
-        .components()
-        .any(|component| component.as_os_str().to_string_lossy().starts_with('.'))
 }
 
 fn persist_file(

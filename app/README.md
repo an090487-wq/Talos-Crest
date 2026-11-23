@@ -262,7 +262,11 @@ overwrites a file when creating one. Hidden files are off by default; ignore
 rules come from the Explorer exclusions plus local `.gitignore`, `.ignore`, and
 `.talosignore` files, and the same policy is used by the watcher and Chronicle.
 Sensitive paths such as keys and credentials stay excluded. Large scans are
-bounded and run off the UI thread; the view renders visible rows only.
+bounded and run off the UI thread; the view renders visible rows only. The
+file-change queue is bounded and automatically requests a full refresh during
+very large bursts; if the native watcher fails, Talos retries reconnection up
+to three times before asking you to use Refresh. Hovering a tree row shows
+whether double-click or Enter opens a file or expands a folder.
 
 To preview frontend changes in the desktop app, run `npm run tauri dev` from
 this directory. An installed Linux app does not update when source files

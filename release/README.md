@@ -18,7 +18,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`acf10bc0a20035690288881ac2219f66bbcae617472b0283bfd8ff465c037108`
+`a76b0b2224a91e6da54730693a47f5af3960dadfe86f195dfaf3e80926943a0f`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -35,7 +35,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`30be9677f720a31bd0c190e70781d2535bebece18b9c8b3959ae788fd77a975f`
+`0541e59d187b41359caa30078b323e31d3fd34d7d86ab76d9476172d8a8c2292`
 
 ## Optional GitHub access
 
@@ -48,8 +48,9 @@ rest of the editor needs no network connection.
 Both builds also include the Universal Project Workspace: a bounded local
 folder scanner with nested Explorer navigation, automatic restoration of the
 last folder per window, recent-project fallback, a workspace/status indicator,
-structured file-change updates, shared ignore rules, and Chronicle project
-memory. No workspace content is uploaded or analyzed remotely.
+structured file-change updates with bounded queueing and watcher recovery, one
+shared ignore/security policy for Explorer, watcher, and Chronicle, and bounded
+Chronicle project memory. No workspace content is uploaded or analyzed remotely.
 
 Canvas is also fully local. It includes screenshot annotation shapes and
 callouts, pixel measurement, palette extraction and HEX/RGB/HSL inspection,

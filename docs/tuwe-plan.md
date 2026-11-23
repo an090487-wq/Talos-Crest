@@ -46,21 +46,28 @@ This is an enhancement of the existing Talos Crest workspace stack, not a rewrit
 
 Checkpoint: `tsc --noEmit`, `npm test`, `npm run build`, `cargo test --workspace`, `git diff --check`.
 
-### Phase 2 — Unify ignore/security policy
+### Phase 2 — Unify ignore/security policy (completed)
 
-- Make Chronicle consume the shared workspace policy instead of its divergent matcher.
-- Add real on-disk `.gitignore`, `.ignore`, `.talosignore`, hidden, and sensitive-file tests.
+- Chronicle now consumes `WorkspacePolicy::load_with_options` from the shared module instead of its private `IgnoreMatcher`; the duplicate `is_always_excluded` / `has_hidden_component` code is removed.
+- Sensitive-name protection is centralized in `WorkspacePolicy` and cannot be disabled by subsystem settings.
+- Added `subsystem_policy_options_keep_hidden_and_sensitive_rules` Rust test.
+
+Additional Phase 2 defect fixes:
+- Stale dependency/insight caches are invalidated when the watcher changes files.
+- `workspace_entry_metadata` inspects the symlink itself, so links outside the root no longer fail canonicalization or report as files.
+- Explorer rows carry a tooltip explaining that double-click or Enter opens/expands.
 
 ### Phase 3 — Shared scan snapshot
 
 - Reuse one generation-stamped workspace snapshot for find-in-files, watcher setup, dependency source reads, and insights where safe.
 - Avoid content reads during workspace open; preserve `spawn_blocking` and generation guards.
 
-### Phase 4 — Watcher and event reliability
+### Phase 4 — Watcher and event reliability (completed)
 
-- Bound the pending event map.
-- Add automatic recovery/re-registration tests and multiple-directory-change coverage.
-- Preserve the existing 750 ms emit interval and idle/deferred UI updates.
+- Bounded the pending change map at 10,000 paths; overflow collapses to one `__talos_rescan__` event that forces a full scan instead of unbounded growth or silent loss.
+- Added frontend watcher recovery with three exponential-backoff re-registration attempts; successful scans reset the counter and clear pending timers.
+- Preserved the existing 750 ms emit interval and idle/deferred UI updates.
+- Added Rust test `workspace_change_queue_is_bounded_and_requests_rescan_on_overflow` and static frontend wiring checks.
 
 ### Phase 5 — Explorer and project intelligence
 

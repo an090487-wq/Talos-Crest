@@ -21,6 +21,15 @@ const SENSITIVE_PATTERNS: &[&str] = &[
     "service-account*.json",
 ];
 
+/// Selects which ignore files a workspace-aware subsystem honours.
+pub(crate) struct WorkspacePolicyOptions<'a> {
+    pub exclusions: &'a [String],
+    pub show_hidden: bool,
+    pub respect_gitignore: bool,
+    pub respect_ignore: bool,
+    pub respect_talos_ignore: bool,
+}
+
 /// One consistent set of rules for every workspace-aware subsystem.
 pub(crate) struct WorkspacePolicy {
     matchers: Vec<Gitignore>,
@@ -28,7 +37,7 @@ pub(crate) struct WorkspacePolicy {
 }
 
 impl WorkspacePolicy {
-    /// Build the policy for a canonical workspace root.
+    /// Build the default policy used by the Explorer and filesystem watcher.
     ///
     /// `exclusions` are the legacy Explorer comma-separated names, kept as a
     /// compatibility layer. They are converted into gitignore-style patterns
@@ -38,8 +47,32 @@ impl WorkspacePolicy {
         exclusions: &[String],
         show_hidden: bool,
     ) -> Result<Self, String> {
+        Self::load_with_options(root, WorkspacePolicyOptions {
+            exclusions,
+            show_hidden,
+            respect_gitignore: true,
+            respect_ignore: true,
+            respect_talos_ignore: true,
+        })
+    }
+
+    /// Build a policy with subsystem-specific ignore-file preferences.
+    ///
+    /// Sensitive-name protection is always active and cannot be disabled by a
+    /// caller. This is the single loader used by Explorer, watcher, and Chronicle.
+    pub(crate) fn load_with_options(
+        root: &Path,
+        options: WorkspacePolicyOptions<'_>,
+    ) -> Result<Self, String> {
         let mut matchers = Vec::new();
-        for name in [".gitignore", ".ignore", ".talosignore"] {
+        for (name, enabled) in [
+            (".gitignore", options.respect_gitignore),
+            (".ignore", options.respect_ignore),
+            (".talosignore", options.respect_talos_ignore),
+        ] {
+            if !enabled {
+                continue;
+            }
             let path = root.join(name);
             if !path.is_file() {
                 continue;
@@ -56,7 +89,8 @@ impl WorkspacePolicy {
         }
 
         let mut user_builder = GitignoreBuilder::new(root);
-        for pattern in exclusions
+        for pattern in options
+            .exclusions
             .iter()
             .map(String::as_str)
             .chain(SENSITIVE_PATTERNS.iter().copied())
@@ -76,7 +110,7 @@ impl WorkspacePolicy {
 
         Ok(Self {
             matchers,
-            show_hidden,
+            show_hidden: options.show_hidden,
         })
     }
 
@@ -158,5 +192,21 @@ mod tests {
         assert!(policy.is_ignored(Path::new("keys/service-account-prod.json"), false));
         assert!(policy.is_ignored(Path::new("private.key"), false));
         assert!(WorkspacePolicy::is_sensitive_name("id_rsa"));
+    }
+
+    #[test]
+    fn subsystem_policy_options_keep_hidden_and_sensitive_rules() {
+        let exclusions = vec!["generated".to_string()];
+        let policy = WorkspacePolicy::load_with_options(Path::new("/project"), WorkspacePolicyOptions {
+            exclusions: &exclusions,
+            show_hidden: false,
+            respect_gitignore: false,
+            respect_ignore: false,
+            respect_talos_ignore: false,
+        })
+        .unwrap();
+        assert!(policy.is_ignored(Path::new("src/generated/out.ts"), false));
+        assert!(policy.is_ignored(Path::new("src/.cache/out.ts"), false));
+        assert!(policy.is_ignored(Path::new("secrets/private.key"), false));
     }
 }
