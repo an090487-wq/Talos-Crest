@@ -57,10 +57,22 @@ Additional Phase 2 defect fixes:
 - `workspace_entry_metadata` inspects the symlink itself, so links outside the root no longer fail canonicalization or report as files.
 - Explorer rows carry a tooltip explaining that double-click or Enter opens/expands.
 
-### Phase 3 — Shared scan snapshot
+### Phase 3 — Shared scan snapshot (completed)
 
-- Reuse one generation-stamped workspace snapshot for find-in-files, watcher setup, dependency source reads, and insights where safe.
-- Avoid content reads during workspace open; preserve `spawn_blocking` and generation guards.
+- Find-in-files now receives the file paths from the frontend's current
+  `ProjectScan` snapshot. The backend validates each path against the canonical
+  root and the live `WorkspacePolicy` before reading it; if no paths are
+  supplied, it falls back to the original tree walk.
+- Watcher registration receives the snapshot's directory list with the same
+  validation and a fallback walk. Truncated scans deliberately keep the fallback
+  because their snapshot is incomplete.
+- `findInWorkspace` captures both the scan object and `scanGeneration` and drops
+  results if either changed while the search was running.
+- Dependency analysis and insights already consumed snapshot paths, so they were
+  left unchanged. Chronicle's own settings-driven indexer also stays separate.
+- Synthetic 2,000-file microbenchmark in `cargo test` (three runs): full walk
+  42–49 ms, reused snapshot 28–40 ms. This is one machine and one workload; it
+  is not a general latency guarantee.
 
 ### Phase 4 — Watcher and event reliability (completed)
 

@@ -1583,18 +1583,27 @@ async function findInWorkspace() {
     setMessage("Open a project before searching across its files.", true);
     return;
   }
+  const snapshot = scan;
+  const generation = scanGeneration;
+  // A truncated scan is not a complete file list, so let the backend walk the
+  // tree in that case instead of searching only the captured prefix.
+  const snapshotPaths = snapshot.truncated
+    ? undefined
+    : snapshot.entries.filter((entry) => entry.kind === "file").map((entry) => entry.path);
   const query = window.prompt("Search text in all workspace files:");
   if (!query?.trim()) return;
   const summary = $("arch-details");
   summary.textContent = "Searching workspace files…";
   try {
     const matches = await invoke<WorkspaceTextMatch[]>("search_workspace_text", {
-      root: scan.root,
+      root: snapshot.root,
       query,
       exclusions: currentExclusions(),
       showHidden,
       limit: 200,
+      paths: snapshotPaths,
     });
+    if (generation !== scanGeneration || scan !== snapshot) return;
     summary.textContent = "";
     const heading = document.createElement("strong");
     heading.textContent = `${matches.length}${matches.length === 200 ? "+" : ""} match${matches.length === 1 ? "" : "es"} for “${query}”`;
@@ -1613,6 +1622,7 @@ async function findInWorkspace() {
     if (!matches.length) summary.appendChild(document.createTextNode("No matching files."));
     setMessage(`Workspace text search finished with ${matches.length} result${matches.length === 1 ? "" : "s"}.`);
   } catch (error) {
+    if (generation !== scanGeneration || scan !== snapshot) return;
     summary.textContent = "Search failed.";
     setMessage(`Workspace text search failed: ${String(error)}`, true);
   }
@@ -1804,6 +1814,9 @@ async function scanProject(root: string, forceWatch = false): Promise<boolean> {
           root: result.root,
           exclusions: currentExclusions(),
           showHidden: showHidden,
+          // A truncated scan has an incomplete directory list; fall back to a
+          // real directory walk on the backend in that case.
+          directories: result.truncated ? undefined : [...directories],
         });
         watchedRoot = result.root;
         watchedDirectories = directories;
@@ -2383,6 +2396,9 @@ export function initArchitectureExplorer(
         root,
         exclusions: currentExclusions(),
         showHidden,
+        directories: scan?.truncated
+          ? undefined
+          : [...new Set(scan?.entries.filter((entry) => entry.kind === "directory").map((entry) => entry.path) ?? [])],
       }).then(() => {
         watcherFailed = false;
         watcherRecoveryAttempts = 0;

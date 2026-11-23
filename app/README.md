@@ -327,10 +327,12 @@ The project watcher runs for the active workspace and emits debounced,
 path-level change events, including while the Explorer is closed. File
 create/modify/delete events update affected entries incrementally from metadata;
 directory changes cause a rescan, and newly discovered directories are
-registered for watching. Watching is capped at 2,000 directories; partial
-registration failures emit a visible warning, and **Refresh** remains the
-recovery path. Search inputs are debounced, superseded scans are discarded, and
-indexing is never performed on a keystroke.
+registered for watching. It reuses the directories from the current Explorer
+scan, validates them on the backend, and falls back to a directory walk when the
+scan is truncated. Watching is capped at 2,000 directories; partial registration
+failures emit a visible warning, and **Refresh** remains the recovery path.
+Search inputs are debounced, superseded scans are discarded, and indexing is
+never performed on a keystroke.
 
 The tree shows unsaved and current-editor error or warning badges; Git,
 newly-created/deleted, and background-file diagnostics are not yet integrated.
@@ -380,7 +382,11 @@ matching, regular expressions, next/previous, replace, replace-all, and a
 bounded match count. **Find in Files** in the Explorer searches text in scanned
 workspace files in a background task; it is bounded by file size, file count,
 total bytes, and result count, and respects the active ignore/hidden policy.
-It opens matching files but does not perform cross-file replacement.
+It reuses the current Explorer scan's file list instead of walking the tree a
+second time, revalidates every path against the canonical root and current
+ignore rules, and falls back to a full walk if the scan was truncated. Search
+results are discarded if the workspace changes while the search runs. It opens
+matching files but does not perform cross-file replacement.
 
 ## Set up Android code execution
 

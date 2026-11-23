@@ -1282,11 +1282,9 @@ struct WorkspaceTextMatch {
     text: String,
 }
 
-fn search_workspace_text_at(
-    root: &str,
+fn search_file_paths(
     query: &str,
-    exclusions: &[String],
-    show_hidden: bool,
+    paths: &[String],
     limit: usize,
 ) -> Result<Vec<WorkspaceTextMatch>, String> {
     const MAX_SEARCH_FILES: usize = 4_000;
@@ -1298,17 +1296,16 @@ fn search_workspace_text_at(
         return Ok(Vec::new());
     }
     let lower_needle = needle.to_ascii_lowercase();
-    let scan = scan_project_tree(root, exclusions, show_hidden, None)?;
     let mut matches = Vec::new();
     let mut bytes_read = 0u64;
     let mut files_read = 0usize;
 
-    for entry in scan.entries.iter().filter(|entry| entry.kind == "file") {
+    for path_text in paths {
         if matches.len() >= limit || files_read >= MAX_SEARCH_FILES || bytes_read >= MAX_TOTAL_BYTES
         {
             break;
         }
-        let path = PathBuf::from(&entry.path);
+        let path = PathBuf::from(path_text);
         let metadata = match fs::symlink_metadata(&path) {
             Ok(metadata) if metadata.is_file() && metadata.len() <= MAX_FILE_BYTES => metadata,
             _ => continue,
@@ -1327,7 +1324,7 @@ fn search_workspace_text_at(
             while let Some(found) = lower[offset..].find(&lower_needle) {
                 let column = offset + found;
                 matches.push(WorkspaceTextMatch {
-                    path: entry.path.clone(),
+                    path: path_text.clone(),
                     line: line_index + 1,
                     column: column + 1,
                     text: line.chars().take(240).collect(),
@@ -1348,6 +1345,66 @@ fn search_workspace_text_at(
     Ok(matches)
 }
 
+/// Validate paths coming from the frontend's current workspace snapshot.
+/// They are checked against the canonical root and the live ignore policy so a
+/// stale or hostile list can never widen what the search reads.
+fn snapshot_file_paths(
+    root: &str,
+    paths: &[String],
+    exclusions: &[String],
+    show_hidden: bool,
+) -> Result<Vec<String>, String> {
+    let root = canonical_project_root(root)?;
+    let policy = workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?;
+    let mut result = Vec::with_capacity(paths.len());
+    for path in paths {
+        let candidate = PathBuf::from(path);
+        let candidate = if candidate.is_absolute() {
+            candidate
+        } else {
+            root.join(candidate)
+        };
+        let Ok(canonical) = candidate.canonicalize() else {
+            continue;
+        };
+        if !canonical.starts_with(&root) {
+            continue;
+        }
+        let relative = canonical.strip_prefix(&root).unwrap_or(&canonical);
+        let name = canonical.file_name().and_then(|name| name.to_str()).unwrap_or("");
+        if policy.is_ignored(relative, false)
+            || workspace::WorkspacePolicy::is_sensitive_name(name)
+        {
+            continue;
+        }
+        result.push(canonical.to_string_lossy().into_owned());
+    }
+    Ok(result)
+}
+
+fn search_workspace_text_at(
+    root: &str,
+    query: &str,
+    exclusions: &[String],
+    show_hidden: bool,
+    limit: usize,
+    paths: Option<&[String]>,
+) -> Result<Vec<WorkspaceTextMatch>, String> {
+    if query.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let candidates: Vec<String> = match paths {
+        Some(paths) => snapshot_file_paths(root, paths, exclusions, show_hidden)?,
+        None => scan_project_tree(root, exclusions, show_hidden, None)?
+            .entries
+            .into_iter()
+            .filter(|entry| entry.kind == "file")
+            .map(|entry| entry.path)
+            .collect(),
+    };
+    search_file_paths(query, &candidates, limit)
+}
+
 #[tauri::command]
 async fn search_workspace_text(
     root: String,
@@ -1355,10 +1412,18 @@ async fn search_workspace_text(
     exclusions: Vec<String>,
     show_hidden: bool,
     limit: Option<usize>,
+    paths: Option<Vec<String>>,
 ) -> Result<Vec<WorkspaceTextMatch>, String> {
     let limit = limit.unwrap_or(200).clamp(1, 500);
     tauri::async_runtime::spawn_blocking(move || {
-        search_workspace_text_at(&root, &query, &exclusions, show_hidden, limit)
+        search_workspace_text_at(
+            &root,
+            &query,
+            &exclusions,
+            show_hidden,
+            limit,
+            paths.as_deref(),
+        )
     })
     .await
     .map_err(|error| format!("workspace text search task failed: {error}"))?
@@ -1601,10 +1666,11 @@ fn watch_project(
     root: String,
     exclusions: Vec<String>,
     show_hidden: bool,
+    directories: Option<Vec<String>>,
 ) -> Result<(), String> {
     #[cfg(target_os = "android")]
     {
-        let _ = (window, root, exclusions, show_hidden);
+        let _ = (window, root, exclusions, show_hidden, directories);
         return Ok(());
     }
 
@@ -1680,7 +1746,33 @@ fn watch_project(
             })
             .map_err(|e| format!("could not start project watcher: {e}"))?;
         let mut watcher = watcher;
-        let dirs = collect_watch_dirs(&root, &policy);
+        let dirs = match directories {
+            Some(paths) if !paths.is_empty() => {
+                // Reuse the directories from the current workspace snapshot.
+                // Validate them like any other caller input, and keep the root
+                // even when the supplied list is unusable.
+                let mut validated = vec![root.clone()];
+                for path in paths {
+                    let candidate = PathBuf::from(path);
+                    let Ok(canonical) = candidate.canonicalize() else {
+                        continue;
+                    };
+                    if !canonical.is_dir()
+                        || !canonical.starts_with(&root)
+                        || watch_path_ignored(&canonical, &root, &policy)
+                        || validated.contains(&canonical)
+                    {
+                        continue;
+                    }
+                    if validated.len() >= WATCHED_DIR_LIMIT {
+                        break;
+                    }
+                    validated.push(canonical);
+                }
+                validated
+            }
+            _ => collect_watch_dirs(&root, &policy),
+        };
         let mut watched = 0;
         let mut failed = 0usize;
         for dir in dirs {
@@ -3127,12 +3219,101 @@ mod tests {
         .unwrap();
         fs::write(root.join("generated.txt"), "NEEDLE_TOKEN\n").unwrap();
 
-        let matches =
-            search_workspace_text_at(root.to_str().unwrap(), "needle_token", &[], false, 20)
-                .unwrap();
+        let matches = search_workspace_text_at(
+            root.to_str().unwrap(),
+            "needle_token",
+            &[],
+            false,
+            20,
+            None,
+        )
+        .unwrap();
         assert_eq!(matches.len(), 1);
         assert!(matches[0].path.ends_with("src/api.py"));
         assert_eq!(matches[0].line, 2);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn snapshot_search_reuses_paths_but_revalidates_policy_and_boundary() {
+        let parent = temp_workspace("snapshot-search");
+        let root = parent.join("workspace");
+        let outside = parent.join("outside.txt");
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(root.join(".gitignore"), "generated.txt\n").unwrap();
+        fs::write(root.join("src/api.py"), "TOKEN_VALUE = 1\n").unwrap();
+        fs::write(root.join("generated.txt"), "TOKEN_VALUE = 2\n").unwrap();
+        fs::write(root.join("private.key"), "TOKEN_VALUE = 3\n").unwrap();
+        fs::write(&outside, "TOKEN_VALUE = 4\n").unwrap();
+
+        let root_text = root.to_string_lossy().into_owned();
+        let supplied = vec![
+            root.join("src/api.py").to_string_lossy().into_owned(),
+            root.join("generated.txt").to_string_lossy().into_owned(),
+            root.join("private.key").to_string_lossy().into_owned(),
+            outside.to_string_lossy().into_owned(),
+            "../outside.txt".to_string(),
+        ];
+        let matches = search_workspace_text_at(
+            &root_text,
+            "token_value",
+            &[],
+            false,
+            20,
+            Some(&supplied),
+        )
+        .unwrap();
+
+        assert_eq!(matches.len(), 1);
+        assert!(matches[0].path.ends_with("src/api.py"));
+        fs::remove_dir_all(parent).unwrap();
+    }
+
+    #[test]
+    fn snapshot_search_returns_the_same_results_without_a_second_walk() {
+        let root = temp_workspace("snapshot-benchmark");
+        for directory in 0..40 {
+            let path = root.join(format!("module-{directory:02}"));
+            fs::create_dir_all(&path).unwrap();
+            for file in 0..50 {
+                let token = if directory == 20 && file == 25 { "NEEDLE_TOKEN" } else { "other" };
+                fs::write(path.join(format!("source-{file:03}.txt")), token).unwrap();
+            }
+        }
+        let root_text = root.to_string_lossy().into_owned();
+        let paths: Vec<String> = fs::read_dir(&root)
+            .unwrap()
+            .flatten()
+            .filter(|entry| entry.path().is_dir())
+            .flat_map(|entry| fs::read_dir(entry.path()).unwrap().flatten())
+            .map(|entry| entry.path().to_string_lossy().into_owned())
+            .collect();
+
+        let started = Instant::now();
+        let walked = search_workspace_text_at(&root_text, "needle_token", &[], false, 20, None)
+            .unwrap();
+        let walked_ms = started.elapsed().as_millis();
+
+        let started = Instant::now();
+        let reused = search_workspace_text_at(
+            &root_text,
+            "needle_token",
+            &[],
+            false,
+            20,
+            Some(&paths),
+        )
+        .unwrap();
+        let reused_ms = started.elapsed().as_millis();
+
+        assert_eq!(walked.len(), 1);
+        assert_eq!(walked[0].path, reused[0].path);
+        eprintln!(
+            "snapshot_search_benchmark: {} files, walk {} ms, reused snapshot {} ms",
+            paths.len(),
+            walked_ms,
+            reused_ms
+        );
         fs::remove_dir_all(root).unwrap();
     }
 

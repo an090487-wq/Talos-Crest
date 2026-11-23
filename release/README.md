@@ -18,7 +18,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`3a57871be480e53ad19e06875c04781b4d5438b317daec8e464c2579bae9bc1c`
+`88c9e3cd710c8d09b3757b1461c710e8a56ad8ef957637068ad04e51c6e65331`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -35,7 +35,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`b9f2dda509a59cfef428e7abd19d11ff0b72536403e315f7ad40e32d0e004f5f`
+`c5ecd92f9d30fbb1c11d34fd70aa1cbd9a5ade44c5d66acbe97fc746a385f703`
 
 ## Optional GitHub access
 
@@ -50,7 +50,10 @@ folder scanner with nested Explorer navigation, automatic restoration of the
 last folder per window, recent-project fallback, a workspace/status indicator,
 structured file-change updates with bounded queueing and watcher recovery, one
 shared ignore/security policy for Explorer, watcher, and Chronicle, and bounded
-Chronicle project memory. No workspace content is uploaded or analyzed remotely.
+Chronicle project memory. Find in Files and watcher registration reuse the
+current Explorer scan instead of walking the tree again, with backend
+revalidation and a fallback for truncated scans. No workspace content is
+uploaded or analyzed remotely.
 
 The editor includes a local Custom Error Detection engine with built-in rules
 for common Python, JavaScript/TypeScript, C/C++, Rust, and Java defects, plus

@@ -140,3 +140,18 @@ test("symlink metadata inspects the link itself", () => {
   assert.match(libRs, /fs::symlink_metadata\(&candidate\)/);
   assert.match(libRs, /Inspect the link itself, not its target/);
 });
+
+test("find-in-files reuses the generation-stamped snapshot", () => {
+  assert.match(architecture, /const snapshot = scan;\s*const generation = scanGeneration;/);
+  assert.match(architecture, /paths: snapshotPaths/);
+  assert.match(architecture, /generation !== scanGeneration \|\| scan !== snapshot/);
+  assert.match(libRs, /fn snapshot_file_paths\(/);
+  assert.match(libRs, /paths: Option<Vec<String>>/);
+  assert.match(libRs, /scan_project_tree\(root, exclusions, show_hidden, None\)/);
+});
+
+test("watcher registration reuses snapshot directories with a fallback", () => {
+  assert.match(architecture, /directories: result\.truncated \? undefined : \[\.\.\.directories\]/);
+  assert.match(libRs, /directories: Option<Vec<String>>/);
+  assert.match(libRs, /_ => collect_watch_dirs\(&root, &policy\)/);
+});
