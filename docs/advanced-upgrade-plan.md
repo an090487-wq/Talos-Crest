@@ -105,13 +105,22 @@ default; only the opt-in GitHub Observatory may contact GitHub.
 
 ### Increment B — lazy workspace loading and Explorer polish
 
-1. Add a root-bound Rust command that lists one directory level with the shared
-   policy and bounded child count.
-2. Add a frontend tree model that keeps only loaded children and virtualizes the
-   visible rows.
-3. Keep the full scan available as an explicit fallback for search/insights.
-4. Add inline create/rename with validation and cancellation.
-5. Add a project overview panel that reads existing scan/insight data.
+Implemented:
+
+1. `list_project_directory` lists one directory level through the shared policy
+   and a bounded child count, with symlink and path-boundary checks.
+2. Initial project open, workspace restore, Quick Open fallback, and project
+   watcher registration now use that lazy listing; loaded directories are tracked
+   and expanded on demand.
+3. Full scan remains available as an explicit fallback for Quick Open, Find in
+   Files, dependency analysis, architecture classification, insights, and
+   watcher recovery.
+
+Remaining:
+
+1. Inline create/rename with validation and cancellation.
+2. A project overview panel built from existing scan/insight data.
+3. A faster name-based backend index for Quick Open that avoids a full scan.
 
 ### Increment C — search, diff, and editor groups
 

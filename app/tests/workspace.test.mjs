@@ -151,7 +151,7 @@ test("find-in-files reuses the generation-stamped snapshot", () => {
 });
 
 test("watcher registration reuses snapshot directories with a fallback", () => {
-  assert.match(architecture, /directories: result\.truncated \? undefined : \[\.\.\.directories\]/);
+  assert.match(architecture, /directories: result\.truncated \|\| result\.lazy \? undefined : \[\.\.\.directories\]/);
   assert.match(libRs, /directories: Option<Vec<String>>/);
   assert.match(libRs, /_ => collect_watch_dirs\(&root, &policy\)/);
 });

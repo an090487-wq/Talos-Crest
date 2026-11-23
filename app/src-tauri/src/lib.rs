@@ -822,7 +822,7 @@ fn modified_ms(metadata: &fs::Metadata) -> Option<u64> {
         .map(|duration| duration.as_millis().min(u64::MAX as u128) as u64)
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, Debug, serde::Serialize)]
 struct ProjectEntry {
     path: String,
     parent: String,
@@ -1049,6 +1049,189 @@ async fn scan_project(
     })
     .await
     .map_err(|error| format!("project scan task failed: {error}"))?
+}
+
+#[derive(Debug, serde::Serialize)]
+struct ProjectDirectory {
+    root: String,
+    path: String,
+    entry: ProjectEntry,
+    entries: Vec<ProjectEntry>,
+    warnings: Vec<String>,
+    truncated: bool,
+}
+
+/// List one directory level for the lazy Explorer.
+///
+/// This deliberately does not recurse. The root, the requested path, and every
+/// child are checked against the same canonical root and workspace policy used
+/// by the full scan, so lazy loading cannot widen what the Explorer may read.
+fn list_project_directory_at(
+    root: &str,
+    path: &str,
+    exclusions: &[String],
+    show_hidden: bool,
+    registry: Option<&Registry>,
+) -> Result<ProjectDirectory, String> {
+    const MAX_DIRECTORY_ENTRIES: usize = 10_000;
+
+    let root = canonical_project_root(root)?;
+    let requested = {
+        let candidate = PathBuf::from(path);
+        if candidate.as_os_str().is_empty() {
+            root.clone()
+        } else if candidate.is_absolute() {
+            candidate
+        } else {
+            root.join(candidate)
+        }
+    };
+    let directory = requested
+        .canonicalize()
+        .map_err(|error| format!("could not open directory '{}': {error}", requested.display()))?;
+    if !directory.starts_with(&root) {
+        return Err("directory is outside the workspace".into());
+    }
+    if !directory.is_dir() {
+        return Err(format!("workspace entry is not a directory: {}", directory.display()));
+    }
+
+    let policy = workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?;
+    let relative = directory.strip_prefix(&root).unwrap_or(Path::new(""));
+    if !relative.as_os_str().is_empty() && policy.is_ignored(relative, true) {
+        return Err(format!("directory is excluded by workspace policy: {}", relative.display()));
+    }
+
+    let depth = relative.components().count();
+    let parent = if depth == 0 {
+        String::new()
+    } else {
+        directory
+            .parent()
+            .map(|parent| parent.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    };
+    let metadata = fs::symlink_metadata(&directory)
+        .map_err(|error| format!("could not inspect {}: {error}", directory.display()))?;
+    let mut warnings = Vec::new();
+    let mut entries = Vec::new();
+    let mut truncated = false;
+    let children = fs::read_dir(&directory)
+        .map_err(|error| format!("could not read {}: {error}", directory.display()))?;
+
+    for child in children {
+        let child = match child {
+            Ok(child) => child,
+            Err(error) => {
+                warnings.push(format!(
+                    "Could not read an entry in {}: {error}",
+                    directory.display()
+                ));
+                continue;
+            }
+        };
+        if entries.len() >= MAX_DIRECTORY_ENTRIES {
+            truncated = true;
+            break;
+        }
+        let child_path = child.path();
+        let name = child.file_name().to_string_lossy().into_owned();
+        let file_type = match child.file_type() {
+            Ok(file_type) => file_type,
+            Err(error) => {
+                warnings.push(format!("Could not inspect {}: {error}", child_path.display()));
+                continue;
+            }
+        };
+        let child_relative = child_path.strip_prefix(&root).unwrap_or(&child_path);
+        if policy.is_ignored(child_relative, file_type.is_dir())
+            || workspace::WorkspacePolicy::is_sensitive_name(&name)
+        {
+            continue;
+        }
+        let child_metadata = match fs::symlink_metadata(&child_path) {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                warnings.push(format!("Could not inspect {}: {error}", child_path.display()));
+                continue;
+            }
+        };
+        let kind = if file_type.is_symlink() {
+            "link"
+        } else if file_type.is_dir() {
+            "directory"
+        } else {
+            "file"
+        };
+        let extension = if kind == "file" {
+            child_path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase()
+        } else {
+            String::new()
+        };
+        entries.push(ProjectEntry {
+            path: child_path.to_string_lossy().into_owned(),
+            parent: directory.to_string_lossy().into_owned(),
+            name,
+            kind: kind.into(),
+            extension,
+            language: language_for_path(&child_path, registry),
+            size: child_metadata.len(),
+            modified_ms: modified_ms(&child_metadata),
+            depth: depth + 1,
+            child_count: 0,
+            file_count: 0,
+        });
+    }
+
+    entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    let directory_text = directory.to_string_lossy().into_owned();
+    let entry = ProjectEntry {
+        path: directory_text.clone(),
+        parent,
+        name: directory
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("Project")
+            .to_string(),
+        kind: "directory".into(),
+        extension: String::new(),
+        language: String::new(),
+        size: 0,
+        modified_ms: modified_ms(&metadata),
+        depth,
+        child_count: entries.len(),
+        file_count: 0,
+    };
+
+    Ok(ProjectDirectory {
+        root: root.to_string_lossy().into_owned(),
+        path: directory_text,
+        entry,
+        entries,
+        warnings,
+        truncated,
+    })
+}
+
+#[tauri::command]
+async fn list_project_directory(
+    app: tauri::AppHandle,
+    root: String,
+    path: String,
+    exclusions: Vec<String>,
+    show_hidden: bool,
+) -> Result<ProjectDirectory, String> {
+    let resource_dir = app.path().resource_dir().ok();
+    tauri::async_runtime::spawn_blocking(move || {
+        let registry = language_registry(resource_dir.as_deref());
+        list_project_directory_at(&root, &path, &exclusions, show_hidden, registry.as_ref())
+    })
+    .await
+    .map_err(|error| format!("directory listing task failed: {error}"))?
 }
 
 fn canonical_project_root(root: &str) -> Result<PathBuf, String> {
@@ -3268,6 +3451,95 @@ mod tests {
     }
 
     #[test]
+    fn lazy_directory_listing_respects_policy_and_workspace_boundary() {
+        let parent = std::env::temp_dir().join(format!(
+            "talos-lazy-directory-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let root = parent.join("workspace");
+        let outside = parent.join("outside");
+        fs::create_dir_all(root.join("src/nested")).unwrap();
+        fs::create_dir_all(root.join("node_modules")).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(root.join("src/main.ts"), "export {};").unwrap();
+        fs::write(root.join("src/nested/helper.py"), "pass").unwrap();
+        fs::write(root.join("node_modules/ignored.js"), "").unwrap();
+        fs::write(outside.join("secret.txt"), "secret").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&outside, root.join("outside-link")).unwrap();
+
+        let exclusions = ["node_modules".to_string()];
+        let root_text = root.to_string_lossy().into_owned();
+        let listing =
+            list_project_directory_at(&root_text, "", &exclusions, false, None).unwrap();
+        assert_eq!(listing.path, root_text);
+        assert_eq!(listing.entry.depth, 0);
+        assert_eq!(listing.entry.child_count, listing.entries.len());
+        assert!(listing.entries.iter().any(|entry| entry.name == "src"));
+        assert!(!listing
+            .entries
+            .iter()
+            .any(|entry| entry.name == "node_modules"));
+        assert!(listing
+            .entries
+            .iter()
+            .all(|entry| entry.depth == 1 && entry.parent == root_text));
+        #[cfg(unix)]
+        assert!(listing
+            .entries
+            .iter()
+            .any(|entry| entry.name == "outside-link" && entry.kind == "link"));
+
+        let src_text = root.join("src").to_string_lossy().into_owned();
+        let src = list_project_directory_at(&root_text, &src_text, &exclusions, false, None).unwrap();
+        assert_eq!(src.entry.depth, 1);
+        assert!(src
+            .entries
+            .iter()
+            .any(|entry| entry.name == "nested" && entry.depth == 2));
+        assert!(src
+            .entries
+            .iter()
+            .any(|entry| entry.name == "main.ts" && entry.extension == "ts"));
+
+        let ignored = list_project_directory_at(
+            &root_text,
+            &root.join("node_modules").to_string_lossy(),
+            &exclusions,
+            false,
+            None,
+        )
+        .expect_err("an excluded directory must not be listable");
+        assert!(ignored.contains("excluded"), "{ignored}");
+
+        let file = list_project_directory_at(
+            &root_text,
+            &root.join("src/main.ts").to_string_lossy(),
+            &exclusions,
+            false,
+            None,
+        )
+        .expect_err("a file is not a directory");
+        assert!(file.contains("not a directory"), "{file}");
+
+        let escaped = list_project_directory_at(
+            &root_text,
+            &outside.to_string_lossy(),
+            &exclusions,
+            false,
+            None,
+        )
+        .expect_err("a directory outside the root must be rejected");
+        assert!(escaped.contains("outside the workspace"), "{escaped}");
+
+        fs::remove_dir_all(&parent).unwrap();
+    }
+
+    #[test]
     fn project_operations_create_rename_and_delete_only_inside_workspace() {
         let parent = std::env::temp_dir().join(format!(
             "talos-project-operations-{}-{}",
@@ -3669,6 +3941,7 @@ pub fn run() {
             take_window_context,
             is_android,
             scan_project,
+            list_project_directory,
             workspace_entry_metadata,
             search_workspace_text,
             list_recent_workspaces,

@@ -46,11 +46,24 @@ interface ProjectEntry {
   depth: number;
   child_count: number;
   file_count: number;
+  /** Client-only: true once this directory's immediate children were loaded. */
+  children_loaded?: boolean;
 }
 
 interface ProjectScan {
   id: string;
   root: string;
+  entries: ProjectEntry[];
+  warnings: string[];
+  truncated: boolean;
+  /** Client-only: the initial tree was loaded one directory at a time. */
+  lazy?: boolean;
+}
+
+interface ProjectDirectory {
+  root: string;
+  path: string;
+  entry: ProjectEntry;
   entries: ProjectEntry[];
   warnings: string[];
   truncated: boolean;
@@ -214,6 +227,7 @@ function showArchitectureWindow() {
 let panStart: { x: number; y: number; left: number; top: number } | null = null;
 let spaceHeld = false;
 let expandedVersion = 0;
+let loadingDirectories = new Set<string>();
 let componentExpandedVersion = 0;
 let cachedTreeRows: {
   snapshot: ProjectScan;
@@ -390,7 +404,7 @@ function renderDetails() {
     ["Name", entry.name],
     ["Type", entry.kind === "directory" ? "Folder" : entry.kind === "link" ? "Symbolic link (not followed)" : entry.extension ? `${entry.extension.toUpperCase()} file` : "File"],
     ["Path", entry.path],
-    ["Size", entry.kind === "directory" ? `${entry.file_count} files` : humanSize(entry.size)],
+    ["Size", entry.kind === "directory" ? (scan?.lazy ? "Not counted in lazy view" : `${entry.file_count} files`) : humanSize(entry.size)],
     ["Children", entry.kind === "directory" ? String(entry.child_count) : "—"],
     ["Modified", entry.modified_ms ? new Date(entry.modified_ms).toLocaleString() : "Unavailable"],
   ];
@@ -490,7 +504,7 @@ async function createEntry(kind: "file" | "directory") {
       root,
       path,
     });
-    await scanProject(root);
+    await refreshTree(root);
     selectedPath = createdPath;
     render();
     setMessage(`Created ${path}`);
@@ -521,7 +535,7 @@ async function renameSelected() {
   try {
     await invoke("rename_project_entry", { root, from, to });
     onWorkspacePathChange?.(entry.path, absolutePath(to));
-    await scanProject(root);
+    await refreshTree(root);
     selectedPath = absolutePath(to);
     render();
     setMessage(`Renamed to ${to}`);
@@ -547,7 +561,7 @@ async function performMove(entry: ProjectEntry, to: string) {
       onWorkspacePathChange?.(oldPath, newPath);
       if (expanded.delete(oldPath)) expanded.add(newPath);
     }
-    await scanProject(root);
+    await refreshTree(root);
     selectedPath = movedRoot;
     render();
     setMessage(`Moved ${from} to ${to}`);
@@ -579,7 +593,7 @@ async function duplicateSelected(entryOverride?: ProjectEntry) {
       exclusions: currentExclusions(),
       showHidden,
     });
-    await scanProject(root);
+    await refreshTree(root);
     const createdPath = absolutePath(result.path);
     selectedPath = createdPath;
     render();
@@ -628,7 +642,7 @@ async function deleteSelected() {
   try {
     await invoke("delete_project_entry", { root, path });
     onWorkspacePathChange?.(entry.path, null);
-    await scanProject(root);
+    await refreshTree(root);
     selectedPath = parentPath;
     render();
     setMessage(`Deleted ${path}`);
@@ -644,6 +658,118 @@ async function copyPath(path: string) {
   } catch (error) {
     setMessage(`Could not copy path: ${String(error)}`, true);
   }
+}
+
+async function toggleDirectory(entry: ProjectEntry, index: number): Promise<void> {
+  if (!scan || entry.kind !== "directory") return;
+  const snapshot = scan;
+  const generation = scanGeneration;
+  if (expanded.has(entry.path)) {
+    expanded.delete(entry.path);
+    expandedVersion++;
+    cachedTreeRows = null;
+    render();
+    focusTreeRow(index);
+    return;
+  }
+  expanded.add(entry.path);
+  expandedVersion++;
+  cachedTreeRows = null;
+  if (entry.children_loaded === true || loadingDirectories.has(entry.path)) {
+    render();
+    focusTreeRow(index);
+    return;
+  }
+  loadingDirectories.add(entry.path);
+  render();
+  try {
+    const listing = await invoke<ProjectDirectory>("list_project_directory", {
+      root: snapshot.root,
+      path: entry.path,
+      exclusions: currentExclusions(),
+      showHidden,
+    });
+    if (generation !== scanGeneration || scan !== snapshot || !scan) return;
+    const children = listing.entries.map((child) => ({
+      ...child,
+      children_loaded: false,
+    }));
+    const nextEntries = scan.entries.filter(
+      (candidate) => !(candidate.path === entry.path ? false : isPathInside(candidate.path, entry.path)),
+    );
+    const targetIndex = nextEntries.findIndex((candidate) => candidate.path === entry.path);
+    const updatedEntry = {
+      ...(targetIndex >= 0 ? nextEntries[targetIndex] : entry),
+      ...listing.entry,
+      children_loaded: true,
+      child_count: children.length,
+    };
+    if (targetIndex >= 0) nextEntries[targetIndex] = updatedEntry;
+    else nextEntries.push(updatedEntry);
+    for (const child of children) nextEntries.push(child);
+    // Remove expansion state for descendants that were replaced by the fresh listing.
+    for (const path of [...expanded]) {
+      if (isPathInside(path, entry.path) && path !== entry.path && !nextEntries.some((candidate) => candidate.path === path)) {
+        expanded.delete(path);
+      }
+    }
+    scan = {
+      ...scan,
+      entries: nextEntries,
+      warnings: listing.warnings.length ? listing.warnings : scan.warnings,
+      truncated: scan.truncated || listing.truncated,
+    };
+    entryByPath = new Map(scan.entries.map((candidate) => [candidate.path, candidate]));
+    cachedTreeRows = null;
+    expandedVersion++;
+    if (listing.warnings.length) setMessage(`Loaded ${entry.name} with ${listing.warnings.length} warning(s).`, true);
+  } catch (error) {
+    expanded.delete(entry.path);
+    expandedVersion++;
+    cachedTreeRows = null;
+    setMessage(`Could not load ${entry.name}: ${String(error)}`, true);
+  } finally {
+    loadingDirectories.delete(entry.path);
+    cachedTreeRows = null;
+    render();
+    focusTreeRow(index);
+  }
+}
+
+async function restoreLazyExpansion(generation: number): Promise<void> {
+  if (!scan?.lazy) return;
+  const root = scan.root;
+  const expandedPaths = [...expanded]
+    .filter((path) => path !== root)
+    .sort((a, b) => a.length - b.length);
+  let loaded = 0;
+  for (const path of expandedPaths) {
+    if (generation !== scanGeneration || !scan?.lazy || loaded >= 40) break;
+    const entry = entryByPath.get(path);
+    if (!entry || entry.kind !== "directory" || entry.children_loaded) continue;
+    let parent = entry.parent;
+    let ancestorsExpanded = true;
+    while (parent && parent !== root) {
+      if (!expanded.has(parent)) {
+        ancestorsExpanded = false;
+        break;
+      }
+      parent = entryByPath.get(parent)?.parent ?? "";
+    }
+    if (!ancestorsExpanded || (parent && parent !== root && !entryByPath.has(parent))) continue;
+    expanded.delete(path);
+    await toggleDirectory(entry, -1);
+    loaded++;
+  }
+}
+
+async function refreshTree(root: string, forceWatch = false): Promise<boolean> {
+  return scanProject(root, forceWatch, { lazy: scan?.lazy ?? false });
+}
+
+function isPathInside(path: string, ancestor: string): boolean {
+  const prefix = ancestor.endsWith("/") || ancestor.endsWith("\\\\") ? ancestor : `${ancestor}/`;
+  return path === ancestor || path.startsWith(prefix);
 }
 
 function visibleEntries(): ProjectEntry[] {
@@ -767,16 +893,12 @@ function renderFileTree() {
       const toggle = document.createElement("button");
       toggle.className = "arch-tree-chevron";
       toggle.type = "button";
-      toggle.textContent = isExpanded ? "▾" : "▸";
+      toggle.textContent = loadingDirectories.has(entry.path) ? "…" : (isExpanded ? "▾" : "▸");
+      toggle.disabled = loadingDirectories.has(entry.path);
       toggle.setAttribute("aria-label", `${isExpanded ? "Collapse" : "Expand"} ${entry.name}`);
       toggle.addEventListener("click", (event) => {
         event.stopPropagation();
-        if (expanded.has(entry.path)) expanded.delete(entry.path);
-        else expanded.add(entry.path);
-        expandedVersion++;
-        cachedTreeRows = null;
-        render();
-        focusTreeRow(index);
+        void toggleDirectory(entry, index);
       });
       row.appendChild(toggle);
       row.addEventListener("dragover", (event) => {
@@ -834,14 +956,7 @@ function renderFileTree() {
     });
     row.addEventListener("dblclick", () => {
       if (entry.kind === "file") void openSelected();
-      else if (entry.kind === "directory") {
-        if (expanded.has(entry.path)) expanded.delete(entry.path);
-        else expanded.add(entry.path);
-        expandedVersion++;
-        cachedTreeRows = null;
-        render();
-        focusTreeRow(index);
-      }
+      else if (entry.kind === "directory") void toggleDirectory(entry, index);
     });
     row.addEventListener("contextmenu", (event) => showEntryContextMenu(event, entry));
     row.addEventListener("keydown", (event) => {
@@ -851,29 +966,14 @@ function renderFileTree() {
         focusTreeRow(index + delta);
       } else if (event.key === "ArrowRight" && entry.kind === "directory" && !expanded.has(entry.path)) {
         event.preventDefault();
-        expanded.add(entry.path);
-        expandedVersion++;
-        cachedTreeRows = null;
-        render();
-        focusTreeRow(index);
+        void toggleDirectory(entry, index);
       } else if (event.key === "ArrowLeft" && entry.kind === "directory" && expanded.has(entry.path)) {
         event.preventDefault();
-        expanded.delete(entry.path);
-        expandedVersion++;
-        cachedTreeRows = null;
-        render();
-        focusTreeRow(index);
+        void toggleDirectory(entry, index);
       } else if (event.key === "Enter") {
         event.preventDefault();
         if (entry.kind === "file") void openSelected();
-        else if (entry.kind === "directory") {
-          if (expanded.has(entry.path)) expanded.delete(entry.path);
-          else expanded.add(entry.path);
-          expandedVersion++;
-          cachedTreeRows = null;
-          render();
-          focusTreeRow(index);
-        }
+        else if (entry.kind === "directory") void toggleDirectory(entry, index);
       }
     });
     tree.appendChild(row);
@@ -1073,9 +1173,9 @@ function renderGraph() {
     }
     const titleX = x + (entry.kind === "directory" ? 57 : 42) * zoom;
     const title = entry.kind === "directory" && entry.path === scan?.root
-      ? `${entry.name}  ·  ${entry.file_count} files`
+      ? `${entry.name}  ·  ${scan?.lazy ? "lazy" : `${entry.file_count} files`}`
       : entry.kind === "directory"
-        ? `${entry.name}  ·  ${entry.file_count}`
+        ? `${entry.name}  ·  ${scan?.lazy ? "lazy" : entry.file_count}`
         : entry.name;
     const label = svg("text", {
       x: String(titleX),
@@ -1652,7 +1752,7 @@ function render() {
 
 async function chooseProject() {
   const picked = await open({ multiple: false, directory: true });
-  if (typeof picked === "string") await scanProject(picked);
+  if (typeof picked === "string") await scanProject(picked, false, { lazy: true });
 }
 
 export async function chooseWorkspace() {
@@ -1691,7 +1791,7 @@ async function findInWorkspace() {
   const generation = scanGeneration;
   // A truncated scan is not a complete file list, so let the backend walk the
   // tree in that case instead of searching only the captured prefix.
-  const snapshotPaths = snapshot.truncated
+  const snapshotPaths = snapshot.truncated || snapshot.lazy
     ? undefined
     : snapshot.entries.filter((entry) => entry.kind === "file").map((entry) => entry.path);
   const query = window.prompt("Search text in all workspace files:");
@@ -1834,13 +1934,23 @@ export function openQuickOpen() {
   input.value = "";
   quickOpenIndex = 0;
   const savedRoot = getWindowValue("talos.workspace-root");
-  if (!scan && savedRoot && !busy) void scanProject(savedRoot);
-  if (scan && quickOpenWorker) updateQuickOpenIndex();
+  if (!scan && savedRoot && !busy) void scanProject(savedRoot, false, { lazy: true });
+  if (scan?.lazy) {
+    $("quick-open-status").textContent = "Indexing the full project for Quick Open…";
+    void ensureFullScan().then(() => {
+      if (!($("quick-open-dialog") as HTMLDialogElement).open) return;
+      if (scan && quickOpenWorker) updateQuickOpenIndex();
+      renderQuickOpen();
+    });
+  } else if (scan && quickOpenWorker) {
+    updateQuickOpenIndex();
+  }
   renderQuickOpen();
   input.focus();
 }
 
-async function scanProject(root: string, forceWatch = false): Promise<boolean> {
+interface ScanProjectOptions { lazy?: boolean; }
+async function scanProject(root: string, forceWatch = false, options: ScanProjectOptions = {}): Promise<boolean> {
   if (busy) {
     queuedRoot = root;
     await new Promise<void>((resolve) => scanWaiters.push(resolve));
@@ -1854,11 +1964,35 @@ async function scanProject(root: string, forceWatch = false): Promise<boolean> {
   try {
     const changedRoot = scan?.root !== root;
     const previousExpanded = expanded;
-    const result = await invoke<ProjectScan>("scan_project", {
-      root,
-      exclusions: currentExclusions(),
-      showHidden: showHidden,
-    });
+    const result = options.lazy
+      ? await invoke<ProjectDirectory>("list_project_directory", {
+          root,
+          path: root,
+          exclusions: currentExclusions(),
+          showHidden,
+        }).then((listing) => ({
+          id: listing.root,
+          root: listing.root,
+          entries: [
+            { ...listing.entry, children_loaded: true },
+            ...listing.entries.map((entry) => ({ ...entry, children_loaded: false })),
+          ],
+          warnings: listing.warnings,
+          truncated: listing.truncated,
+          lazy: true as const,
+        }))
+      : await invoke<ProjectScan>("scan_project", {
+          root,
+          exclusions: currentExclusions(),
+          showHidden: showHidden,
+        }).then((scanResult) => ({
+          ...scanResult,
+          lazy: false as const,
+          entries: scanResult.entries.map((entry) => ({
+            ...entry,
+            children_loaded: entry.kind === "directory",
+          })),
+        }));
     if (generation !== scanGeneration) return false;
     scan = result;
     try {
@@ -1898,9 +2032,13 @@ async function scanProject(root: string, forceWatch = false): Promise<boolean> {
     const directories = new Set(
       result.entries.filter((entry) => entry.kind === "directory").map((entry) => entry.path),
     );
-    expanded = changedRoot
-      ? new Set([result.root])
-      : new Set([...previousExpanded].filter((path) => directories.has(path)));
+    if (result.lazy) {
+      expanded = changedRoot ? new Set([result.root]) : new Set(previousExpanded);
+    } else {
+      expanded = changedRoot
+        ? new Set([result.root])
+        : new Set([...previousExpanded].filter((path) => directories.has(path)));
+    }
     expanded.add(result.root);
     expandedVersion++;
     cachedTreeRows = null;
@@ -1911,19 +2049,19 @@ async function scanProject(root: string, forceWatch = false): Promise<boolean> {
     let watcherWarning = "";
     let watcherStatus: "idle" | "active" | "error" = "idle";
     const policyKey = JSON.stringify([currentExclusions(), showHidden]);
-    const newDirectories = [...directories].some((path) => !watchedDirectories.has(path));
+    const newDirectories = !result.lazy && [...directories].some((path) => !watchedDirectories.has(path));
     if (forceWatch || watchedRoot !== result.root || newDirectories || watcherPolicyKey !== policyKey) {
       try {
         await invoke("watch_project", {
           root: result.root,
           exclusions: currentExclusions(),
           showHidden: showHidden,
-          // A truncated scan has an incomplete directory list; fall back to a
-          // real directory walk on the backend in that case.
-          directories: result.truncated ? undefined : [...directories],
+          // A truncated or lazy scan has an incomplete directory list; fall back
+          // to a real directory walk on the backend in that case.
+          directories: result.truncated || result.lazy ? undefined : [...directories],
         });
         watchedRoot = result.root;
-        watchedDirectories = directories;
+        watchedDirectories = result.lazy ? new Set() : directories;
         watcherPolicyKey = policyKey;
         watcherFailed = false;
         watcherRecoveryAttempts = 0;
@@ -1943,11 +2081,12 @@ async function scanProject(root: string, forceWatch = false): Promise<boolean> {
     markWorkspaceReady(result, watcherStatus);
     const warnings = result.warnings.slice(0, 3).join(" · ");
     setMessage(
-      `${result.entries.length.toLocaleString()} entries scanned${result.truncated ? " (limit reached)" : ""}${warnings ? ` · ${warnings}` : ""}${watcherWarning ? ` · ${watcherWarning}` : ""}`,
+      `${result.entries.length.toLocaleString()} entries ${result.lazy ? "loaded" : "scanned"}${result.lazy ? " (folders load on expand)" : result.truncated ? " (limit reached)" : ""}${warnings ? ` · ${warnings}` : ""}${watcherWarning ? ` · ${watcherWarning}` : ""}`,
       result.warnings.length > 0 || !!watcherWarning
     );
     $("arch-graph-viewport").scrollTop = 0;
     render();
+    if (result.lazy) void restoreLazyExpansion(scanGeneration);
     if (($("quick-open-dialog") as HTMLDialogElement).open) renderQuickOpen();
     if (mode === "dependencies") void analyzeCurrentProject();
     if (isInsightMode(mode)) void loadInsights();
@@ -2021,6 +2160,12 @@ function setMode(next: ArchMode) {
   focusMode = false;
   setWindowValue("talos.arch-focus", "false");
   $("arch-focus").classList.remove("active");
+  const needsFullTree = next === "dependencies" || next === "architecture" || isInsightMode(next);
+  if (needsFullTree && scan?.lazy) {
+    render();
+    void ensureFullScan();
+    return;
+  }
   if (next === "architecture" && scan) {
     components = classifyArchitecture(
       scan.root,
@@ -2033,6 +2178,11 @@ function setMode(next: ArchMode) {
   render();
   if (next === "dependencies") void analyzeCurrentProject();
   if (isInsightMode(next)) void loadInsights();
+}
+
+async function ensureFullScan(): Promise<boolean> {
+  if (!scan?.lazy) return !!scan;
+  return scanProject(scan.root, false, { lazy: false });
 }
 
 function graphNodeCount(): number {
@@ -2165,12 +2315,12 @@ async function applyWorkspaceChanges(payload: WorkspaceChangeEvent) {
   const generation = scanGeneration;
   const paths = payload.changes.map((change) => change.path);
   if (payload.changes.some((change) => change.kind === "__talos_rescan__")) {
-    void scanProject(root, true);
+    void refreshTree(root, true);
     return;
   }
   if (payload.changes.some((change) => entryByPath.get(change.path)?.kind === "directory")) {
     notifyWorkspaceFilesChanged(root, paths);
-    void scanProject(root, true);
+    void refreshTree(root, true);
     return;
   }
   const metadata = await Promise.all(payload.changes.map(async (change) => {
@@ -2213,7 +2363,7 @@ async function applyWorkspaceChanges(payload: WorkspaceChangeEvent) {
   }
   if (fullScanNeeded) {
     notifyWorkspaceFilesChanged(root, paths);
-    void scanProject(root, true);
+    void refreshTree(root, true);
     return;
   }
   if (!changed) return;
@@ -2240,7 +2390,7 @@ async function applyWorkspaceChanges(payload: WorkspaceChangeEvent) {
 async function restoreWorkspace(): Promise<void> {
   const candidates = await workspaceRestoreCandidates();
   for (const root of candidates) {
-    if (await scanProject(root)) return;
+    if (await scanProject(root, false, { lazy: true })) return;
   }
   if (candidates.length > 0) {
     setMessage("No saved workspace could be opened. Choose a project folder.", true);
@@ -2259,7 +2409,7 @@ export function initArchitectureExplorer(
   const showArchitecture = () => {
     showArchitectureWindow();
     if (!scan) void chooseProject();
-    else void scanProject(scan.root);
+    else void refreshTree(scan.root);
   };
   $("btn-architecture").addEventListener("click", showArchitecture);
   const closeExplorer = () => {
@@ -2282,7 +2432,7 @@ export function initArchitectureExplorer(
     void loadRecentWorkspaces();
   }
   $("arch-refresh").addEventListener("click", () => {
-    if (scan) void scanProject(scan.root);
+    if (scan) void refreshTree(scan.root);
     else void chooseProject();
   });
   $("arch-find-text").addEventListener("click", () => void findInWorkspace());
@@ -2317,7 +2467,7 @@ export function initArchitectureExplorer(
   exclusions.value = getWindowValue("talos-architecture-exclusions") ?? DEFAULT_EXCLUSIONS.join(", ");
   exclusions.addEventListener("change", () => {
     setWindowValue("talos-architecture-exclusions", exclusions.value);
-    if (scan) void scanProject(scan.root);
+    if (scan) void refreshTree(scan.root);
   });
   const hiddenToggle = $("arch-show-hidden") as HTMLInputElement;
   hiddenToggle.checked = showHidden;
@@ -2500,7 +2650,7 @@ export function initArchitectureExplorer(
         root,
         exclusions: currentExclusions(),
         showHidden,
-        directories: scan?.truncated
+        directories: scan?.truncated || scan?.lazy
           ? undefined
           : [...new Set(scan?.entries.filter((entry) => entry.kind === "directory").map((entry) => entry.path) ?? [])],
       }).then(() => {
@@ -2520,7 +2670,7 @@ export function initArchitectureExplorer(
 
 export function openWorkspace(root: string) {
   showArchitectureWindow();
-  void scanProject(root);
+  void scanProject(root, false, { lazy: true });
 }
 
 export function openRecentWorkspace() {
