@@ -71,6 +71,20 @@ test("compact layout exposes secondary toolbar actions through an overflow menu"
   assert.match(html, /html\[data-layout-mode="compact"\] #btn-toolbar-overflow \{ display: inline-flex; \}/);
 });
 
+test("Live Studio keeps preview execution sandboxed and adds isolated controls", () => {
+  assert.match(html, /id="preview-viewport"/);
+  assert.match(html, /id="preview-reload"/);
+  assert.match(html, /id="preview-console-toggle"/);
+  assert.match(html, /id="preview-console"/);
+  assert.match(html, /sandbox="allow-scripts"/);
+  assert.match(main, /function injectPreviewBridge/);
+  assert.match(main, /function onPreviewMessage/);
+  assert.match(main, /event\.source !== frame\.contentWindow/);
+  assert.match(main, /data\.nonce !== previewNonce/);
+  assert.match(main, /scheduleHtmlPreviewRefresh/);
+  assert.match(main, /talos\.preview-viewport/);
+});
+
 test("closing tool overlays restores the default navigation state", () => {
   assert.match(main, /\$\("chronicle-dialog"\)\.addEventListener\("close"/);
   assert.match(main, /\$\("quick-open-dialog"\)\.addEventListener\("close"/);

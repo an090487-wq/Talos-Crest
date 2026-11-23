@@ -183,9 +183,16 @@
       #main.pdf-focused #pdf-pane { flex: 1 1 auto !important; width: 100%; min-width: 0; min-height: 0; }
 
       #html-preview { width: 46%; min-width: 280px; border-left: 1px solid var(--line); display: flex; flex-direction: column; background: #fff; }
-      #html-preview-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
-      #html-preview-title { flex: 1; color: var(--muted); }
-      #html-preview-frame { flex: 1 1 0; min-height: 0; width: 100%; border: 0; background: #fff; }
+      #html-preview-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
+      #html-preview-title { flex: 1; min-width: 90px; color: var(--muted); }
+      #preview-viewport { min-height: var(--control-height-sm); max-width: 92px; padding: 2px 4px; font-size: var(--font-sm); }
+      #html-preview-stage { flex: 1; min-height: 0; display: flex; flex-direction: column; background: #fff; }
+      #html-preview-frame { flex: 1 1 0; min-height: 0; width: var(--preview-width, 100%); max-width: 100%; margin: 0 auto; border: 0; background: #fff; }
+      #preview-console { flex: 0 0 auto; max-height: 32%; min-height: 72px; overflow: auto; padding: 6px 8px; background: var(--bg); color: var(--text); border-top: 1px solid var(--line); font: 11px/1.5 var(--mono-font); white-space: pre-wrap; overflow-wrap: anywhere; }
+      .preview-console-row { padding: 2px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
+      .preview-console-row.warn { color: var(--warning); }
+      .preview-console-row.error { color: var(--danger); }
+      .preview-console-row .preview-console-kind { color: var(--muted); margin-right: 6px; text-transform: uppercase; font-size: 9px; }
 
       #panel { height: var(--panel-size); flex: 0 0 var(--panel-size); min-height: 0; overflow: hidden; border-top: 1px solid var(--line); display: flex; flex-direction: column; background: var(--bg); }
       #tabs { display: flex; align-items: center; gap: 5px; padding: 5px 10px; overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; background: var(--panel); border-bottom: 1px solid var(--line); }
@@ -718,7 +725,7 @@
             <button id="btn-architecture" title="Explore project structure (Ctrl+Shift+E)">Explorer</button>
             <button id="btn-outline" title="Show code structure for supported parsers">Outline</button>
             <button id="btn-pdf" title="Open PDF (Ctrl+Shift+P)">PDF</button>
-            <button id="btn-preview" title="Preview the current HTML">Preview</button>
+            <button id="btn-preview" title="Preview the current HTML in Live Studio">Preview</button>
             <button id="btn-calc" title="Open Talos Calc (Ctrl+Shift+C)">Calc</button>
             <button id="btn-canvas" title="Open Talos Canvas (Ctrl+Shift+I)">Canvas</button>
           </div>
@@ -823,15 +830,26 @@
             </aside>
             <aside id="html-preview" class="side-pane hidden">
               <div id="html-preview-bar">
-                <span id="html-preview-title">HTML preview</span>
-                <button id="btn-preview-close" class="mini" aria-label="Close HTML preview">×</button>
+                <span id="html-preview-title">Live Studio</span>
+                <select id="preview-viewport" class="mini" title="Preview viewport width" aria-label="Preview viewport width">
+                  <option value="fit">Fit</option>
+                  <option value="375">375 px</option>
+                  <option value="768">768 px</option>
+                  <option value="1024">1024 px</option>
+                </select>
+                <button id="preview-reload" class="mini" title="Reload the preview">Reload</button>
+                <button id="preview-console-toggle" class="mini" aria-pressed="false" title="Show preview console">Console</button>
+                <button id="btn-preview-close" class="mini" aria-label="Close Live Studio">×</button>
               </div>
-              <iframe
-                id="html-preview-frame"
-                title="HTML preview"
-                sandbox="allow-scripts"
-                referrerpolicy="no-referrer"
-              ></iframe>
+              <div id="html-preview-stage">
+                <iframe
+                  id="html-preview-frame"
+                  title="HTML preview"
+                  sandbox="allow-scripts"
+                  referrerpolicy="no-referrer"
+                ></iframe>
+                <div id="preview-console" class="hidden" role="log" aria-label="Preview console"></div>
+              </div>
             </aside>
           </div>
 

@@ -100,6 +100,21 @@ Files containing invalid UTF-8 or NUL bytes are identified as binary and are
 not loaded into the text editor, preventing bytecode or other binary data from
 being corrupted by a text save.
 
+### Live Studio
+
+**Preview** opens Live Studio beside the editor. It renders the current HTML
+buffer in a sandboxed iframe with scripts enabled but without same-origin access
+to the IDE, so preview code cannot read editor state, invoke Tauri commands, or
+navigate the application. The preview refreshes after edits settle and can be
+reloaded manually. Viewport presets switch between fit-to-pane, 375, 768, and
+1024 pixels, and the choice is remembered per window. An optional console panel
+captures `console.log`/`info`/`warn`/`error`, uncaught errors, and unhandled
+promise rejections through a nonce-checked bridge that only accepts messages
+from the current preview frame. Console output is bounded to 200 rows. The
+preview only renders the active buffer; local asset URLs and multi-page
+navigation are not resolved yet, and a document that declares its own restrictive
+Content Security Policy may block the console bridge.
+
 ## Extension marketplace and catalogue
 
 The bundled registry catalogue contains **135 extensions**. The Extensions view

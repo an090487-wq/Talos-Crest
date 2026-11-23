@@ -85,9 +85,12 @@ default; only the opt-in GitHub Observatory may contact GitHub.
 ### Live preview
 
 - Implemented: sandboxed HTML preview in an iframe with no same-origin access to
-  the IDE.
-- Partial: previews the current buffer only; no live reload, viewport presets,
-  console capture, local asset resolution, or multi-page navigation.
+  the IDE, debounced live refresh, manual reload, viewport presets, and a bounded
+  console/error panel fed by a nonce-checked bridge that accepts messages only
+  from the active preview frame.
+- Partial: previews the current buffer only; no local asset resolution,
+  multi-page navigation, or source-map-aware stack traces. A restrictive CSP in
+  the previewed document can block console capture.
 
 ## Prioritized implementation plan
 
@@ -127,10 +130,16 @@ default; only the opt-in GitHub Observatory may contact GitHub.
 
 ### Increment E — Live Studio
 
-1. Add preview viewport presets and a reload control.
-2. Capture preview console/errors with a bounded isolated bridge.
-3. Resolve local assets through a safe, read-only preview URL layer.
-4. Keep preview execution sandboxed and separate from IDE privileges.
+Implemented:
+
+1. Preview viewport presets and a reload control.
+2. Console/error capture through a bounded, nonce-checked bridge, with the
+   preview frame remaining sandboxed and separate from IDE privileges.
+
+Remaining:
+
+1. Resolve local assets through a safe, read-only preview URL layer.
+2. Add multi-page navigation and clearer limits for CSP-blocked capture.
 
 ### Increment F — extension integrity and performance measurements
 

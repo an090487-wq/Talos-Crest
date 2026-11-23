@@ -1145,6 +1145,102 @@ function showPanel(show: boolean, persist = true) {
   scheduleEditorMeasure();
 }
 
+let previewNonce = "";
+let previewRefreshTimer = 0;
+
+function previewConsoleRow(kind: string, text: string) {
+  const log = $("preview-console");
+  const row = document.createElement("div");
+  row.className = `preview-console-row ${kind}`;
+  const label = document.createElement("span");
+  label.className = "preview-console-kind";
+  label.textContent = kind;
+  row.append(label, document.createTextNode(text.slice(0, 2_000)));
+  log.appendChild(row);
+  while (log.childElementCount > 200) log.firstElementChild?.remove();
+  log.scrollTop = log.scrollHeight;
+}
+
+function clearPreviewConsole() {
+  $("preview-console").replaceChildren();
+}
+
+function injectPreviewBridge(source: string): string {
+  const nonce = JSON.stringify(previewNonce);
+  const bridge = `<script>(function(){var channel="talos-preview";var nonce=${nonce};function normalize(value){try{if(typeof value==="string")return value;if(typeof value==="undefined")return "undefined";if(typeof value==="function")return "[function]";return JSON.stringify(value);}catch(error){return String(value);}}function send(kind,args){try{parent.postMessage({channel:channel,nonce:nonce,kind:kind,args:args},"*");}catch(error){}}["log","info","warn","error"].forEach(function(kind){var original=console[kind];console[kind]=function(){send(kind,Array.prototype.map.call(arguments,normalize));return original.apply(console,arguments);};});window.addEventListener("error",function(event){send("error",[(event.message||"Script error")+" ("+(event.filename||"inline")+":"+(event.lineno||0)+":"+(event.colno||0)+")"]);});window.addEventListener("unhandledrejection",function(event){send("error",["Unhandled promise rejection: "+normalize(event.reason)]);});})();</script>`;
+  const head = /<head(?:\s[^>]*)?>/i.exec(source);
+  if (head) {
+    const index = head.index + head[0].length;
+    return `${source.slice(0, index)}${bridge}${source.slice(index)}`;
+  }
+  const doctype = /^\s*<!doctype[^>]*>/i.exec(source);
+  if (doctype) {
+    const index = doctype.index + doctype[0].length;
+    return `${source.slice(0, index)}${bridge}${source.slice(index)}`;
+  }
+  return `${bridge}${source}`;
+}
+
+function applyPreviewViewport() {
+  const value = ($("preview-viewport") as HTMLSelectElement).value;
+  const frame = $("html-preview-frame") as HTMLIFrameElement;
+  if (value === "fit") frame.style.removeProperty("--preview-width");
+  else frame.style.setProperty("--preview-width", `${Number(value)}px`);
+  setWindowValue("talos.preview-viewport", value);
+}
+
+function refreshHtmlPreview() {
+  if ($("html-preview").classList.contains("hidden")) return;
+  previewNonce = typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  clearPreviewConsole();
+  const frame = $("html-preview-frame") as HTMLIFrameElement;
+  frame.srcdoc = injectPreviewBridge(view.state.doc.toString());
+}
+
+function scheduleHtmlPreviewRefresh() {
+  if ($("html-preview").classList.contains("hidden")) return;
+  window.clearTimeout(previewRefreshTimer);
+  previewRefreshTimer = window.setTimeout(() => {
+    previewRefreshTimer = 0;
+    refreshHtmlPreview();
+  }, 250);
+}
+
+function onPreviewMessage(event: MessageEvent) {
+  const frame = $("html-preview-frame") as HTMLIFrameElement;
+  if (event.source !== frame.contentWindow || $("html-preview").classList.contains("hidden")) return;
+  const data = event.data as {
+    channel?: unknown;
+    nonce?: unknown;
+    kind?: unknown;
+    args?: unknown;
+  } | null;
+  if (!data || data.channel !== "talos-preview" || data.nonce !== previewNonce || typeof data.kind !== "string") return;
+  if (!Array.isArray(data.args)) return;
+  const kind = data.kind === "error" ? "error" : data.kind === "warn" ? "warn" : "log";
+  const text = data.args.map((value) => typeof value === "string" ? value : String(value)).join(" ");
+  previewConsoleRow(kind, text);
+}
+
+function initPreviewControls() {
+  const select = $("preview-viewport") as HTMLSelectElement;
+  const saved = getWindowValue("talos.preview-viewport");
+  if (saved && Array.from(select.options, (option) => option.value).includes(saved)) select.value = saved;
+  select.addEventListener("change", applyPreviewViewport);
+  applyPreviewViewport();
+  $("preview-reload").addEventListener("click", refreshHtmlPreview);
+  $("preview-console-toggle").addEventListener("click", () => {
+    const log = $("preview-console");
+    const hidden = log.classList.toggle("hidden");
+    const button = $("preview-console-toggle") as HTMLButtonElement;
+    button.setAttribute("aria-pressed", String(!hidden));
+    button.textContent = hidden ? "Console" : "Hide console";
+  });
+  window.addEventListener("message", onPreviewMessage);
+}
+
 function previewHtml() {
   toggleOutline(false);
   const preview = $("html-preview");
@@ -1152,10 +1248,13 @@ function previewHtml() {
   $("main").dataset.activeSidePane = preview.id;
   syncSidePane();
   scheduleEditorMeasure();
-  ($("html-preview-frame") as HTMLIFrameElement).srcdoc = view.state.doc.toString();
+  refreshHtmlPreview();
 }
 
 function closeHtmlPreview() {
+  window.clearTimeout(previewRefreshTimer);
+  previewRefreshTimer = 0;
+  clearPreviewConsole();
   ($("html-preview-frame") as HTMLIFrameElement).srcdoc = "";
   $("html-preview").classList.add("hidden");
   syncSidePane();
@@ -1630,6 +1729,7 @@ function activateEditorTab(tab: EditorTab | undefined) {
     if (activeTab === tab) forceLinting(view);
   }, 350);
   scheduleOutline();
+  scheduleHtmlPreviewRefresh();
   scheduleEditorSessionSave();
   view.focus();
 }
@@ -2302,6 +2402,7 @@ function createEditorState(doc: string, previous?: EditorState): EditorState {
             syncActiveTabDirty();
           }
           scheduleOutline();
+          scheduleHtmlPreviewRefresh();
         }
         if (u.docChanged || u.selectionSet) {
           scheduleEditorSessionSave();
@@ -2562,6 +2663,7 @@ document.addEventListener("talos:pdf-focus-change", () => {
 });
 installWorkspaceResizers();
 installToolbarOverflow();
+initPreviewControls();
 applyBuiltinTheme(activeBuiltinTheme, false);
 applyEditorFont(localStorage.getItem("talos.editor-font") ?? "default");
 applyEditorFontSize(editorFontSize);
