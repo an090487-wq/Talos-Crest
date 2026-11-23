@@ -93,6 +93,7 @@ let history: BoundedHistory<Snapshot> | null = null;
 let initialized = false;
 let documentVersion = 0;
 let transformToken = 0;
+let transformRun = 0;
 let previewToken = 0;
 let previewTimer: number | null = null;
 let previewBase: Layer[] | null = null;
@@ -713,6 +714,9 @@ async function requestEncode(bitmap: ImageBitmap, mime: string, quality: number,
 
 async function transformDocument(build: (bitmap: ImageBitmap) => ImageRequest): Promise<boolean> {
   if (!layers.length || exportBusy || transformBusy) return false;
+  // renderAll() deliberately invalidates transformToken, so busy ownership needs
+  // its own counter. Otherwise the first successful Apply sticks "busy" forever.
+  const run = ++transformRun;
   const token = ++transformToken;
   transformBusy = true;
   clearAdjustmentPreview();
@@ -751,7 +755,7 @@ async function transformDocument(build: (bitmap: ImageBitmap) => ImageRequest): 
     if (token === transformToken) status(error instanceof Error ? error.message : String(error));
     return false;
   } finally {
-    if (token === transformToken) transformBusy = false;
+    if (run === transformRun) transformBusy = false;
   }
 }
 
@@ -905,6 +909,7 @@ function closeCanvas(): void {
   // Invalidate in-flight fallback transforms; a worker transform is rejected by
   // the pending-map cleanup below, but fallback promises are not in that map.
   transformToken += 1;
+  transformRun += 1;
   transformBusy = false;
   $("canvas").classList.add("hidden");
   clearTransientState();
@@ -944,7 +949,7 @@ function canvasPoint(event: PointerEvent): Point {
 function setTool(next: Tool): void {
   if (!CANVAS_TOOLS.includes(next)) return;
   if (drawing || cropDrag || (dragStart && (dragTool === "line" || dragTool === "rect" || dragTool === "ellipse"))) return;
-  hideTextInput();
+  commitText();
   tool = next;
   setWindowValue("talos.canvas.tool", next);
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-canvas-tool]")) {
@@ -1399,6 +1404,7 @@ function onPointerDown(event: PointerEvent): void {
   }
   if (tool === "text") {
     clearAdjustmentPreview();
+    commitText();
     startText(point);
     return;
   }
@@ -1531,8 +1537,23 @@ async function resizeTo(size: Size, label = "Resize"): Promise<void> {
     status("Choose dimensions from 1 to 20000 with at most 100 megapixels.");
     return;
   }
-  if (size.width === width && size.height === height) return;
+  if (size.width === width && size.height === height) {
+    status("Canvas already has these dimensions.");
+    return;
+  }
   await transformWithHistory(label, (bitmap) => ({ type: "resize", bitmap, width: size.width, height: size.height }));
+}
+
+function syncLockedAspect(changed: "width" | "height"): void {
+  if (!input("canvas-lock-aspect").checked || !width || !height) return;
+  const widthField = input("canvas-width");
+  const heightField = input("canvas-height");
+  const value = Number((changed === "width" ? widthField : heightField).value);
+  if (!Number.isFinite(value) || value <= 0) return;
+  const other = changed === "width"
+    ? Math.round((value * height) / width)
+    : Math.round((value * width) / height);
+  (changed === "width" ? heightField : widthField).value = String(Math.max(1, Math.min(20000, other)));
 }
 
 async function applyResize(): Promise<void> {
@@ -1943,6 +1964,9 @@ function initialize(): void {
       hideTextInput();
     }
   });
+  // Clicking a tool, the canvas, or outside the dialog should keep typed text
+  // instead of silently discarding it. Escape above still discards explicitly.
+  input("canvas-text-input").addEventListener("blur", () => commitText());
 
   $("canvas-resize").addEventListener("click", () => void applyResize());
   $("canvas-apply-crop").addEventListener("click", applyCropSelection);
@@ -2009,6 +2033,12 @@ function initialize(): void {
   $("canvas-delete-layer").addEventListener("click", deleteLayer);
   $("canvas-layer-up").addEventListener("click", () => moveLayer(1));
   $("canvas-layer-down").addEventListener("click", () => moveLayer(-1));
+
+  input("canvas-width").addEventListener("input", () => syncLockedAspect("width"));
+  input("canvas-height").addEventListener("input", () => syncLockedAspect("height"));
+  input("canvas-lock-aspect").addEventListener("change", () => {
+    if (input("canvas-lock-aspect").checked) syncLockedAspect("width");
+  });
 
   select("canvas-asset-preset").addEventListener("change", () => {
     const preset = ASSET_PRESETS.find((item) => item.id === select("canvas-asset-preset").value);

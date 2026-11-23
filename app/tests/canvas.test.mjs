@@ -341,9 +341,29 @@ test("canvas center guides use a subtle grid-matched color", () => {
 test("canvas async, export, and keyboard invariants are enforced", () => {
   const ui = readFileSync(resolve(appDir, "src/canvas/canvas-ui.ts"), "utf8");
   assert.match(ui, /!layers\.length \|\| exportBusy \|\| transformBusy/);
-  assert.match(ui, /if \(token === transformToken\) transformBusy = false;/);
+  assert.match(ui, /const run = \+\+transformRun;/);
+  assert.match(ui, /if \(run === transformRun\) transformBusy = false;/);
+  assert.match(ui, /transformRun \+= 1;/);
   assert.match(ui, /const sourceLayers = layers\.slice\(\);/);
   assert.match(ui, /target\.closest\("#canvas"\)/);
   assert.match(ui, /select\("canvas-export-format"\)\.value = mime;/);
   assert.match(ui, /previewBase = layers\.map\(/);
+});
+
+test("locked resizing syncs the other dimension and reports no-op sizes", () => {
+  const ui = readFileSync(resolve(appDir, "src/canvas/canvas-ui.ts"), "utf8");
+  assert.match(ui, /function syncLockedAspect\(changed: "width" \| "height"\)/);
+  assert.match(ui, /input\("canvas-width"\)\.addEventListener\("input", \(\) => syncLockedAspect\("width"\)\)/);
+  assert.match(ui, /input\("canvas-height"\)\.addEventListener\("input", \(\) => syncLockedAspect\("height"\)\)/);
+  assert.match(ui, /Canvas already has these dimensions\./);
+});
+
+test("typed canvas text survives tool changes and click-away", () => {
+  const ui = readFileSync(resolve(appDir, "src/canvas/canvas-ui.ts"), "utf8");
+  const setTool = ui.slice(ui.indexOf("function setTool("), ui.indexOf("function drawSelection("));
+  const pointerDown = ui.slice(ui.indexOf("if (tool === \"text\") {"), ui.indexOf("clearAdjustmentPreview();\n  dragTool"));
+  assert.match(setTool, /commitText\(\);/);
+  assert.doesNotMatch(setTool, /hideTextInput\(\);/);
+  assert.match(pointerDown, /commitText\(\);\n    startText\(point\);/);
+  assert.match(ui, /input\("canvas-text-input"\)\.addEventListener\("blur", \(\) => commitText\(\)\)/);
 });
