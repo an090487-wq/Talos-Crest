@@ -203,10 +203,25 @@ symbols for Python, JavaScript, JSX, TypeScript, and TSX. Other languages show
 an explicit no-parser message. Talos does not currently run a language server
 or claim general compiler diagnostics, completion, or debugging support.
 
-The Architecture Explorer provides project navigation, file operations, and
-dependency visualization. Rust validates workspace-relative paths for explorer
-file operations; file creation never overwrites an existing path, and delete
-asks for confirmation in the UI.
+The Architecture Explorer is the Universal Project Workspace on desktop. It
+opens any local folder: empty, manifest-free, mixed-language, deeply nested, or
+part of a monorepo. A stable workspace identity and the most recently opened
+roots are stored in the local configuration directory; the **Recent projects**
+selector opens one again without a folder dialog. The scan records nested
+files, folders, sizes, modification times, detected languages, file extensions,
+counts, and a bounded set of warnings. Missing manifests are not errors, and
+unknown languages remain browsable as text rather than being assigned invented
+semantics.
+
+The tree supports expand/collapse, filename filtering, refresh, and contextual
+**New file**, **New folder**, **Rename**, **Move…**, **Delete**, and **Copy
+path** actions. Rust validates every workspace-relative path, refuses traversal
+and moves into a directory's own subtree, rejects symlinked parents, and never
+overwrites a file when creating one. Hidden files are off by default; ignore
+rules come from the Explorer exclusions plus local `.gitignore`, `.ignore`, and
+`.talosignore` files, and the same policy is used by the watcher and Chronicle.
+Sensitive paths such as keys and credentials stay excluded. Large scans are
+bounded and run off the UI thread; the view renders visible rows only.
 
 To preview frontend changes in the desktop app, run `npm run tauri dev` from
 this directory. An installed Linux app does not update when source files
@@ -246,16 +261,46 @@ network request is made. **Technical Debt** ranks files by a static score from
 branch complexity, repeated normalized lines, TODO/FIXME markers, and very long
 lines, highlighting hotspots for inspection without claiming to prove bugs.
 
-The project watcher runs for the active workspace and batches file-change
-events before refreshing the tree, including while the Explorer is closed. Use
-**Refresh** if watching is unavailable. The explorer can show hidden entries, open a selected file,
-create/rename/delete workspace entries, and copy absolute or relative paths.
-Right-click a tree item for the same file actions. File operations never follow
-symbolic-link directories. The tree shows unsaved and current-editor error or
-warning badges; Git, newly-created/deleted, and background-file diagnostics are
-not yet integrated. SVG exports support up to 10,000 visible nodes; PNG exports
-support up to 1,000. Analysis is local-only; the Explorer does not send source
-code to AI or external services.
+The project watcher runs for the active workspace and emits debounced,
+path-level change events, including while the Explorer is closed. File
+create/modify/delete events update affected entries incrementally from metadata;
+directory changes cause a rescan, and newly discovered directories are
+registered for watching. Watching is capped at 2,000 directories; partial
+registration failures emit a visible warning, and **Refresh** remains the
+recovery path. Search inputs are debounced, superseded scans are discarded, and
+indexing is never performed on a keystroke.
+
+The tree shows unsaved and current-editor error or warning badges; Git,
+newly-created/deleted, and background-file diagnostics are not yet integrated.
+SVG exports support up to 10,000 visible nodes; PNG exports support up to
+1,000. Dependency and architecture views use explicit language adapters:
+local JavaScript/TypeScript imports and Python modules are resolved when they
+point at workspace files, while other languages are shown as text with detected
+language metadata. This is static evidence, not a language server, compiler, or
+a claim that every language has semantic analysis. Analysis is local-only; the
+Explorer does not send source code to AI or external services.
+
+### Optional GitHub integration
+
+The **GitHub** tab in Observatory is a separate, opt-in section; Source Control
+remains unavailable because this build is not a Source Control provider. Add a
+GitHub personal access token in that tab to browse repositories on the token,
+list issues and pull requests (open, closed, or all), read a conversation and
+its comments, create an issue, comment, close/reopen an item, and merge a pull
+request. **Open on GitHub** launches the system browser. The token applies to
+the whole device, while the chosen owner/repository, Issues/Pulls selection,
+state filter, and active Observatory tab are remembered per window.
+
+Talos stores the token encrypted in the local configuration directory with a
+locally generated key; on Unix both files are written with owner-only
+permissions, and clearing the token removes the encrypted token file. Talos
+calls the GitHub REST API directly from this tab only when you ask it to, with
+an allow-list of API paths, a request timeout, and no redirects. No account,
+telemetry, cloud relay, or background synchronization is involved. If you are
+offline, or never open this tab, the editor, marketplace, and the other
+Observatory insight tabs work exactly as before. Token scopes are controlled in
+GitHub: grant only the repository, issue, and pull-request permissions you want
+Talos to use.
 
 ## Project and editor navigation
 
@@ -270,8 +315,10 @@ Ctrl+G opens Go to Line; Ctrl+Shift+O filters symbols from the current file's
 supported Code Outline. Ctrl+F opens CodeMirror's Find panel, and Ctrl+H opens
 its replacement field. The panel supports case-sensitive and whole-word
 matching, regular expressions, next/previous, replace, replace-all, and a
-bounded match count. Workspace-wide text search and cross-file replacement
-are not implemented yet.
+bounded match count. **Find in Files** in the Explorer searches text in scanned
+workspace files in a background task; it is bounded by file size, file count,
+total bytes, and result count, and respects the active ignore/hidden policy.
+It opens matching files but does not perform cross-file replacement.
 
 ## Set up Android code execution
 

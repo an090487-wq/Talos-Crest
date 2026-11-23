@@ -1,21 +1,23 @@
+use base64::{engine::general_purpose::STANDARD, Engine};
 use std::{
     collections::HashMap,
     fs,
     path::{Component, Path, PathBuf},
     process::Command,
     sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex, OnceLock,
-        atomic::{AtomicU64, Ordering},
     },
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use base64::{Engine, engine::general_purpose::STANDARD};
-use tauri::{Emitter, Manager};
 use talos_core::language::{Language, Registry};
+use tauri::{Emitter, Manager};
 
 mod chronicle;
+mod github;
 mod insights;
 mod terminal;
+mod workspace;
 
 static PROJECT_WATCHERS: OnceLock<Mutex<HashMap<String, notify::RecommendedWatcher>>> =
     OnceLock::new();
@@ -56,8 +58,28 @@ struct FileSavedEvent {
 }
 
 // ---------- files ----------
+const MAX_TEXT_FILE_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_BINARY_FILE_BYTES: u64 = 256 * 1024 * 1024;
+
+fn metadata_revision(metadata: &fs::Metadata) -> String {
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_nanos().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+    format!("size:{}:mtime:{modified}", metadata.len())
+}
+
 #[tauri::command]
 fn read_file(path: String) -> Result<String, String> {
+    let metadata = fs::metadata(&path).map_err(|e| format!("{path}: {e}"))?;
+    if metadata.len() > MAX_TEXT_FILE_BYTES {
+        return Err(format!(
+            "{path}: text files larger than {} MiB are not opened by Talos",
+            MAX_TEXT_FILE_BYTES / (1024 * 1024)
+        ));
+    }
     fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))
 }
 
@@ -70,6 +92,18 @@ fn file_revision(contents: &[u8]) -> String {
 }
 
 fn read_file_snapshot(path: &Path) -> Result<Option<FileSnapshot>, String> {
+    match fs::metadata(path) {
+        Ok(metadata) if metadata.len() > MAX_TEXT_FILE_BYTES => {
+            return Ok(Some(FileSnapshot {
+                contents: String::new(),
+                revision: metadata_revision(&metadata),
+                binary: true,
+            }));
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("{}: {error}", path.display())),
+        Ok(_) => {}
+    }
     match fs::read(path) {
         Ok(bytes) => {
             let revision = file_revision(&bytes);
@@ -144,6 +178,13 @@ fn write_file_checked(
 /// Raw bytes (used by the PDF reader).
 #[tauri::command]
 fn read_file_bytes(path: String) -> Result<tauri::ipc::Response, String> {
+    let metadata = fs::metadata(&path).map_err(|e| format!("{path}: {e}"))?;
+    if metadata.len() > MAX_BINARY_FILE_BYTES {
+        return Err(format!(
+            "{path}: files larger than {} MiB are not supported",
+            MAX_BINARY_FILE_BYTES / (1024 * 1024)
+        ));
+    }
     fs::read(&path)
         .map(tauri::ipc::Response::new)
         .map_err(|e| format!("{path}: {e}"))
@@ -160,13 +201,25 @@ fn write_file(path: String, contents: String) -> Result<(), String> {
 #[tauri::command]
 fn write_file_bytes(path: String, contents: String, overwrite: bool) -> Result<(), String> {
     let target = Path::new(&path);
-    if !overwrite && target.exists() {
-        return Err("That file already exists. Choose a new name or confirm an explicit overwrite.".to_string());
-    }
     let bytes = STANDARD
         .decode(contents.as_bytes())
         .map_err(|error| format!("Invalid image data: {error}"))?;
-    fs::write(target, bytes).map_err(|error| format!("{path}: {error}"))
+    let mut options = fs::OpenOptions::new();
+    options.write(true).truncate(overwrite).create(overwrite);
+    if !overwrite {
+        options.create_new(true);
+    }
+    options
+        .open(target)
+        .and_then(|mut file| std::io::Write::write_all(&mut file, &bytes))
+        .map_err(|error| {
+            if !overwrite && error.kind() == std::io::ErrorKind::AlreadyExists {
+                "That file already exists. Choose a new name or confirm an explicit overwrite."
+                    .to_string()
+            } else {
+                format!("{path}: {error}")
+            }
+        })
 }
 
 /// File passed on the command line:  talos main.py
@@ -240,14 +293,112 @@ fn is_android() -> bool {
     cfg!(target_os = "android")
 }
 
+// ---------- recent workspaces ----------
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RecentWorkspace {
+    id: String,
+    path: String,
+    name: String,
+    opened_at: u64,
+}
+
+const MAX_RECENT_WORKSPACES: usize = 12;
+
+fn recent_workspaces_path() -> PathBuf {
+    config_dir().join("workspaces").join("recent.json")
+}
+
+fn load_recent_workspaces() -> Vec<RecentWorkspace> {
+    let path = recent_workspaces_path();
+    let Ok(text) = fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let Ok(mut items) = serde_json::from_str::<Vec<RecentWorkspace>>(&text) else {
+        return Vec::new();
+    };
+    items.retain(|item| Path::new(&item.path).is_dir());
+    items.truncate(MAX_RECENT_WORKSPACES);
+    items
+}
+
+fn save_recent_workspaces(items: &[RecentWorkspace]) -> Result<(), String> {
+    let path = recent_workspaces_path();
+    let parent = path.parent().ok_or("recent workspace path has no parent")?;
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("could not create {}: {error}", parent.display()))?;
+    let text = serde_json::to_string_pretty(items)
+        .map_err(|error| format!("could not encode recent workspaces: {error}"))?;
+    fs::write(&path, text)
+        .map_err(|error| format!("could not write {}: {error}", path.display()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn list_recent_workspaces() -> Vec<RecentWorkspace> {
+    load_recent_workspaces()
+}
+
+#[tauri::command]
+fn remember_workspace(root: String) -> Result<RecentWorkspace, String> {
+    let root = canonical_project_root(&root)?;
+    let path = root.to_string_lossy().into_owned();
+    let item = RecentWorkspace {
+        id: file_revision(path.as_bytes()),
+        name: root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(path.as_str())
+            .to_string(),
+        opened_at: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_millis() as u64)
+            .unwrap_or(0),
+        path,
+    };
+    let mut items = load_recent_workspaces();
+    items.retain(|existing| existing.id != item.id);
+    items.insert(0, item.clone());
+    items.truncate(MAX_RECENT_WORKSPACES);
+    save_recent_workspaces(&items)?;
+    Ok(item)
+}
+
+#[tauri::command]
+fn clear_recent_workspaces() -> Result<(), String> {
+    save_recent_workspaces(&[])
+}
+
 // ---------- config + extensions ----------
-fn config_dir() -> PathBuf {
+pub(crate) fn config_dir() -> PathBuf {
     if let Ok(x) = std::env::var("XDG_CONFIG_HOME") {
         if !x.is_empty() {
             return PathBuf::from(x).join("talos");
         }
     }
-    PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(".config/talos")
+    if let Ok(home) = std::env::var("HOME") {
+        if !home.is_empty() {
+            return PathBuf::from(home).join(".config/talos");
+        }
+    }
+    #[cfg(target_os = "windows")]
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        if !appdata.is_empty() {
+            return PathBuf::from(appdata).join("talos");
+        }
+    }
+    #[cfg(target_os = "windows")]
+    if let Ok(profile) = std::env::var("USERPROFILE") {
+        if !profile.is_empty() {
+            return PathBuf::from(profile).join(".config/talos");
+        }
+    }
+    PathBuf::from(".config/talos")
 }
 
 fn ext_dir() -> PathBuf {
@@ -357,7 +508,10 @@ fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
         NEXT_TEMP_ID.fetch_add(1, Ordering::Relaxed)
     ));
     fs::write(&temp_path, contents).map_err(|error| {
-        format!("could not write temporary file {}: {error}", temp_path.display())
+        format!(
+            "could not write temporary file {}: {error}",
+            temp_path.display()
+        )
     })?;
     if let Err(error) = fs::rename(&temp_path, path) {
         let _ = fs::remove_file(&temp_path);
@@ -394,7 +548,9 @@ fn extension_permission_requirements(manifest: &serde_json::Value) -> Vec<String
     let can_run = manifest
         .get("language")
         .and_then(|language| language.get("run"))
-        .is_some_and(|command| !command.is_null() && command.as_str().is_some_and(|s| !s.is_empty()));
+        .is_some_and(|command| {
+            !command.is_null() && command.as_str().is_some_and(|s| !s.is_empty())
+        });
     if can_run {
         permissions.push("process.execution".into());
     }
@@ -427,7 +583,9 @@ fn validate_extension_manifest(
         .and_then(serde_json::Value::as_str)
         .ok_or("extension has no semantic version")?;
     if !valid_semver(version) || version != expected_version {
-        return Err(format!("invalid or unexpected extension version '{version}'"));
+        return Err(format!(
+            "invalid or unexpected extension version '{version}'"
+        ));
     }
     let kind = manifest
         .get("kind")
@@ -440,14 +598,19 @@ fn validate_extension_manifest(
         let permissions = permissions
             .as_array()
             .ok_or("extension permissions must be an array")?;
-        if permissions.iter().any(|permission| {
-            permission.as_str() != Some("process.execution")
-        }) {
+        if permissions
+            .iter()
+            .any(|permission| permission.as_str() != Some("process.execution"))
+        {
             return Err("extension requests permissions Talos does not support".into());
         }
     }
     match kind {
-        "theme" if !manifest.get("theme").is_some_and(serde_json::Value::is_object) => {
+        "theme"
+            if !manifest
+                .get("theme")
+                .is_some_and(serde_json::Value::is_object) =>
+        {
             return Err("theme extension needs a 'theme' object".into());
         }
         "language" => {
@@ -467,9 +630,15 @@ fn validate_extension_manifest(
                             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
                 })
             {
-                return Err("language configuration contains invalid id, name, or extensions".into());
+                return Err(
+                    "language configuration contains invalid id, name, or extensions".into(),
+                );
             }
-            if parsed.run.as_ref().is_some_and(|command| command.trim().is_empty() || command.len() > 4096) {
+            if parsed
+                .run
+                .as_ref()
+                .is_some_and(|command| command.trim().is_empty() || command.len() > 4096)
+            {
                 return Err("language run command is empty or too long".into());
             }
         }
@@ -510,9 +679,9 @@ fn validate_extension_manifest(
                         .ok_or("snippet languages must be an array")?;
                     if languages.len() > 32
                         || languages.iter().any(|language| {
-                            language.as_str().is_none_or(|value| {
-                                value.trim().is_empty() || value.len() > 64
-                            })
+                            language
+                                .as_str()
+                                .is_none_or(|value| value.trim().is_empty() || value.len() > 64)
                         })
                     {
                         return Err("snippet contains an invalid language list".into());
@@ -551,13 +720,18 @@ fn validate_extension_manifest(
                     || filename.chars().any(char::is_control)
                     || content.len() > 1_048_576
                 {
-                    return Err("template contains an invalid label, filename, or oversized content".into());
+                    return Err(
+                        "template contains an invalid label, filename, or oversized content".into(),
+                    );
                 }
             }
         }
         _ => {}
     }
-    Ok((kind.to_string(), extension_permission_requirements(manifest)))
+    Ok((
+        kind.to_string(),
+        extension_permission_requirements(manifest),
+    ))
 }
 
 #[tauri::command]
@@ -603,13 +777,35 @@ fn default_registry(app: tauri::AppHandle) -> Result<String, String> {
     Ok(development.to_string_lossy().into_owned())
 }
 
-#[derive(serde::Serialize)]
+fn language_registry(resource_dir: Option<&Path>) -> Option<Registry> {
+    languages_dirs(resource_dir)
+        .iter()
+        .find_map(|dir| Registry::load_dir(dir).ok())
+}
+
+fn language_for_path(path: &Path, registry: Option<&Registry>) -> String {
+    registry
+        .and_then(|registry| registry.detect(path))
+        .map(|language| language.id.clone())
+        .unwrap_or_default()
+}
+
+fn modified_ms(metadata: &fs::Metadata) -> Option<u64> {
+    metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis().min(u64::MAX as u128) as u64)
+}
+
+#[derive(Clone, serde::Serialize)]
 struct ProjectEntry {
     path: String,
     parent: String,
     name: String,
     kind: String,
     extension: String,
+    language: String,
     size: u64,
     modified_ms: Option<u64>,
     depth: usize,
@@ -619,6 +815,7 @@ struct ProjectEntry {
 
 #[derive(serde::Serialize)]
 struct ProjectScan {
+    id: String,
     root: String,
     entries: Vec<ProjectEntry>,
     warnings: Vec<String>,
@@ -638,7 +835,12 @@ struct ProjectSources {
     warnings: Vec<String>,
 }
 
-fn scan_project_tree(root: &str, exclusions: &[String]) -> Result<ProjectScan, String> {
+fn scan_project_tree(
+    root: &str,
+    exclusions: &[String],
+    show_hidden: bool,
+    registry: Option<&Registry>,
+) -> Result<ProjectScan, String> {
     const MAX_ENTRIES: usize = 50_000;
     const MAX_DEPTH: usize = 64;
 
@@ -646,7 +848,10 @@ fn scan_project_tree(root: &str, exclusions: &[String]) -> Result<ProjectScan, S
         .canonicalize()
         .map_err(|e| format!("could not open project directory '{root}': {e}"))?;
     if !root.is_dir() {
-        return Err(format!("project root is not a directory: {}", root.display()));
+        return Err(format!(
+            "project root is not a directory: {}",
+            root.display()
+        ));
     }
 
     let root_path = root.to_string_lossy().into_owned();
@@ -661,18 +866,14 @@ fn scan_project_tree(root: &str, exclusions: &[String]) -> Result<ProjectScan, S
             .to_string(),
         kind: "directory".into(),
         extension: String::new(),
+        language: String::new(),
         size: 0,
-        modified_ms: root_meta
-            .modified()
-            .ok()
-            .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-            .map(|duration| duration.as_millis().min(u64::MAX as u128) as u64),
+        modified_ms: modified_ms(&root_meta),
         depth: 0,
         child_count: 0,
         file_count: 0,
     }];
-    let excluded: std::collections::HashSet<&str> =
-        exclusions.iter().map(String::as_str).collect();
+    let policy = workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?;
     let mut stack = vec![(root.clone(), 0usize)];
     let mut warnings = Vec::new();
     let mut child_counts: HashMap<String, usize> = HashMap::new();
@@ -709,13 +910,6 @@ fn scan_project_tree(root: &str, exclusions: &[String]) -> Result<ProjectScan, S
             };
             let path = child.path();
             let name = child.file_name().to_string_lossy().into_owned();
-            if excluded.contains(name.as_str()) {
-                continue;
-            }
-            if entries.len() >= MAX_ENTRIES {
-                truncated = true;
-                break;
-            }
             let file_type = match child.file_type() {
                 Ok(file_type) => file_type,
                 Err(error) => {
@@ -723,6 +917,14 @@ fn scan_project_tree(root: &str, exclusions: &[String]) -> Result<ProjectScan, S
                     continue;
                 }
             };
+            let relative = path.strip_prefix(&root).unwrap_or(&path);
+            if policy.is_ignored(relative, file_type.is_dir()) {
+                continue;
+            }
+            if entries.len() >= MAX_ENTRIES {
+                truncated = true;
+                break;
+            }
             let metadata = match fs::symlink_metadata(&path) {
                 Ok(metadata) => metadata,
                 Err(error) => {
@@ -752,13 +954,10 @@ fn scan_project_tree(root: &str, exclusions: &[String]) -> Result<ProjectScan, S
                 parent: parent_text.clone(),
                 name,
                 kind: kind.into(),
+                language: language_for_path(&path, registry),
                 extension,
                 size: metadata.len(),
-                modified_ms: metadata
-                    .modified()
-                    .ok()
-                    .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-                    .map(|duration| duration.as_millis().min(u64::MAX as u128) as u64),
+                modified_ms: modified_ms(&metadata),
                 depth: depth + 1,
                 child_count: 0,
                 file_count: 0,
@@ -796,6 +995,7 @@ fn scan_project_tree(root: &str, exclusions: &[String]) -> Result<ProjectScan, S
     });
 
     Ok(ProjectScan {
+        id: file_revision(root_path.as_bytes()),
         root: root_path,
         entries,
         warnings,
@@ -804,10 +1004,19 @@ fn scan_project_tree(root: &str, exclusions: &[String]) -> Result<ProjectScan, S
 }
 
 #[tauri::command]
-async fn scan_project(root: String, exclusions: Vec<String>) -> Result<ProjectScan, String> {
-    tauri::async_runtime::spawn_blocking(move || scan_project_tree(&root, &exclusions))
-        .await
-        .map_err(|error| format!("project scan task failed: {error}"))?
+async fn scan_project(
+    app: tauri::AppHandle,
+    root: String,
+    exclusions: Vec<String>,
+    show_hidden: bool,
+) -> Result<ProjectScan, String> {
+    let resource_dir = app.path().resource_dir().ok();
+    tauri::async_runtime::spawn_blocking(move || {
+        let registry = language_registry(resource_dir.as_deref());
+        scan_project_tree(&root, &exclusions, show_hidden, registry.as_ref())
+    })
+    .await
+    .map_err(|error| format!("project scan task failed: {error}"))?
 }
 
 fn canonical_project_root(root: &str) -> Result<PathBuf, String> {
@@ -890,6 +1099,33 @@ fn rename_project_entry_at(root: &str, from: &str, to: &str) -> Result<(), Strin
     })
 }
 
+fn move_project_entry_at(root: &str, from: &str, to: &str) -> Result<(), String> {
+    let root = canonical_project_root(root)?;
+    let source = project_entry_path(&root, from, true)?;
+    let destination = project_entry_path(&root, to, false)?;
+    if source == destination {
+        return Ok(());
+    }
+    if let Some(parent) = destination.parent() {
+        if !parent.is_dir() {
+            return Err(format!(
+                "destination folder does not exist: {}",
+                parent.display()
+            ));
+        }
+    }
+    if destination.starts_with(&source) {
+        return Err("a folder cannot be moved inside itself".to_string());
+    }
+    fs::rename(&source, &destination).map_err(|error| {
+        format!(
+            "could not move {} to {}: {error}",
+            source.display(),
+            destination.display()
+        )
+    })
+}
+
 fn delete_project_entry_at(root: &str, relative: &str) -> Result<(), String> {
     let root = canonical_project_root(root)?;
     let path = project_entry_path(&root, relative, true)?;
@@ -925,10 +1161,194 @@ async fn rename_project_entry(root: String, from: String, to: String) -> Result<
 }
 
 #[tauri::command]
+async fn move_project_entry(root: String, from: String, to: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || move_project_entry_at(&root, &from, &to))
+        .await
+        .map_err(|error| format!("move task failed: {error}"))?
+}
+
+#[tauri::command]
 async fn delete_project_entry(root: String, path: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || delete_project_entry_at(&root, &path))
         .await
         .map_err(|error| format!("deletion task failed: {error}"))?
+}
+
+fn workspace_entry_metadata_at(
+    root: &str,
+    path: &str,
+    exclusions: &[String],
+    show_hidden: bool,
+    registry: Option<&Registry>,
+) -> Result<Option<ProjectEntry>, String> {
+    let root = canonical_project_root(root)?;
+    let candidate = PathBuf::from(path);
+    let canonical = match candidate.canonicalize() {
+        Ok(canonical) => canonical,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("could not inspect {path}: {error}")),
+    };
+    if !canonical.starts_with(&root) {
+        return Err(format!("workspace path escapes the project: {path}"));
+    }
+    let relative = canonical.strip_prefix(&root).unwrap_or(&canonical);
+    let policy = workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?;
+    if policy.is_ignored(relative, canonical.is_dir())
+        || workspace::WorkspacePolicy::is_sensitive_name(
+            &canonical
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or(""),
+        )
+    {
+        return Ok(None);
+    }
+    let metadata = fs::symlink_metadata(&canonical)
+        .map_err(|error| format!("could not inspect {path}: {error}"))?;
+    let kind = if metadata.file_type().is_symlink() {
+        "link"
+    } else if metadata.file_type().is_dir() {
+        "directory"
+    } else {
+        "file"
+    };
+    let extension = if kind == "file" {
+        canonical
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase()
+    } else {
+        String::new()
+    };
+    let depth = relative.components().count();
+    Ok(Some(ProjectEntry {
+        path: canonical.to_string_lossy().into_owned(),
+        parent: canonical
+            .parent()
+            .map(|parent| parent.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        name: canonical
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("")
+            .to_string(),
+        kind: kind.into(),
+        extension,
+        language: language_for_path(&canonical, registry),
+        size: metadata.len(),
+        modified_ms: modified_ms(&metadata),
+        depth,
+        child_count: 0,
+        file_count: 0,
+    }))
+}
+
+#[derive(serde::Serialize)]
+struct WorkspaceTextMatch {
+    path: String,
+    line: usize,
+    column: usize,
+    text: String,
+}
+
+fn search_workspace_text_at(
+    root: &str,
+    query: &str,
+    exclusions: &[String],
+    show_hidden: bool,
+    limit: usize,
+) -> Result<Vec<WorkspaceTextMatch>, String> {
+    const MAX_SEARCH_FILES: usize = 4_000;
+    const MAX_FILE_BYTES: u64 = 512 * 1024;
+    const MAX_TOTAL_BYTES: u64 = 16 * 1024 * 1024;
+
+    let needle = query.trim();
+    if needle.is_empty() {
+        return Ok(Vec::new());
+    }
+    let lower_needle = needle.to_ascii_lowercase();
+    let scan = scan_project_tree(root, exclusions, show_hidden, None)?;
+    let mut matches = Vec::new();
+    let mut bytes_read = 0u64;
+    let mut files_read = 0usize;
+
+    for entry in scan.entries.iter().filter(|entry| entry.kind == "file") {
+        if matches.len() >= limit || files_read >= MAX_SEARCH_FILES || bytes_read >= MAX_TOTAL_BYTES
+        {
+            break;
+        }
+        let path = PathBuf::from(&entry.path);
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) if metadata.is_file() && metadata.len() <= MAX_FILE_BYTES => metadata,
+            _ => continue,
+        };
+        let Ok(text) = fs::read_to_string(&path) else {
+            continue;
+        };
+        if text.contains('\0') {
+            continue;
+        }
+        bytes_read = bytes_read.saturating_add(metadata.len());
+        files_read += 1;
+        for (line_index, line) in text.lines().enumerate() {
+            let lower = line.to_ascii_lowercase();
+            let mut offset = 0usize;
+            while let Some(found) = lower[offset..].find(&lower_needle) {
+                let column = offset + found;
+                matches.push(WorkspaceTextMatch {
+                    path: entry.path.clone(),
+                    line: line_index + 1,
+                    column: column + 1,
+                    text: line.chars().take(240).collect(),
+                });
+                if matches.len() >= limit {
+                    break;
+                }
+                offset = column + needle.len();
+                if offset >= lower.len() {
+                    break;
+                }
+            }
+            if matches.len() >= limit {
+                break;
+            }
+        }
+    }
+    Ok(matches)
+}
+
+#[tauri::command]
+async fn search_workspace_text(
+    root: String,
+    query: String,
+    exclusions: Vec<String>,
+    show_hidden: bool,
+    limit: Option<usize>,
+) -> Result<Vec<WorkspaceTextMatch>, String> {
+    let limit = limit.unwrap_or(200).clamp(1, 500);
+    tauri::async_runtime::spawn_blocking(move || {
+        search_workspace_text_at(&root, &query, &exclusions, show_hidden, limit)
+    })
+    .await
+    .map_err(|error| format!("workspace text search task failed: {error}"))?
+}
+
+#[tauri::command]
+async fn workspace_entry_metadata(
+    app: tauri::AppHandle,
+    root: String,
+    path: String,
+    exclusions: Vec<String>,
+    show_hidden: bool,
+) -> Result<Option<ProjectEntry>, String> {
+    let resource_dir = app.path().resource_dir().ok();
+    tauri::async_runtime::spawn_blocking(move || {
+        let registry = language_registry(resource_dir.as_deref());
+        workspace_entry_metadata_at(&root, &path, &exclusions, show_hidden, registry.as_ref())
+    })
+    .await
+    .map_err(|error| format!("workspace metadata task failed: {error}"))?
 }
 
 fn read_project_sources(root: &str, paths: &[String]) -> Result<ProjectSources, String> {
@@ -979,7 +1399,9 @@ fn read_project_sources(root: &str, paths: &[String]) -> Result<ProjectSources, 
         if !supported.contains(&extension.as_str()) {
             continue;
         }
-        if metadata.len() > MAX_FILE_BYTES || bytes_read.saturating_add(metadata.len()) > MAX_TOTAL_BYTES {
+        if metadata.len() > MAX_FILE_BYTES
+            || bytes_read.saturating_add(metadata.len()) > MAX_TOTAL_BYTES
+        {
             warnings.push(format!("Skipped oversized source file: {path}"));
             continue;
         }
@@ -1031,39 +1453,84 @@ async fn load_project_manifests(
 const WATCHED_DIR_LIMIT: usize = 2000;
 const WATCH_EMIT_INTERVAL_MS: u64 = 750;
 
-fn is_ignored_watch_path(path: &Path, root: &Path) -> bool {
-    let Ok(relative) = path.strip_prefix(root) else {
-        return path != root;
-    };
-    relative.components().any(|component| {
-        let Component::Normal(name) = component else {
-            return false;
-        };
-        let name = name.to_string_lossy();
-        if name.starts_with('.') && name != ".github" {
-            return true;
-        }
-        matches!(
-            name.as_ref(),
-            "node_modules"
-                | "target"
-                | "dist"
-                | "build"
-                | "out"
-                | "coverage"
-                | "__pycache__"
-                | "vendor"
-                | "venv"
-                | "snap"
-                | "Downloads"
-                | "Pictures"
-                | "Videos"
-                | "Music"
-        )
-    })
+#[derive(Clone, serde::Serialize)]
+struct WorkspaceChange {
+    path: String,
+    kind: String,
 }
 
-fn collect_watch_dirs(root: &Path) -> Vec<PathBuf> {
+#[derive(Clone, serde::Serialize)]
+struct WorkspaceChangeEvent {
+    root: String,
+    changes: Vec<WorkspaceChange>,
+}
+
+fn record_workspace_change(
+    pending: &mut HashMap<String, String>,
+    path: impl Into<String>,
+    kind: &str,
+) -> bool {
+    // notify delivers events in order; keep the last state for each path.
+    // Create→delete stays a delete, while delete→create stays a create.
+    pending.insert(path.into(), kind.to_string());
+    true
+}
+
+fn schedule_workspace_changes(
+    window: tauri::WebviewWindow,
+    root: String,
+    pending: Arc<Mutex<HashMap<String, String>>>,
+    scheduled: Arc<AtomicBool>,
+) {
+    if scheduled
+        .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+        .is_err()
+    {
+        return;
+    }
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(WATCH_EMIT_INTERVAL_MS));
+        let changes = {
+            let mut guard = pending
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let changes: Vec<WorkspaceChange> = guard
+                .iter()
+                .map(|(path, kind)| WorkspaceChange {
+                    path: path.clone(),
+                    kind: kind.clone(),
+                })
+                .collect();
+            guard.clear();
+            // Release the scheduling flag under the same lock as the drain so
+            // an event arriving between them cannot be stranded in `pending`.
+            scheduled.store(false, Ordering::Relaxed);
+            changes
+        };
+        if changes.is_empty() {
+            return;
+        }
+        if let Err(error) = window.emit(
+            "architecture://changed",
+            WorkspaceChangeEvent { root, changes },
+        ) {
+            eprintln!("could not deliver workspace changes: {error}");
+        }
+    });
+}
+
+fn watch_path_ignored(path: &Path, root: &Path, policy: &workspace::WorkspacePolicy) -> bool {
+    if path == root {
+        return false;
+    }
+    let relative = match path.strip_prefix(root) {
+        Ok(relative) => relative,
+        Err(_) => return true,
+    };
+    policy.is_ignored(relative, path.is_dir())
+}
+
+fn collect_watch_dirs(root: &Path, policy: &workspace::WorkspacePolicy) -> Vec<PathBuf> {
     let mut dirs = vec![root.to_path_buf()];
     let mut index = 0;
     while index < dirs.len() && dirs.len() < WATCHED_DIR_LIMIT {
@@ -1080,7 +1547,7 @@ fn collect_watch_dirs(root: &Path) -> Vec<PathBuf> {
                     continue;
                 }
                 let path = entry.path();
-                if !is_ignored_watch_path(&path, root) {
+                if !watch_path_ignored(&path, root, policy) {
                     dirs.push(path);
                 }
             }
@@ -1091,11 +1558,15 @@ fn collect_watch_dirs(root: &Path) -> Vec<PathBuf> {
 }
 
 #[tauri::command]
-fn watch_project(window: tauri::WebviewWindow, root: String) -> Result<(), String> {
+fn watch_project(
+    window: tauri::WebviewWindow,
+    root: String,
+    exclusions: Vec<String>,
+    show_hidden: bool,
+) -> Result<(), String> {
     #[cfg(target_os = "android")]
     {
-        let _ = window;
-        let _ = root;
+        let _ = (window, root, exclusions, show_hidden);
         return Ok(());
     }
 
@@ -1106,49 +1577,62 @@ fn watch_project(window: tauri::WebviewWindow, root: String) -> Result<(), Strin
             .canonicalize()
             .map_err(|e| format!("could not watch project '{root}': {e}"))?;
         if !root.is_dir() {
-            return Err(format!("project root is not a directory: {}", root.display()));
+            return Err(format!(
+                "project root is not a directory: {}",
+                root.display()
+            ));
         }
+        let policy = Arc::new(workspace::WorkspacePolicy::load(
+            &root,
+            &exclusions,
+            show_hidden,
+        )?);
         let project_root = root.to_string_lossy().into_owned();
         let window_label = window.label().to_string();
-        let emit_last_emit = Arc::new(AtomicU64::new(0));
+        let pending_changes: Arc<Mutex<HashMap<String, String>>> =
+            Arc::new(Mutex::new(HashMap::new()));
+        let emit_scheduled = Arc::new(AtomicBool::new(false));
         let watch_root = root.clone();
+        let event_policy = policy.clone();
+        let watcher_window = window.clone();
+        let changes_for_event = pending_changes.clone();
+        let scheduled_for_event = emit_scheduled.clone();
+        let root_for_event = project_root.clone();
         let watcher =
             notify::recommended_watcher(move |event: notify::Result<notify::Event>| match event {
                 Ok(event) if matches!(event.kind, notify::EventKind::Access(_)) => {}
                 Ok(event) => {
-                    if event
-                        .paths
-                        .iter()
-                        .any(|path| is_ignored_watch_path(path, &watch_root))
+                    let kind = match &event.kind {
+                        notify::EventKind::Create(_) => "create",
+                        notify::EventKind::Remove(_) => "delete",
+                        notify::EventKind::Modify(_) => "modify",
+                        _ => "modify",
+                    };
+                    let mut changed = false;
                     {
-                        return;
-                    }
-                    let now = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .map(|duration| duration.as_millis() as u64)
-                        .unwrap_or(0);
-                    let mut previous = emit_last_emit.load(Ordering::Relaxed);
-                    loop {
-                        if now.saturating_sub(previous) < WATCH_EMIT_INTERVAL_MS {
-                            return;
-                        }
-                        match emit_last_emit.compare_exchange_weak(
-                            previous,
-                            now,
-                            Ordering::Relaxed,
-                            Ordering::Relaxed,
-                        ) {
-                            Ok(_) => break,
-                            Err(current) => previous = current,
+                        let mut guard = changes_for_event
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner());
+                        for path in event.paths {
+                            if watch_path_ignored(&path, &watch_root, &event_policy) {
+                                continue;
+                            }
+                            changed |=
+                                record_workspace_change(&mut guard, path.to_string_lossy(), kind);
                         }
                     }
-                    if let Err(error) = window.emit("architecture://changed", &project_root) {
-                        eprintln!("could not notify Architecture Explorer: {error}");
+                    if changed {
+                        schedule_workspace_changes(
+                            watcher_window.clone(),
+                            root_for_event.clone(),
+                            changes_for_event.clone(),
+                            scheduled_for_event.clone(),
+                        );
                     }
                 }
                 Err(error) => {
                     if let Err(emit_error) =
-                        window.emit("architecture://watch-error", error.to_string())
+                        watcher_window.emit("architecture://watch-error", error.to_string())
                     {
                         eprintln!(
                             "project watcher failed ({error}); event delivery failed: {emit_error}"
@@ -1158,14 +1642,17 @@ fn watch_project(window: tauri::WebviewWindow, root: String) -> Result<(), Strin
             })
             .map_err(|e| format!("could not start project watcher: {e}"))?;
         let mut watcher = watcher;
-        let dirs = collect_watch_dirs(&root);
+        let dirs = collect_watch_dirs(&root, &policy);
         let mut watched = 0;
+        let mut failed = 0usize;
         for dir in dirs {
             if watcher
                 .watch(&dir, notify::RecursiveMode::NonRecursive)
                 .is_ok()
             {
                 watched += 1;
+            } else {
+                failed += 1;
             }
         }
         if watched == 0 {
@@ -1173,6 +1660,12 @@ fn watch_project(window: tauri::WebviewWindow, root: String) -> Result<(), Strin
                 "could not watch {}: no accessible directories",
                 root.display()
             ));
+        }
+        if failed > 0 {
+            let message = format!(
+                "Watching {failed} directories failed; changes there may be missed. Use Refresh."
+            );
+            let _ = window.emit("architecture://watch-error", message);
         }
         PROJECT_WATCHERS
             .get_or_init(|| Mutex::new(HashMap::new()))
@@ -1211,7 +1704,8 @@ fn ext_list() -> Result<Vec<serde_json::Value>, String> {
         let entries = fs::read_dir(&dir)
             .map_err(|error| format!("could not read extensions {}: {error}", dir.display()))?;
         for entry in entries {
-            let entry = entry.map_err(|error| format!("could not read extension entry: {error}"))?;
+            let entry =
+                entry.map_err(|error| format!("could not read extension entry: {error}"))?;
             let path = entry.path();
             if !entry
                 .file_type()
@@ -1251,11 +1745,13 @@ fn ext_list() -> Result<Vec<serde_json::Value>, String> {
             let enabled = status
                 .and_then(|value| value.get("enabled"))
                 .and_then(serde_json::Value::as_bool)
-                .unwrap_or(required.is_empty() || required.iter().all(|permission| granted.contains(permission)));
-            let rollback_manifest = dir
-                .join("rollback")
-                .join(&id)
-                .join("manifest.json");
+                .unwrap_or(
+                    required.is_empty()
+                        || required
+                            .iter()
+                            .all(|permission| granted.contains(permission)),
+                );
+            let rollback_manifest = dir.join("rollback").join(&id).join("manifest.json");
             let rollback_text = read_optional_bytes(&rollback_manifest)?;
             let rollback_value = rollback_text
                 .as_deref()
@@ -1270,11 +1766,11 @@ fn ext_list() -> Result<Vec<serde_json::Value>, String> {
                 .get("version")
                 .and_then(serde_json::Value::as_str)
                 .map(str::to_string);
-            let rollback_available = rollback_version.is_some()
-                && rollback_version != current_version.as_deref();
-            let object = manifest
-                .as_object_mut()
-                .ok_or_else(|| format!("extension {} manifest must be an object", path.display()))?;
+            let rollback_available =
+                rollback_version.is_some() && rollback_version != current_version.as_deref();
+            let object = manifest.as_object_mut().ok_or_else(|| {
+                format!("extension {} manifest must be an object", path.display())
+            })?;
             object.insert("enabled".into(), serde_json::Value::Bool(enabled));
             object.insert(
                 "grantedPermissions".into(),
@@ -1331,7 +1827,9 @@ fn ext_install(
         serde_json::from_str(&text).map_err(|e| format!("invalid extension file: {e}"))?;
     let (kind, required_permissions) =
         validate_extension_manifest(&v, &expected_id, &expected_version)?;
-    if approved_permissions.iter().any(|permission| permission != "process.execution")
+    if approved_permissions
+        .iter()
+        .any(|permission| permission != "process.execution")
         || required_permissions
             .iter()
             .any(|permission| !approved_permissions.contains(permission))
@@ -1343,8 +1841,9 @@ fn ext_install(
             return Err(format!("invalid extension dependency '{dependency}'"));
         }
         let dependency_path = ext_dir().join(format!("{dependency}.json"));
-        let dependency_text = fs::read_to_string(&dependency_path)
-            .map_err(|_| format!("required extension dependency '{dependency}' is not installed"))?;
+        let dependency_text = fs::read_to_string(&dependency_path).map_err(|_| {
+            format!("required extension dependency '{dependency}' is not installed")
+        })?;
         let dependency_manifest: serde_json::Value = serde_json::from_str(&dependency_text)
             .map_err(|error| format!("invalid dependency '{dependency}': {error}"))?;
         if dependency_manifest
@@ -1352,7 +1851,9 @@ fn ext_install(
             .and_then(serde_json::Value::as_str)
             .is_none_or(|version| !valid_semver(version))
         {
-            return Err(format!("dependency '{dependency}' has an invalid installed version"));
+            return Err(format!(
+                "dependency '{dependency}' has an invalid installed version"
+            ));
         }
     }
 
@@ -1363,9 +1864,14 @@ fn ext_install(
     let previous_language = read_optional_bytes(&language_path)?;
     let mut state = read_extension_state()?;
     if let Some(previous_bytes) = &previous_manifest {
-        let previous_value: serde_json::Value = serde_json::from_slice(previous_bytes)
-            .map_err(|error| format!("installed extension is invalid and must be removed first: {error}"))?;
-        if let Some(publisher) = previous_value.get("publisher").or_else(|| previous_value.get("author")) {
+        let previous_value: serde_json::Value =
+            serde_json::from_slice(previous_bytes).map_err(|error| {
+                format!("installed extension is invalid and must be removed first: {error}")
+            })?;
+        if let Some(publisher) = previous_value
+            .get("publisher")
+            .or_else(|| previous_value.get("author"))
+        {
             let next_publisher = v.get("publisher").or_else(|| v.get("author"));
             if next_publisher != Some(publisher) {
                 return Err("publisher identity changed for this extension id".into());
@@ -1375,7 +1881,9 @@ fn ext_install(
             .get("version")
             .and_then(serde_json::Value::as_str)
             .ok_or("installed extension has no version")?;
-        if !valid_semver(installed_version) || compare_semver(&expected_version, installed_version) <= 0 {
+        if !valid_semver(installed_version)
+            || compare_semver(&expected_version, installed_version) <= 0
+        {
             return Err("installed extension version is already current or newer".into());
         }
         let rollback_dir = dir.join("rollback").join(&expected_id);
@@ -1418,7 +1926,8 @@ fn ext_install(
             created_language_dir = true;
         }
         let pretty = serde_json::to_string_pretty(
-            v.get("language").ok_or("language extension needs a 'language' section")?,
+            v.get("language")
+                .ok_or("language extension needs a 'language' section")?,
         )
         .map_err(|e| e.to_string())?;
         if let Err(error) = write_atomic(&language_path, &pretty) {
@@ -1442,7 +1951,9 @@ fn ext_install(
             }
         }
         if let Err(rollback_error) = rollback {
-            return Err(format!("{error}; restoring previous language config failed: {rollback_error}"));
+            return Err(format!(
+                "{error}; restoring previous language config failed: {rollback_error}"
+            ));
         }
         return Err(error);
     }
@@ -1462,7 +1973,9 @@ fn ext_install(
         let manifest_rollback = restore_file(&manifest_path, previous_manifest.as_deref());
         let language_rollback = restore_file(&language_path, previous_language.as_deref());
         if let Err(rollback_error) = manifest_rollback.and(language_rollback) {
-            return Err(format!("{error}; restoring previous extension files failed: {rollback_error}"));
+            return Err(format!(
+                "{error}; restoring previous extension files failed: {rollback_error}"
+            ));
         }
         return Err(error);
     }
@@ -1476,13 +1989,11 @@ fn restore_file(path: &Path, contents: Option<&[u8]>) -> Result<(), String> {
                 .map_err(|error| format!("backup for {} is not UTF-8: {error}", path.display()))?;
             write_atomic(path, restored)
         }
-        None => {
-            match fs::remove_file(path) {
-                Ok(()) => Ok(()),
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-                Err(error) => Err(format!("could not remove {}: {error}", path.display())),
-            }
-        }
+        None => match fs::remove_file(path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(format!("could not remove {}: {error}", path.display())),
+        },
     }
 }
 
@@ -1545,7 +2056,9 @@ fn ext_set_enabled(id: String, enabled: bool, permissions: Vec<String>) -> Resul
     let manifest: serde_json::Value =
         serde_json::from_str(&text).map_err(|error| format!("invalid extension {id}: {error}"))?;
     let required = extension_permission_requirements(&manifest);
-    if permissions.iter().any(|permission| permission != "process.execution")
+    if permissions
+        .iter()
+        .any(|permission| permission != "process.execution")
         || (enabled
             && required
                 .iter()
@@ -1558,8 +2071,7 @@ fn ext_set_enabled(id: String, enabled: bool, permissions: Vec<String>) -> Resul
         id,
         serde_json::json!({ "enabled": enabled, "permissions": permissions }),
     );
-    let contents =
-        serde_json::to_string_pretty(&state).map_err(|error| error.to_string())?;
+    let contents = serde_json::to_string_pretty(&state).map_err(|error| error.to_string())?;
     fs::create_dir_all(config_dir()).map_err(|error| error.to_string())?;
     write_atomic(&extension_state_path(), &contents)
 }
@@ -1603,11 +2115,19 @@ fn ext_rollback(id: String) -> Result<(), String> {
         }
     }
 
-    fs::create_dir_all(current_manifest_path.parent().ok_or("invalid extension path")?)
-        .map_err(|error| error.to_string())?;
+    fs::create_dir_all(
+        current_manifest_path
+            .parent()
+            .ok_or("invalid extension path")?,
+    )
+    .map_err(|error| error.to_string())?;
     if kind == "language" {
-        fs::create_dir_all(current_language_path.parent().ok_or("invalid language path")?)
-            .map_err(|error| error.to_string())?;
+        fs::create_dir_all(
+            current_language_path
+                .parent()
+                .ok_or("invalid language path")?,
+        )
+        .map_err(|error| error.to_string())?;
         let contents = std::str::from_utf8(backup_language.as_deref().unwrap_or_default())
             .map_err(|error| format!("rollback language config is not UTF-8: {error}"))?;
         write_atomic(&current_language_path, contents)?;
@@ -1619,17 +2139,21 @@ fn ext_rollback(id: String) -> Result<(), String> {
     if let Err(error) = write_atomic(&current_manifest_path, manifest_text) {
         let language_rollback = restore_file(&current_language_path, current_language.as_deref());
         if let Err(rollback_error) = language_rollback {
-            return Err(format!("{error}; restoring current language config failed: {rollback_error}"));
+            return Err(format!(
+                "{error}; restoring current language config failed: {rollback_error}"
+            ));
         }
         return Err(error);
     }
-    let state_text = serde_json::to_string_pretty(&next_state)
-        .map_err(|error| error.to_string())?;
+    let state_text =
+        serde_json::to_string_pretty(&next_state).map_err(|error| error.to_string())?;
     if let Err(error) = write_atomic(&extension_state_path(), &state_text) {
         let manifest_rollback = restore_file(&current_manifest_path, current_manifest.as_deref());
         let language_rollback = restore_file(&current_language_path, current_language.as_deref());
         if let Err(rollback_error) = manifest_rollback.and(language_rollback) {
-            return Err(format!("{error}; restoring current extension failed: {rollback_error}"));
+            return Err(format!(
+                "{error}; restoring current extension failed: {rollback_error}"
+            ));
         }
         return Err(error);
     }
@@ -1650,7 +2174,9 @@ fn ext_remove(id: String) -> Result<(), String> {
         Ok(contents) => Some(contents),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(error) => {
-            return Err(format!("could not read extension language config '{id}': {error}"));
+            return Err(format!(
+                "could not read extension language config '{id}': {error}"
+            ));
         }
     };
     let mut state = read_extension_state()?;
@@ -1671,9 +2197,13 @@ fn ext_remove(id: String) -> Result<(), String> {
             let language_rollback = restore_file(&language, old_language.as_deref());
             restore_state_after_remove(&old_state, &error)?;
             if let Err(rollback_error) = manifest_rollback.and(language_rollback) {
-                return Err(format!("{error}; extension removal rollback failed: {rollback_error}"));
+                return Err(format!(
+                    "{error}; extension removal rollback failed: {rollback_error}"
+                ));
             }
-            return Err(format!("could not remove language config for '{id}': {error}"));
+            return Err(format!(
+                "could not remove language config for '{id}': {error}"
+            ));
         }
     }
     // Rollback data is only metadata for a previous version; a failed cleanup
@@ -1799,10 +2329,7 @@ fn ext_check_dependencies(
             }
             "python-module" => {
                 if !valid_python_module_name(&requirement.name) {
-                    return Err(format!(
-                        "invalid python module name '{}'",
-                        requirement.name
-                    ));
+                    return Err(format!("invalid python module name '{}'", requirement.name));
                 }
             }
             kind => return Err(format!("unsupported dependency kind '{kind}'")),
@@ -1912,7 +2439,8 @@ fn enabled_extension_languages() -> Result<Vec<Language>, String> {
         .map_err(|error| format!("could not read extension languages: {error}"))?;
     let mut languages = Vec::new();
     for entry in entries {
-        let entry = entry.map_err(|error| format!("could not read extension language entry: {error}"))?;
+        let entry =
+            entry.map_err(|error| format!("could not read extension language entry: {error}"))?;
         let path = entry.path();
         if !entry
             .file_type()
@@ -1922,7 +2450,10 @@ fn enabled_extension_languages() -> Result<Vec<Language>, String> {
         {
             continue;
         }
-        let id = path.file_stem().and_then(|stem| stem.to_str()).unwrap_or_default();
+        let id = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or_default();
         if !valid_id(id) {
             continue;
         }
@@ -1934,9 +2465,9 @@ fn enabled_extension_languages() -> Result<Vec<Language>, String> {
             .get("permissions")
             .and_then(serde_json::Value::as_array)
             .is_some_and(|permissions| {
-                permissions.iter().any(|permission| {
-                    permission.as_str() == Some("process.execution")
-                })
+                permissions
+                    .iter()
+                    .any(|permission| permission.as_str() == Some("process.execution"))
             });
         if !enabled || !approved {
             continue;
@@ -1971,15 +2502,13 @@ async fn run_file_impl(resource_dir: Option<&Path>, path: String) -> Result<RunR
         }
     }
     if found.is_none() {
-        found = enabled_extension_languages()?
-            .into_iter()
-            .find(|language| {
-                language.extensions.iter().any(|extension| {
-                    p.extension().and_then(|value| value.to_str()).is_some_and(|actual| {
-                        extension.eq_ignore_ascii_case(&format!(".{actual}"))
-                    })
-                })
-            });
+        found = enabled_extension_languages()?.into_iter().find(|language| {
+            language.extensions.iter().any(|extension| {
+                p.extension()
+                    .and_then(|value| value.to_str())
+                    .is_some_and(|actual| extension.eq_ignore_ascii_case(&format!(".{actual}")))
+            })
+        });
     }
     let lang = found.ok_or_else(|| {
         format!("no language configured for {path} (add one in languages/ or install a language extension)")
@@ -2028,9 +2557,10 @@ fn run_source_impl(
                     .and_then(|name| Path::new(name).extension())
                     .and_then(|extension| extension.to_str())
                     .is_some_and(|actual| {
-                        language.extensions.iter().any(|extension| {
-                            extension.eq_ignore_ascii_case(&format!(".{actual}"))
-                        })
+                        language
+                            .extensions
+                            .iter()
+                            .any(|extension| extension.eq_ignore_ascii_case(&format!(".{actual}")))
                     }),
             }
         });
@@ -2066,6 +2596,7 @@ fn run_source_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Instant;
 
     #[test]
     fn checked_file_writes_detect_stale_revisions() {
@@ -2083,13 +2614,11 @@ mod tests {
         let original = read_file_snapshot(&path).unwrap().unwrap();
 
         fs::write(&path, "changed by another window").unwrap();
-        let conflict = write_file_if_unchanged(&path, "my edits", Some(&original.revision)).unwrap();
+        let conflict =
+            write_file_if_unchanged(&path, "my edits", Some(&original.revision)).unwrap();
         match conflict {
             CheckedWriteOutcome::Conflict { snapshot } => {
-                assert_eq!(
-                    snapshot.unwrap().contents,
-                    "changed by another window"
-                );
+                assert_eq!(snapshot.unwrap().contents, "changed by another window");
             }
             CheckedWriteOutcome::Saved { .. } => panic!("a stale revision must not be written"),
         }
@@ -2175,9 +2704,7 @@ mod tests {
             extension_permission_requirements(&language),
             vec!["process.execution"]
         );
-        assert!(
-            validate_extension_manifest(&language, "lang-test", "1.0.0").is_ok()
-        );
+        assert!(validate_extension_manifest(&language, "lang-test", "1.0.0").is_ok());
         let unsupported = serde_json::json!({
             "id": "lang-test",
             "name": "Test Language",
@@ -2229,13 +2756,19 @@ mod tests {
             "é",
             &too_long_tool,
         ] {
-            assert!(!valid_tool_dependency_name(name), "expected '{name}' to be rejected");
+            assert!(
+                !valid_tool_dependency_name(name),
+                "expected '{name}' to be rejected"
+            );
         }
 
         let long_module = "a".repeat(64);
         let too_long_module = "a".repeat(65);
         for name in ["os", "_private", "module_2", &long_module] {
-            assert!(valid_python_module_name(name), "expected '{name}' to be valid");
+            assert!(
+                valid_python_module_name(name),
+                "expected '{name}' to be valid"
+            );
         }
         for name in [
             "",
@@ -2248,7 +2781,10 @@ mod tests {
             "é",
             &too_long_module,
         ] {
-            assert!(!valid_python_module_name(name), "expected '{name}' to be rejected");
+            assert!(
+                !valid_python_module_name(name),
+                "expected '{name}' to be rejected"
+            );
         }
     }
 
@@ -2325,14 +2861,31 @@ mod tests {
         #[cfg(unix)]
         std::os::unix::fs::symlink(root.join("src"), root.join("src-link")).unwrap();
 
-        let exclusions = [".git", "node_modules", "__pycache__", "dist", "build", ".venv", "vendor"]
-            .map(str::to_string);
-        let scan = scan_project_tree(root.to_str().unwrap(), &exclusions).unwrap();
+        let exclusions = [
+            ".git",
+            "node_modules",
+            "__pycache__",
+            "dist",
+            "build",
+            ".venv",
+            "vendor",
+        ]
+        .map(str::to_string);
+        let scan = scan_project_tree(root.to_str().unwrap(), &exclusions, true, None).unwrap();
         assert_eq!(scan.entries[0].path, root.to_string_lossy());
-        assert!(scan.entries.iter().all(|entry| !entry.path.contains("node_modules")));
+        assert!(scan
+            .entries
+            .iter()
+            .all(|entry| !entry.path.contains("node_modules")));
         assert_eq!(scan.entries[0].file_count, 2);
-        assert!(scan.entries.iter().any(|entry| entry.name == "src-link" && entry.kind == "link"));
-        assert!(!scan.entries.iter().any(|entry| entry.path.ends_with("src-link/main.ts")));
+        assert!(scan
+            .entries
+            .iter()
+            .any(|entry| entry.name == "src-link" && entry.kind == "link"));
+        assert!(!scan
+            .entries
+            .iter()
+            .any(|entry| entry.path.ends_with("src-link/main.ts")));
 
         fs::remove_dir_all(root).unwrap();
     }
@@ -2423,6 +2976,140 @@ mod tests {
 
         assert!(error.contains("Choose a run language"));
     }
+
+    #[test]
+    fn workspace_change_coalescing_keeps_the_last_event_for_a_path() {
+        let mut pending = HashMap::new();
+        record_workspace_change(&mut pending, "/work/a.txt", "create");
+        record_workspace_change(&mut pending, "/work/a.txt", "delete");
+        assert_eq!(
+            pending.get("/work/a.txt").map(String::as_str),
+            Some("delete")
+        );
+        record_workspace_change(&mut pending, "/work/a.txt", "create");
+        assert_eq!(
+            pending.get("/work/a.txt").map(String::as_str),
+            Some("create")
+        );
+    }
+
+    fn temp_workspace(name: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "talos-{name}-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    #[test]
+    fn universal_scan_respects_ignore_rules_hidden_policy_and_language_detection() {
+        let root = temp_workspace("universal-scan");
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::create_dir_all(root.join(".hidden")).unwrap();
+        fs::create_dir_all(root.join("node_modules")).unwrap();
+        fs::write(root.join(".gitignore"), "ignored.txt\n").unwrap();
+        fs::write(root.join("src/main.py"), "print('hello')\n").unwrap();
+        fs::write(root.join("ignored.txt"), "secret").unwrap();
+        fs::write(root.join(".hidden/notes.py"), "pass").unwrap();
+        fs::write(root.join("node_modules/pkg.js"), "").unwrap();
+
+        let languages = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../languages");
+        let registry = Registry::load_dir(&languages).unwrap();
+        let hidden = scan_project_tree(
+            root.to_str().unwrap(),
+            &["node_modules".to_string()],
+            false,
+            Some(&registry),
+        )
+        .unwrap();
+        let paths: Vec<String> = hidden
+            .entries
+            .iter()
+            .map(|entry| entry.path.clone())
+            .collect();
+        assert!(paths.iter().any(|path| path.ends_with("src/main.py")));
+        assert!(!paths.iter().any(|path| path.ends_with("ignored.txt")));
+        assert!(!paths.iter().any(|path| path.contains(".hidden")));
+        assert!(!paths.iter().any(|path| path.contains("node_modules")));
+        let main = hidden
+            .entries
+            .iter()
+            .find(|entry| entry.name == "main.py")
+            .unwrap();
+        assert_eq!(main.extension, "py");
+        assert_eq!(main.language, "python");
+
+        let shown = scan_project_tree(root.to_str().unwrap(), &[], true, None).unwrap();
+        assert!(shown.entries.iter().any(|entry| entry.name == "notes.py"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn move_project_entry_validates_destination() {
+        let parent = temp_workspace("move-workspace");
+        let root = parent.join("workspace");
+        fs::create_dir_all(root.join("src/nested")).unwrap();
+        fs::write(root.join("src/main.py"), "pass").unwrap();
+        let root_text = root.to_string_lossy().into_owned();
+
+        move_project_entry_at(&root_text, "src/main.py", "src/nested/main.py").unwrap();
+        assert!(root.join("src/nested/main.py").is_file());
+        assert!(move_project_entry_at(&root_text, "src/nested", "src/nested/inside").is_err());
+        assert!(move_project_entry_at(&root_text, "src/nested/main.py", "../outside.py").is_err());
+        assert!(move_project_entry_at(&root_text, "src/missing.py", "src/new.py").is_err());
+        fs::remove_dir_all(parent).unwrap();
+    }
+
+    #[test]
+    fn workspace_text_search_indexes_unopened_files_and_skips_ignored_files() {
+        let root = temp_workspace("text-search");
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(root.join(".gitignore"), "generated.txt\n").unwrap();
+        fs::write(
+            root.join("src/api.py"),
+            "def handler():\n    return 'NEEDLE_TOKEN'\n",
+        )
+        .unwrap();
+        fs::write(root.join("generated.txt"), "NEEDLE_TOKEN\n").unwrap();
+
+        let matches =
+            search_workspace_text_at(root.to_str().unwrap(), "needle_token", &[], false, 20)
+                .unwrap();
+        assert_eq!(matches.len(), 1);
+        assert!(matches[0].path.ends_with("src/api.py"));
+        assert_eq!(matches[0].line, 2);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn large_workspace_scan_stays_bounded() {
+        let root = temp_workspace("large-scan");
+        for directory in 0..50 {
+            let path = root.join(format!("module-{directory:02}"));
+            fs::create_dir_all(&path).unwrap();
+            for file in 0..60 {
+                fs::write(path.join(format!("source-{file:03}.py")), "VALUE = 1\n").unwrap();
+            }
+        }
+
+        let started = Instant::now();
+        let scan = scan_project_tree(root.to_str().unwrap(), &[], true, None).unwrap();
+        let elapsed = started.elapsed();
+        eprintln!(
+            "large_workspace_scan_stays_bounded: {} entries in {} ms",
+            scan.entries.len(),
+            elapsed.as_millis()
+        );
+        assert_eq!(scan.entries.len(), 3_051);
+        assert!(!scan.truncated);
+        assert!(elapsed < Duration::from_secs(15));
+        fs::remove_dir_all(root).unwrap();
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -2446,9 +3133,15 @@ pub fn run() {
             take_window_context,
             is_android,
             scan_project,
+            workspace_entry_metadata,
+            search_workspace_text,
+            list_recent_workspaces,
+            remember_workspace,
+            clear_recent_workspaces,
             create_project_file,
             create_project_folder,
             rename_project_entry,
+            move_project_entry,
             delete_project_entry,
             load_project_sources,
             measure_project_components,
@@ -2456,6 +3149,10 @@ pub fn run() {
             watch_project,
             stop_project_watch,
             force_quit,
+            github::github_token_status,
+            github::github_set_token,
+            github::github_clear_token,
+            github::github_api,
             settings_read,
             settings_write,
             chronicle::chronicle_status,
@@ -2463,6 +3160,7 @@ pub fn run() {
             chronicle::chronicle_set_settings,
             chronicle::chronicle_index_start,
             chronicle::chronicle_index_cancel,
+            chronicle::chronicle_index_on_workspace_change,
             chronicle::chronicle_search,
             chronicle::chronicle_timeline,
             chronicle::chronicle_decisions,

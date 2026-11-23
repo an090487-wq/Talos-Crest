@@ -9,8 +9,8 @@ Talos Chronicle is the local-first project memory engine for Talos Crest. It sto
 | C1 | Complete | SQLite storage, migrations, stable project identity, status/settings commands |
 | C2 | Complete | Bounded incremental indexing, ignore support, evidence, observations, events, searchable text, cancellation |
 | C3 | Complete | Bounded FTS search, timeline, observations, ADR-style decisions, evidence-backed commands |
-| C4 | Planned | Chronicle panel UI and privacy controls |
-| C5 | Planned | Optional semantic search and AI grounding |
+| C4 | Shipped with limits | Chronicle panel UI, local privacy controls, async commands, safe evidence links |
+| C5 | Not implemented | Optional semantic search and AI grounding |
 
 ## Storage layout
 
@@ -53,7 +53,7 @@ Every non-user claim carries evidence, confidence, and one of these statuses:
 - `inferred` — heuristic extraction from untrusted source text.
 - `proposed` — a possible decision or interpretation requiring confirmation.
 
-Chronicle does not fabricate explanations. Indexing stores facts and bounded evidence; C3 search, timeline, observations, and decisions return only stored records and their evidence.
+Chronicle does not fabricate explanations. Indexing stores facts and bounded evidence; C3 search, timeline, observations, and decisions return only stored records and their evidence. The `entities`, `relations`, and `snapshots` tables exist for a future semantic layer but are not populated by shipped analysis, and `commit_hash` remains empty because this build has no Source Control provider.
 
 ## Indexing pipeline
 
@@ -72,10 +72,14 @@ Indexing runs in `tauri::async_runtime::spawn_blocking` and is cancelable. The f
 5. SHA-256 content hashes skip unchanged files.
 6. Changed UTF-8 files produce bounded observations and evidence excerpts.
 7. Records are committed in small batches.
-8. Stale `index_state` and search rows are pruned at the end.
+8. Stale file-derived `index_state` and search rows are pruned at the end; user-authored decision and observation records are preserved.
 9. Progress and completion are emitted as Tauri events.
 
-Cancellation is generation-based. Starting a new index increments the generation, and older jobs stop at their next check. `chronicle_index_cancel` increments the generation for the active job.
+All Chronicle IPC commands move SQLite and filesystem work to `spawn_blocking`; none of it runs on the UI thread. Indexing requires `settings.enabled`, and the workspace-change path additionally requires `settings.index_on_workspace_change`. A disabled manual start returns an explanatory error; disabled automatic starts are silent no-ops so saving a file cannot surface errors or add work to a typing path.
+
+Cancellation is generation-based. Starting a new index increments the generation, and older jobs stop at their next check. `chronicle_index_cancel` increments the generation for the active job. A cancelled job commits bounded work already completed, skips pruning, and retains its last-good `index_state` rows so reported status remains accurate. Unreadable files and directories are logged and skipped rather than aborting a whole pass.
+
+The frontend coalesces progress and update events, tracks job identity so stale events are ignored, discards late responses after a query or workspace change, and resolves evidence paths only inside the active workspace. Chronicle indexing is not triggered by keystrokes or unsaved buffers; the explorer dispatches `talos:workspace-files-changed` and calls `chronicle_index_on_workspace_change`, which honours the settings gate.
 
 ## Privacy and untrusted content
 
@@ -96,6 +100,7 @@ chronicle_settings
 chronicle_set_settings
 chronicle_index_start
 chronicle_index_cancel
+chronicle_index_on_workspace_change
 chronicle_search
 chronicle_timeline
 chronicle_decisions

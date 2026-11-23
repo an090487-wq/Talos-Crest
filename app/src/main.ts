@@ -2398,23 +2398,29 @@ void listen<FileSavedNotice>("talos://file-saved", (event) => {
     }
   }
 }).catch((error: unknown) => say(`Could not subscribe to file changes: ${String(error)}`));
-void listen<string>("architecture://changed", (event) => {
-  const normalize = (path: string) => path.replace(/\\/g, "/");
-  const root = normalize(event.payload).replace(/\/$/, "");
-  const changedTabs = editorTabs.filter((tab) => {
-    if (!tab.path) return false;
-    const path = normalize(tab.path);
-    return path === root || path.startsWith(`${root}/`);
-  });
-  if (!changedTabs.length) return;
-  if (externalCheckTimer) window.clearTimeout(externalCheckTimer);
-  externalCheckTimer = window.setTimeout(() => {
-    externalCheckTimer = 0;
-    void Promise.all(changedTabs.map((tab) => checkExternalFileRevision(tab))).catch((error: unknown) => {
-      say(`Could not check open files for external changes: ${String(error)}`);
+void listen<{ root: string; changes: { path: string; kind: string }[] } | string>(
+  "architecture://changed",
+  (event) => {
+    const normalize = (path: string) => path.replace(/\\/g, "/").replace(/\/$/, "");
+    const payload = event.payload;
+    const changedPaths = (
+      typeof payload === "string" ? [payload] : payload.changes.map((change) => change.path)
+    ).map(normalize);
+    const changedTabs = editorTabs.filter((tab) => {
+      if (!tab.path) return false;
+      const path = normalize(tab.path);
+      return changedPaths.some((changed) => path === changed || path.startsWith(`${changed}/`));
     });
-  }, 250);
-}).catch((error: unknown) => say(`Could not subscribe to workspace file changes: ${String(error)}`));
+    if (!changedTabs.length) return;
+    if (externalCheckTimer) window.clearTimeout(externalCheckTimer);
+    externalCheckTimer = window.setTimeout(() => {
+      externalCheckTimer = 0;
+      void Promise.all(changedTabs.map((tab) => checkExternalFileRevision(tab))).catch((error: unknown) => {
+        say(`Could not check open files for external changes: ${String(error)}`);
+      });
+    }, 250);
+  },
+).catch((error: unknown) => say(`Could not subscribe to workspace file changes: ${String(error)}`));
 void initExtensions({
   setTheme: (def: ThemeDef | null) => {
     if (def) {

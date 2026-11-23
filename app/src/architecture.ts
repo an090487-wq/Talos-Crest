@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { closeOtherDialogs, closeTopmostDialog } from "./ui/dialogs";
+import { initGitHubPanel, renderGitHubPanel } from "./github-ui";
 import { getWindowValue, setWindowValue } from "./window-state";
 import {
   analyzeDependencies,
@@ -29,6 +30,7 @@ interface ProjectEntry {
   name: string;
   kind: "directory" | "file" | "link";
   extension: string;
+  language: string;
   size: number;
   modified_ms: number | null;
   depth: number;
@@ -37,10 +39,41 @@ interface ProjectEntry {
 }
 
 interface ProjectScan {
+  id: string;
   root: string;
   entries: ProjectEntry[];
   warnings: string[];
   truncated: boolean;
+}
+
+interface RecentWorkspace {
+  id: string;
+  path: string;
+  name: string;
+  openedAt: number;
+}
+
+interface WorkspaceChange {
+  path: string;
+  kind: "create" | "modify" | "delete";
+}
+
+interface WorkspaceChangeEvent {
+  root: string;
+  changes: WorkspaceChange[];
+}
+
+interface WorkspaceTextMatch {
+  path: string;
+  line: number;
+  column: number;
+  text: string;
+}
+
+interface ChronicleIndexJob {
+  projectId: string;
+  jobId: number;
+  accepted: boolean;
 }
 
 interface ArchitectureRow {
@@ -65,6 +98,7 @@ const NODE_WIDTH = 206;
 const NODE_HEIGHT = 32;
 
 type InsightMode = "performance" | "sandbox" | "debt";
+type ArchMode = "structure" | "dependencies" | "architecture" | InsightMode | "github";
 
 interface ManifestSet {
   manifests: ManifestLike[];
@@ -78,7 +112,7 @@ let zoom = storedZoom();
 let busy = false;
 let scanWaiters: (() => void)[] = [];
 let expanded = new Set<string>(storedStringList("talos.arch-expanded"));
-let mode: "structure" | "dependencies" | "architecture" | InsightMode = storedMode();
+let mode: ArchMode = storedMode();
 let dependencyResult: DependencyResult | null = null;
 let analyzedPaths: string[] = [];
 let components: ArchitectureComponent[] = [];
@@ -88,7 +122,13 @@ let analysisBusy = false;
 let focusMode = getWindowValue("talos.arch-focus") === "true";
 let queuedRoot = "";
 let watchedRoot = "";
+let watchedDirectories = new Set<string>();
+let watcherPolicyKey = "";
 let refreshTimer = 0;
+let scanGeneration = 0;
+let archSearchTimer = 0;
+let quickOpenTimer = 0;
+let chronicleIndexTimer = 0;
 let treeScrollFrame = 0;
 let explorerOpen = getWindowValue("talos.explorer-open") === "true";
 let exportFullGraph = false;
@@ -122,9 +162,9 @@ function storedZoom(): number {
   return Number.isFinite(value) && value >= 0.6 && value <= 1.8 ? value : 1;
 }
 
-function storedMode(): "structure" | "dependencies" | "architecture" | InsightMode {
+function storedMode(): ArchMode {
   const value = getWindowValue("talos.arch-mode") ?? "";
-  if (value === "structure" || value === "dependencies" || value === "architecture" || isInsightMode(value)) {
+  if (value === "structure" || value === "dependencies" || value === "architecture" || value === "github" || isInsightMode(value)) {
     return value;
   }
   return "structure";
@@ -264,6 +304,20 @@ function validEntryName(name: string | null): string | null {
     return null;
   }
   return value;
+}
+
+function validWorkspaceRelativePath(value: string | null): string | null {
+  const normalized = value?.trim().replace(/\\/g, "/") ?? "";
+  if (!normalized || normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized)) {
+    setMessage("Enter a workspace-relative path starting with a file or folder name.", true);
+    return null;
+  }
+  const segments = normalized.split("/");
+  if (segments.some((segment) => !segment || segment === "." || segment === ".." || segment.includes("\0"))) {
+    setMessage("Enter a path without empty, '.', or '..' segments.", true);
+    return null;
+  }
+  return segments.join("/");
 }
 
 function addDetailRows(details: HTMLElement, rows: [string, string][]) {
@@ -451,6 +505,33 @@ async function renameSelected() {
     setMessage(`Renamed to ${to}`);
   } catch (error) {
     setMessage(`Could not rename ${entry.name}: ${String(error)}`, true);
+  }
+}
+
+async function moveSelected() {
+  if (!scan) return;
+  const entry = selectedEntry();
+  if (!entry || entry.path === scan.root || entry.kind === "link") return;
+  const from = relativePath(entry.path);
+  const to = validWorkspaceRelativePath(window.prompt(`Move "${entry.name}" to a new workspace-relative path:`, from));
+  if (!to || to === from) return;
+  const root = scan.root;
+  const descendants = scan.entries
+    .filter((candidate) => candidate.path === entry.path || candidate.path.startsWith(`${entry.path}/`))
+    .map((candidate) => candidate.path);
+  try {
+    await invoke("move_project_entry", { root, from, to });
+    const movedRoot = absolutePath(to);
+    for (const oldPath of descendants) {
+      const suffix = oldPath.slice(entry.path.length);
+      onWorkspacePathChange?.(oldPath, `${movedRoot}${suffix}`);
+    }
+    await scanProject(root);
+    selectedPath = movedRoot;
+    render();
+    setMessage(`Moved ${from} to ${to}`);
+  } catch (error) {
+    setMessage(`Could not move ${entry.name}: ${String(error)}`, true);
   }
 }
 
@@ -697,7 +778,14 @@ function entryIcon(entry: ProjectEntry): string {
     toml: "TM", yaml: "YM", yml: "YM", sql: "DB", png: "IMG", jpg: "IMG",
     pdf: "PDF", sh: "SH", java: "JV", c: "C", cpp: "C++",
   };
-  return icons[entry.extension] ?? (entry.extension ? entry.extension.slice(0, 3).toUpperCase() : "FILE");
+  const languageIcons: Record<string, string> = {
+    python: "PY", typescript: "TS", javascript: "JS", rust: "RS", go: "GO",
+    java: "JV", c: "C", cpp: "C++", csharp: "C#", ruby: "RB", php: "PHP",
+    swift: "SW", kotlin: "KT", shell: "SH", html: "HT", css: "CS", json: "{}",
+  };
+  return languageIcons[entry.language]
+    ?? icons[entry.extension]
+    ?? (entry.extension ? entry.extension.slice(0, 3).toUpperCase() : "FILE");
 }
 
 function showEntryContextMenu(event: MouseEvent, entry: ProjectEntry) {
@@ -722,6 +810,7 @@ function showEntryContextMenu(event: MouseEvent, entry: ProjectEntry) {
   actions.push(["Copy Relative Path", () => void copyPath(relativePath(entry.path))]);
   if (entry.path !== scan?.root && entry.kind !== "link") {
     actions.push(["Rename", () => void renameSelected()]);
+    actions.push(["Move…", () => void moveSelected()]);
     actions.push(["Delete", () => void deleteSelected()]);
   }
   let listenerInstalled = false;
@@ -1238,9 +1327,16 @@ function setInsightTable(headers: string[], rows: (string | HTMLElement)[][], pa
 
 function renderInsights(): void {
   const insight = isInsightMode(mode);
-  $("arch-content").classList.toggle("hidden", insight);
+  const github = mode === "github";
+  $("arch-find-text").toggleAttribute("disabled", insight || github);
+  $("arch-content").classList.toggle("hidden", insight || github);
   $("arch-insights").classList.toggle("hidden", !insight);
-  $("arch-window").dataset.insight = String(insight);
+  $("github-panel").classList.toggle("hidden", !github);
+  $("arch-window").dataset.insight = String(insight || github);
+  if (github) {
+    renderGitHubPanel();
+    return;
+  }
   if (!insight) return;
   $("insight-budgets").style.display = mode === "performance" ? "flex" : "none";
   const summary = $("insight-summary");
@@ -1430,7 +1526,7 @@ function render() {
   // Restore the graph panel (and hide the insights panel) on every mode
   // switch, not only when entering an insight tab.
   renderInsights();
-  if (isInsightMode(mode)) return;
+  if (isInsightMode(mode) || mode === "github") return;
   renderGraph();
 }
 
@@ -1441,6 +1537,69 @@ async function chooseProject() {
 
 export async function chooseWorkspace() {
   await chooseProject();
+}
+
+async function loadRecentWorkspaces() {
+  const select = document.getElementById("arch-recent") as HTMLSelectElement | null;
+  if (!select) return;
+  let items: RecentWorkspace[] = [];
+  try {
+    items = await invoke<RecentWorkspace[]>("list_recent_workspaces");
+  } catch {
+    return;
+  }
+  select.textContent = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = items.length ? "Recent projects" : "No recent projects";
+  select.appendChild(placeholder);
+  for (const item of items) {
+    const option = document.createElement("option");
+    option.value = item.path;
+    option.textContent = item.name;
+    option.title = item.path;
+    select.appendChild(option);
+  }
+}
+
+async function findInWorkspace() {
+  if (!scan) {
+    setMessage("Open a project before searching across its files.", true);
+    return;
+  }
+  const query = window.prompt("Search text in all workspace files:");
+  if (!query?.trim()) return;
+  const summary = $("arch-details");
+  summary.textContent = "Searching workspace files…";
+  try {
+    const matches = await invoke<WorkspaceTextMatch[]>("search_workspace_text", {
+      root: scan.root,
+      query,
+      exclusions: currentExclusions(),
+      showHidden,
+      limit: 200,
+    });
+    summary.textContent = "";
+    const heading = document.createElement("strong");
+    heading.textContent = `${matches.length}${matches.length === 200 ? "+" : ""} match${matches.length === 1 ? "" : "es"} for “${query}”`;
+    summary.appendChild(heading);
+    for (const match of matches) {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "workspace-search-result";
+      row.textContent = `${relativePath(match.path) || match.path}:${match.line}:${match.column}  ${match.text.trim()}`;
+      row.title = match.path;
+      row.addEventListener("click", () => {
+        if (onOpenFile) void onOpenFile(match.path);
+      });
+      summary.appendChild(row);
+    }
+    if (!matches.length) summary.appendChild(document.createTextNode("No matching files."));
+    setMessage(`Workspace text search finished with ${matches.length} result${matches.length === 1 ? "" : "s"}.`);
+  } catch (error) {
+    summary.textContent = "Search failed.";
+    setMessage(`Workspace text search failed: ${String(error)}`, true);
+  }
 }
 
 function showQuickOpenResults(results: ProjectEntry[], query: string) {
@@ -1551,13 +1710,14 @@ export function openQuickOpen() {
   input.focus();
 }
 
-async function scanProject(root: string) {
+async function scanProject(root: string, forceWatch = false) {
   if (busy) {
     queuedRoot = root;
     await new Promise<void>((resolve) => scanWaiters.push(resolve));
     return;
   }
   busy = true;
+  const generation = ++scanGeneration;
   setMessage("Scanning project…");
   $("arch-refresh").setAttribute("disabled", "true");
   try {
@@ -1566,14 +1726,20 @@ async function scanProject(root: string) {
     const result = await invoke<ProjectScan>("scan_project", {
       root,
       exclusions: currentExclusions(),
+      showHidden: showHidden,
     });
+    if (generation !== scanGeneration) return;
     scan = result;
     try {
       setWindowValue("talos.workspace-root", result.root);
     } catch (error) {
       setMessage(`Project opened, but its location could not be remembered: ${String(error)}`, true);
     }
-    document.dispatchEvent(new Event("talos:workspace-change"));
+    void invoke("remember_workspace", { root: result.root })
+      .then(() => loadRecentWorkspaces())
+      .catch(() => undefined);
+    document.dispatchEvent(new CustomEvent("talos:workspace-opened", { detail: result.root }));
+    if (changedRoot) document.dispatchEvent(new Event("talos:workspace-change"));
     entryByPath = new Map(result.entries.map((entry) => [entry.path, entry]));
     updateQuickOpenIndex();
     dependencyResult = null;
@@ -1588,11 +1754,15 @@ async function scanProject(root: string) {
         )
       : [];
     selectedComponent = "";
-    if (changedRoot) {
+    if (changedRoot && mode !== "github") {
       mode = "structure";
-      setWindowValue("talos.arch-mode", mode);
       focusMode = false;
-      setWindowValue("talos.arch-focus", "false");
+      try {
+        setWindowValue("talos.arch-mode", mode);
+        setWindowValue("talos.arch-focus", "false");
+      } catch {
+        // Mode persistence is noncritical; scanning must still render.
+      }
     }
     const directories = new Set(
       result.entries.filter((entry) => entry.kind === "directory").map((entry) => entry.path),
@@ -1608,10 +1778,18 @@ async function scanProject(root: string) {
     selectedPath = result.root;
     $("arch-root").textContent = result.root;
     let watcherWarning = "";
-    if (watchedRoot !== result.root) {
+    const policyKey = JSON.stringify([currentExclusions(), showHidden]);
+    const newDirectories = [...directories].some((path) => !watchedDirectories.has(path));
+    if (forceWatch || watchedRoot !== result.root || newDirectories || watcherPolicyKey !== policyKey) {
       try {
-        await invoke("watch_project", { root: result.root });
+        await invoke("watch_project", {
+          root: result.root,
+          exclusions: currentExclusions(),
+          showHidden: showHidden,
+        });
         watchedRoot = result.root;
+        watchedDirectories = directories;
+        watcherPolicyKey = policyKey;
       } catch (error) {
         watcherWarning = `Could not watch workspace changes: ${String(error)}`;
       }
@@ -1687,7 +1865,7 @@ async function analyzeCurrentProject() {
   }
 }
 
-function setMode(next: "structure" | "dependencies" | "architecture" | InsightMode) {
+function setMode(next: ArchMode) {
   mode = next;
   setWindowValue("talos.arch-mode", next);
   focusMode = false;
@@ -1813,6 +1991,86 @@ async function exportPng() {
   window.setTimeout(() => URL.revokeObjectURL(link.href), 0);
 }
 
+function notifyWorkspaceFilesChanged(root: string, paths: string[]) {
+  document.dispatchEvent(new CustomEvent("talos:workspace-files-changed", {
+    detail: { root, paths },
+  }));
+  if (chronicleIndexTimer) window.clearTimeout(chronicleIndexTimer);
+  chronicleIndexTimer = window.setTimeout(() => {
+    chronicleIndexTimer = 0;
+    if (scan?.root !== root) return;
+    void invoke<ChronicleIndexJob>("chronicle_index_on_workspace_change", { root })
+      .then((job) => {
+        if (!job?.accepted || typeof job.jobId !== "number") return;
+        document.dispatchEvent(new CustomEvent("talos:chronicle-index-queued", { detail: job }));
+      })
+      .catch(() => undefined);
+  }, 700);
+}
+
+async function applyWorkspaceChanges(payload: WorkspaceChangeEvent) {
+  if (!scan || scan.root !== payload.root || payload.changes.length === 0) return;
+  const root = scan.root;
+  const generation = scanGeneration;
+  const paths = payload.changes.map((change) => change.path);
+  if (payload.changes.some((change) => entryByPath.get(change.path)?.kind === "directory")) {
+    notifyWorkspaceFilesChanged(root, paths);
+    void scanProject(root, true);
+    return;
+  }
+  const metadata = await Promise.all(payload.changes.map(async (change) => {
+    if (change.kind === "delete") return null;
+    try {
+      return await invoke<ProjectEntry | null>("workspace_entry_metadata", {
+        root,
+        path: change.path,
+        exclusions: currentExclusions(),
+        showHidden,
+      });
+    } catch {
+      // A transient inspection error is not evidence that the entry vanished.
+      return undefined;
+    }
+  }));
+  if (generation !== scanGeneration || !scan || scan.root !== root) return;
+
+  let entries = scan.entries.slice();
+  let fullScanNeeded = false;
+  let changed = false;
+  for (let index = 0; index < payload.changes.length; index++) {
+    const change = payload.changes[index];
+    const existingIndex = entries.findIndex((entry) => entry.path === change.path);
+    const existing = existingIndex >= 0 ? entries[existingIndex] : undefined;
+    const fresh = metadata[index];
+    if (fresh === undefined) continue;
+    if (fresh?.kind === "directory" || existing?.kind === "directory") {
+      fullScanNeeded = true;
+      break;
+    }
+    if (fresh) {
+      if (existingIndex >= 0) entries[existingIndex] = fresh;
+      else entries.push(fresh);
+      changed = true;
+    } else if (existingIndex >= 0) {
+      entries.splice(existingIndex, 1);
+      changed = true;
+    }
+  }
+  if (fullScanNeeded) {
+    notifyWorkspaceFilesChanged(root, paths);
+    void scanProject(root, true);
+    return;
+  }
+  if (!changed) return;
+  scan = { ...scan, entries };
+  entryByPath = new Map(entries.map((entry) => [entry.path, entry]));
+  cachedTreeRows = null;
+  updateQuickOpenIndex();
+  render();
+  if (($("quick-open-dialog") as HTMLDialogElement).open) renderQuickOpen();
+  notifyWorkspaceFilesChanged(root, paths);
+}
+
 export function initArchitectureExplorer(
   openFile: (path: string) => Promise<void>,
   onPathChange?: (oldPath: string, newPath: string | null) => void,
@@ -1821,6 +2079,7 @@ export function initArchitectureExplorer(
   onOpenFile = openFile;
   onWorkspacePathChange = onPathChange;
   getFileDecoration = decorationForPath;
+  initGitHubPanel();
   const showArchitecture = () => {
     showArchitectureWindow();
     if (!scan) void chooseProject();
@@ -1836,11 +2095,28 @@ export function initArchitectureExplorer(
   };
   $("arch-close").addEventListener("click", closeExplorer);
   $("arch-open-project").addEventListener("click", () => void chooseProject());
+  const recent = document.getElementById("arch-recent") as HTMLSelectElement | null;
+  if (recent) {
+    recent.addEventListener("change", () => {
+      const path = recent.value;
+      recent.value = "";
+      if (path) openWorkspace(path);
+    });
+    void loadRecentWorkspaces();
+  }
   $("arch-refresh").addEventListener("click", () => {
     if (scan) void scanProject(scan.root);
     else void chooseProject();
   });
-  $("arch-search").addEventListener("input", render);
+  $("arch-find-text").addEventListener("click", () => void findInWorkspace());
+  $("arch-search").addEventListener("input", () => {
+    if (archSearchTimer) window.clearTimeout(archSearchTimer);
+    archSearchTimer = window.setTimeout(() => {
+      archSearchTimer = 0;
+      cachedTreeRows = null;
+      render();
+    }, 120);
+  });
   const budgetFields: [string, keyof Budgets, number, string][] = [
     ["insight-budget-wall", "wall_ms", 1, "talos.insight-budget-wall"],
     ["insight-budget-cpu", "cpu_ms", 1, "talos.insight-budget-cpu"],
@@ -1888,7 +2164,11 @@ export function initArchitectureExplorer(
   });
   $("quick-open-input").addEventListener("input", () => {
     quickOpenIndex = 0;
-    renderQuickOpen();
+    if (quickOpenTimer) window.clearTimeout(quickOpenTimer);
+    quickOpenTimer = window.setTimeout(() => {
+      quickOpenTimer = 0;
+      renderQuickOpen();
+    }, 80);
   });
   $("quick-open-input").addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -1928,6 +2208,7 @@ export function initArchitectureExplorer(
         (selected === "structure" ||
           selected === "dependencies" ||
           selected === "architecture" ||
+          selected === "github" ||
           isInsightMode(selected))
       ) {
         setMode(selected);
@@ -2014,13 +2295,13 @@ export function initArchitectureExplorer(
   document.addEventListener("keyup", (event) => {
     if (event.code === "Space") spaceHeld = false;
   });
-  void listen<string>("architecture://changed", (event) => {
-    if (!scan || event.payload !== scan.root) return;
+  void listen<WorkspaceChangeEvent>("architecture://changed", (event) => {
+    if (!scan || event.payload.root !== scan.root) return;
     if (refreshTimer) window.clearTimeout(refreshTimer);
     refreshTimer = window.setTimeout(() => {
       refreshTimer = 0;
-      void scanProject(event.payload);
-    }, 500);
+      void applyWorkspaceChanges(event.payload);
+    }, 180);
   }).catch((error: unknown) => setMessage(`Could not subscribe to project changes: ${String(error)}`, true));
   void listen<string>("architecture://watch-error", (event) => {
     setMessage(`Project watcher error: ${event.payload}`, true);

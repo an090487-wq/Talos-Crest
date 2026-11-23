@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { chooseWorkspace } from "./architecture";
 import { getWindowValue, setWindowValue } from "./window-state";
+import { resolveWorkspacePath, sameWorkspaceRoot } from "./workspace-paths";
 
 interface ChronicleSettings {
   enabled: boolean;
@@ -23,12 +24,29 @@ interface ChronicleStatus {
 
 interface ChronicleProgress {
   projectId: string;
+  jobId?: number | null;
   phase: string;
   scanned: number;
   indexed: number;
   unchanged: number;
   skipped: number;
   message: string | null;
+}
+
+interface ChronicleIndexJob {
+  projectId?: string;
+  jobId: number;
+  accepted?: boolean;
+}
+
+interface ChronicleErrorEvent {
+  projectId?: string;
+  jobId?: number | null;
+  message: string;
+}
+
+interface ChronicleEvidence {
+  sourcePath?: string | null;
 }
 
 interface ChronicleEvent {
@@ -47,6 +65,7 @@ interface ChronicleDecision {
   decision: string;
   status: string;
   createdAt: number;
+  evidence?: ChronicleEvidence | null;
 }
 
 interface ChronicleSearchResult {
@@ -60,16 +79,30 @@ interface ChronicleSearchResult {
 
 type ChronicleView = "timeline" | "decisions" | "search";
 
+const REFRESH_COALESCE_MS = 150;
+const PROGRESS_THROTTLE_MS = 120;
+const SEARCH_DEBOUNCE_MS = 180;
+const TERMINAL_PHASES = new Set(["done", "error", "cancelled"]);
+
 const el = (id: string) => document.getElementById(id)!;
 const dialog = () => el("chronicle-dialog") as HTMLDialogElement;
 
 let currentRoot = "";
 let currentProjectId = "";
+let activeJobId: number | null = null;
+let lastTerminalJobId: number | null = null;
 const storedView = getWindowValue("talos.chronicle-view");
 let activeView: ChronicleView =
   storedView === "timeline" || storedView === "decisions" || storedView === "search" ? storedView : "timeline";
 let listenersReady: Promise<void> | null = null;
+const listenerRegistrations = new Map<string, Promise<UnlistenFn>>();
 let indexing = false;
+let refreshTimer = 0;
+let statusGeneration = 0;
+let loadGeneration = 0;
+let lastProgressUpdate = 0;
+let searchTimer = 0;
+let searchPending = false;
 
 function setStatus(message: string) {
   el("chronicle-status").textContent = message;
@@ -82,6 +115,40 @@ function formatTime(value: number): string {
 
 function formatCount(value: number): string {
   return value.toLocaleString();
+}
+
+// Chronicle evidence paths are relative to the project root. Resolve them without
+// ever following a path that escapes the current workspace.
+function resolveSourcePath(sourcePath: string | null | undefined): string | null {
+  return resolveWorkspacePath(currentRoot, sourcePath);
+}
+
+function isCurrentEvent(projectId: string | null | undefined, jobId: number | null | undefined): boolean {
+  if (projectId && currentProjectId && projectId !== currentProjectId) return false;
+  if (typeof jobId !== "number") return true;
+  if (activeJobId !== null) return jobId === activeJobId;
+  return jobId !== lastTerminalJobId;
+}
+
+function clearSearchTimer() {
+  if (searchTimer) {
+    window.clearTimeout(searchTimer);
+    searchTimer = 0;
+  }
+}
+
+function scheduleRefresh() {
+  if (refreshTimer) window.clearTimeout(refreshTimer);
+  refreshTimer = window.setTimeout(() => {
+    refreshTimer = 0;
+    void refresh();
+  }, REFRESH_COALESCE_MS);
+}
+
+function refreshNow(): Promise<void> {
+  if (refreshTimer) window.clearTimeout(refreshTimer);
+  refreshTimer = 0;
+  return refresh();
 }
 
 function emptyState(title: string, detail: string) {
@@ -109,14 +176,18 @@ function resultRow(title: string, meta: string, detail: string, path: string | n
   content.className = "tc-chronicle-row-detail";
   content.textContent = detail;
   row.append(heading, metadata, content);
-  if (path) {
-    row.title = path;
+  const resolved = resolveSourcePath(path);
+  if (resolved) {
+    row.title = resolved;
     row.addEventListener("click", () => {
+      const target = resolveSourcePath(path);
+      if (!target) return;
       dialog().close();
-      document.dispatchEvent(new CustomEvent("talos:open-path", { detail: path }));
+      document.dispatchEvent(new CustomEvent("talos:open-path", { detail: target }));
     });
   } else {
     row.disabled = true;
+    if (path) row.title = "Evidence path is outside the current workspace";
   }
   return row;
 }
@@ -132,7 +203,10 @@ function renderRows(rows: HTMLElement[], emptyTitle: string, emptyDetail: string
 }
 
 async function loadTimeline() {
-  const events = await invoke<ChronicleEvent[]>("chronicle_timeline", { root: currentRoot, limit: 100 });
+  const generation = ++loadGeneration;
+  const root = currentRoot;
+  const events = await invoke<ChronicleEvent[]>("chronicle_timeline", { root, limit: 100 });
+  if (generation !== loadGeneration || root !== currentRoot || activeView !== "timeline") return;
   renderRows(
     events.map((event) => resultRow(
       event.summary,
@@ -147,13 +221,16 @@ async function loadTimeline() {
 }
 
 async function loadDecisions() {
-  const decisions = await invoke<ChronicleDecision[]>("chronicle_decisions", { root: currentRoot, limit: 100 });
+  const generation = ++loadGeneration;
+  const root = currentRoot;
+  const decisions = await invoke<ChronicleDecision[]>("chronicle_decisions", { root, limit: 100 });
+  if (generation !== loadGeneration || root !== currentRoot || activeView !== "decisions") return;
   renderRows(
     decisions.map((decision) => resultRow(
       decision.title,
       `${decision.status} · ${formatTime(decision.createdAt)}`,
       decision.decision,
-      null,
+      decision.evidence?.sourcePath ?? null,
     )),
     "No decisions recorded",
     "Recorded decisions will appear here with their context and status.",
@@ -162,17 +239,22 @@ async function loadDecisions() {
 }
 
 async function loadSearch() {
+  const generation = ++loadGeneration;
+  const root = currentRoot;
   const query = (el("chronicle-search") as HTMLInputElement).value.trim();
+  searchPending = false;
+  clearSearchTimer();
   if (!query) {
     renderRows([], "Search Chronicle", "Enter a term to search indexed evidence, events, and decisions.");
     setStatus("Ready to search the current workspace.");
     return;
   }
   const results = await invoke<ChronicleSearchResult[]>("chronicle_search", {
-    root: currentRoot,
+    root,
     query,
     limit: 100,
   });
+  if (generation !== loadGeneration || root !== currentRoot || activeView !== "search") return;
   renderRows(
     results.map((result) => resultRow(
       result.title,
@@ -188,11 +270,14 @@ async function loadSearch() {
 
 async function loadView() {
   if (!currentRoot) return;
+  const root = currentRoot;
+  const view = activeView;
   try {
-    if (activeView === "timeline") await loadTimeline();
-    else if (activeView === "decisions") await loadDecisions();
+    if (view === "timeline") await loadTimeline();
+    else if (view === "decisions") await loadDecisions();
     else await loadSearch();
   } catch (error) {
+    if (root !== currentRoot || view !== activeView) return;
     renderRows([], "Chronicle could not load", String(error));
     setStatus(`Chronicle error: ${String(error)}`);
   }
@@ -204,11 +289,14 @@ function setView(view: ChronicleView) {
   for (const button of document.querySelectorAll<HTMLElement>("#chronicle-dialog [data-chronicle-view]")) {
     button.classList.toggle("active", button.dataset.chronicleView === view);
   }
+  clearSearchTimer();
   void loadView();
 }
 
-async function loadStatus() {
-  const status = await invoke<ChronicleStatus>("chronicle_status", { root: currentRoot });
+async function loadStatus(generation = ++statusGeneration) {
+  const root = currentRoot;
+  const status = await invoke<ChronicleStatus>("chronicle_status", { root });
+  if (generation !== statusGeneration || root !== currentRoot) return;
   currentProjectId = status.projectId;
   el("chronicle-root").textContent = status.projectRoot;
   el("chronicle-files").textContent = formatCount(status.indexedFiles);
@@ -225,35 +313,70 @@ async function loadStatus() {
 
 async function refresh() {
   if (!currentRoot) return;
+  const generation = ++statusGeneration;
   try {
-    await loadStatus();
+    await loadStatus(generation);
   } catch (error) {
+    if (generation !== statusGeneration) return;
     setStatus(`Chronicle is unavailable for this workspace: ${String(error)}`);
   }
 }
 
+async function registerListener(name: string, register: () => Promise<UnlistenFn>): Promise<UnlistenFn> {
+  const existing = listenerRegistrations.get(name);
+  if (existing) return existing;
+  const pending = register().catch((error) => {
+    listenerRegistrations.delete(name);
+    throw error;
+  });
+  listenerRegistrations.set(name, pending);
+  return pending;
+}
+
 async function ensureListeners() {
-  if (listenersReady) return listenersReady;
-  listenersReady = (async () => {
-    await listen<ChronicleProgress>("chronicle://progress", ({ payload }) => {
-      if (currentProjectId && payload.projectId !== currentProjectId) return;
-      const detail = payload.message
-        ? ` — ${payload.message}`
-        : ` — ${payload.indexed} indexed, ${payload.unchanged} unchanged, ${payload.skipped} skipped`;
-      setStatus(`${payload.phase}${detail}`);
-      if (payload.phase === "done" || payload.phase === "error" || payload.phase === "cancelled") {
-        indexing = false;
-        el("chronicle-index").removeAttribute("disabled");
-        void refresh();
-      }
+  if (!listenersReady) {
+    listenersReady = (async () => {
+      await Promise.all([
+        registerListener("progress", () => listen<ChronicleProgress>("chronicle://progress", ({ payload }) => {
+          if (!isCurrentEvent(payload.projectId, payload.jobId)) return;
+          const terminal = TERMINAL_PHASES.has(payload.phase);
+          const now = Date.now();
+          if (!terminal && now - lastProgressUpdate < PROGRESS_THROTTLE_MS) return;
+          lastProgressUpdate = now;
+          const detail = payload.message
+            ? ` — ${payload.message}`
+            : ` — ${payload.indexed} indexed, ${payload.unchanged} unchanged, ${payload.skipped} skipped`;
+          setStatus(`${payload.phase}${detail}`);
+          if (terminal) {
+            indexing = false;
+            if (typeof payload.jobId === "number") {
+              lastTerminalJobId = payload.jobId;
+              if (payload.jobId === activeJobId) activeJobId = null;
+            }
+            el("chronicle-index").removeAttribute("disabled");
+            scheduleRefresh();
+          }
+        })),
+        registerListener("updated", () => listen<{ projectId?: string }>("chronicle://updated", ({ payload }) => {
+          if (!isCurrentEvent(payload.projectId, undefined)) return;
+          scheduleRefresh();
+        })),
+        registerListener("error", () => listen<ChronicleErrorEvent>("chronicle://error", ({ payload }) => {
+          if (!isCurrentEvent(payload.projectId, payload.jobId)) return;
+          indexing = false;
+          if (typeof payload.jobId === "number") {
+            lastTerminalJobId = payload.jobId;
+            if (payload.jobId === activeJobId) activeJobId = null;
+          }
+          el("chronicle-index").removeAttribute("disabled");
+          setStatus(`Indexing failed: ${payload.message}`);
+        })),
+      ]);
+    })().catch((error) => {
+      listenersReady = null;
+      throw error;
     });
-    await listen("chronicle://updated", () => void refresh());
-    await listen<{ message: string }>("chronicle://error", ({ payload }) => {
-      indexing = false;
-      el("chronicle-index").removeAttribute("disabled");
-      setStatus(`Indexing failed: ${payload.message}`);
-    });
-  })();
+  }
   return listenersReady;
 }
 
@@ -263,23 +386,29 @@ function wire() {
     button.addEventListener("click", () => setView(button.dataset.chronicleView as ChronicleView));
     button.classList.toggle("active", button.dataset.chronicleView === activeView);
   }
-  let searchTimer = 0;
   el("chronicle-search").addEventListener("input", () => {
-    window.clearTimeout(searchTimer);
+    searchPending = true;
+    clearSearchTimer();
+    if (activeView !== "search") return;
     searchTimer = window.setTimeout(() => {
-      if (activeView === "search") void loadView();
-    }, 180);
+      searchTimer = 0;
+      if (activeView !== "search" || !searchPending) return;
+      void loadView();
+    }, SEARCH_DEBOUNCE_MS);
   });
-  el("chronicle-refresh").addEventListener("click", () => void refresh());
+  el("chronicle-refresh").addEventListener("click", () => void refreshNow());
   el("chronicle-index").addEventListener("click", () => void (async () => {
     if (indexing || !currentRoot) return;
     indexing = true;
     el("chronicle-index").setAttribute("disabled", "true");
     try {
-      await invoke("chronicle_index_start", { root: currentRoot });
+      const job = await invoke<ChronicleIndexJob>("chronicle_index_start", { root: currentRoot });
+      if (job && typeof job.jobId === "number") activeJobId = job.jobId;
+      if (job?.projectId) currentProjectId = job.projectId;
       setStatus("Indexing queued…");
     } catch (error) {
       indexing = false;
+      activeJobId = null;
       el("chronicle-index").removeAttribute("disabled");
       setStatus(`Could not start indexing: ${String(error)}`);
     }
@@ -311,16 +440,33 @@ function wire() {
   });
   document.addEventListener("talos:workspace-change", () => {
     const root = getWindowValue("talos.workspace-root");
-    if (root && root !== currentRoot && dialog().open) {
+    if (root && (!currentRoot || !sameWorkspaceRoot(root, currentRoot)) && dialog().open) {
       currentRoot = root;
-      void refresh();
+      void refreshNow();
     }
+  });
+  document.addEventListener("talos:workspace-files-changed", (event) => {
+    const detail = (event as CustomEvent<{ root?: string; paths?: string[] }>).detail;
+    if (!detail || typeof detail.root !== "string" || !sameWorkspaceRoot(detail.root, currentRoot)) return;
+    scheduleRefresh();
+  });
+  document.addEventListener("talos:chronicle-index-queued", (event) => {
+    const job = (event as CustomEvent<ChronicleIndexJob>).detail;
+    if (!job?.accepted || typeof job.jobId !== "number") return;
+    if (job.projectId && currentProjectId && job.projectId !== currentProjectId) return;
+    activeJobId = job.jobId;
+    if (job.projectId) currentProjectId = job.projectId;
+    indexing = true;
+    el("chronicle-index").setAttribute("disabled", "true");
+    setStatus("Indexing queued after workspace changes…");
   });
 }
 
 export async function openChronicle() {
   wireOnce();
-  void ensureListeners();
+  void ensureListeners().catch(() => {
+    setStatus("Chronicle events are unavailable; reopen Chronicle to retry.");
+  });
   if (!dialog().open) dialog().showModal();
   const root = getWindowValue("talos.workspace-root");
   if (!root) {
@@ -332,7 +478,7 @@ export async function openChronicle() {
   if (!selectedRoot) return;
   currentRoot = selectedRoot;
   setStatus("Loading Chronicle…");
-  await refresh();
+  await refreshNow();
 }
 
 let wired = false;

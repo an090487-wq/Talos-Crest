@@ -271,12 +271,41 @@
       .insight-badge.over, .insight-badge.high, .insight-badge.critical { color: var(--danger); border-color: var(--danger); }
       .insight-badge.info { color: var(--info); border-color: var(--info); }
       #insight-note { color: var(--muted); font-size: 10px; line-height: 1.5; }
+      #github-panel { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 8px; padding: 12px; overflow: auto; }
+      #github-toolbar, #github-toolbar-secondary { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+      #github-toolbar-secondary { padding-top: 4px; border-top: 1px solid var(--line); }
+      #github-toolbar input, #github-toolbar-secondary input, #github-toolbar-secondary select,
+      #github-compose input, #github-compose textarea { padding: 5px 7px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; font: 11px var(--mono-font); }
+      #github-token { width: 260px; }
+      #github-toolbar-secondary input { width: 150px; }
+      #github-toolbar-secondary button.active { color: var(--accent); border-color: var(--accent); }
+      #github-token-status, #github-status { color: var(--muted); font-size: 11px; }
+      #github-status.error { color: var(--danger); }
+      #github-workspace { display: flex; flex: 1; min-height: 180px; gap: 10px; }
+      #github-list { width: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+      .github-section-title { padding: 7px 9px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+      .github-row { display: flex; width: 100%; flex-direction: column; align-items: flex-start; gap: 2px; padding: 7px 9px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; text-align: left; background: transparent; }
+      .github-row strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; }
+      .github-row span { color: var(--muted); font-size: 10px; }
+      .github-row.active { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+      #github-detail { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 8px; overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
+      #github-detail-head h3 { margin: 0 0 3px; font-size: 13px; }
+      #github-detail-head a { color: var(--accent); font-size: 11px; }
+      .github-meta { color: var(--muted); font-size: 10px; }
+      #github-detail-body { white-space: pre-wrap; font-size: 11px; line-height: 1.5; }
+      .github-comment { padding: 7px 9px; border-left: 2px solid var(--line); background: var(--surface-raised); font-size: 11px; }
+      .github-comment div { white-space: pre-wrap; margin-top: 3px; }
+      #github-compose { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+      #github-compose textarea { min-height: 64px; resize: vertical; }
+      #github-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+      .github-privacy { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
       #arch-window[data-insight="true"] #arch-focus,
       #arch-window[data-insight="true"] #arch-zoom-out,
       #arch-window[data-insight="true"] #arch-zoom-in,
       #arch-window[data-insight="true"] #arch-fit,
       #arch-window[data-insight="true"] #arch-export,
       #arch-window[data-insight="true"] #arch-export-png { display: none; }
+      #arch-window[data-insight="true"] #arch-privacy { display: none; }
       #arch-graph-pane { display: flex; flex: 1; min-width: 0; flex-direction: column; }
       #arch-graph-viewport { position: relative; flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--line) 75%, transparent) 1px, transparent 0) 0 0 / 22px 22px; }
       #arch-graph-viewport { cursor: grab; }
@@ -341,6 +370,8 @@
       .workspace-result.active, .workspace-result:hover { background: var(--surface-raised); border-color: var(--line); }
       .workspace-result-name { flex: 0 0 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .workspace-result-path { flex: 1; overflow: hidden; color: var(--muted); font: 11px var(--mono-font); text-overflow: ellipsis; white-space: nowrap; }
+      .workspace-search-result { display: block; width: 100%; overflow: hidden; border-color: transparent; background: transparent; color: var(--text); font: 11px var(--mono-font); text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+      .workspace-search-result:hover { background: var(--surface-raised); border-color: var(--line); }
       .cm-search .talos-search-count { flex-basis: 100%; color: var(--muted); font: 11px var(--ui-font); }
       .shortcuts-list { max-height: min(560px, 65vh); overflow: auto; padding: 2px 10px 12px; }
       .shortcuts-group { margin-top: 12px; }
@@ -777,9 +808,14 @@
             <button class="arch-mode" data-arch-mode="performance" role="tab">Performance Budget</button>
             <button class="arch-mode" data-arch-mode="sandbox" role="tab">Dependency Sandbox</button>
             <button class="arch-mode" data-arch-mode="debt" role="tab">Technical Debt</button>
+            <button class="arch-mode" data-arch-mode="github" role="tab">GitHub</button>
           </div>
           <button id="arch-open-project" class="accent">Open Project</button>
+          <select id="arch-recent" aria-label="Recent projects" title="Reopen a recent project">
+            <option value="">Recent projects</option>
+          </select>
           <button id="arch-refresh" title="Rescan the current project">Refresh</button>
+          <button id="arch-find-text" title="Search text across all workspace files">Find in Files</button>
           <input id="arch-search" type="search" placeholder="Search files and folders…" aria-label="Search project graph" />
           <input id="arch-excludes" type="text" aria-label="Excluded directory names" title="Comma-separated directory names to exclude" />
           <label class="arch-hidden-toggle"><input id="arch-show-hidden" type="checkbox" /> Show hidden files</label>
@@ -822,6 +858,47 @@
             </table>
           </div>
           <div id="insight-note"></div>
+        </div>
+        <div id="github-panel" class="hidden">
+          <div id="github-toolbar">
+            <input id="github-token" type="password" placeholder="Personal access token" aria-label="GitHub personal access token" autocomplete="off" spellcheck="false" />
+            <button id="github-token-save" class="accent">Save token</button>
+            <button id="github-token-clear">Clear token</button>
+            <span id="github-token-status">Not connected</span>
+          </div>
+          <div id="github-toolbar-secondary">
+            <input id="github-owner" type="text" placeholder="owner" aria-label="GitHub repository owner" autocomplete="off" spellcheck="false" />
+            <input id="github-repo" type="text" placeholder="repository" aria-label="GitHub repository name" autocomplete="off" spellcheck="false" />
+            <button id="github-load">Load</button>
+            <button id="github-my-repos">My repositories</button>
+            <button id="github-kind-issues" class="active">Issues</button>
+            <button id="github-kind-pulls">Pull requests</button>
+            <select id="github-state" aria-label="Issue state">
+              <option value="open">Open</option>
+              <option value="closed">Closed</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+          <div id="github-status" role="status">GitHub is optional. Talos stays fully offline unless you use this tab.</div>
+          <div id="github-workspace">
+            <div id="github-list" role="list" aria-label="GitHub items"></div>
+            <div id="github-detail">
+              <div id="github-detail-head"></div>
+              <div id="github-detail-body"></div>
+              <div id="github-comments"></div>
+              <div id="github-compose">
+                <input id="github-title" type="text" placeholder="New issue title" aria-label="New issue title" />
+                <textarea id="github-body" placeholder="Description or comment" aria-label="Description or comment"></textarea>
+                <div id="github-actions">
+                  <button id="github-create">Create issue</button>
+                  <button id="github-comment">Add comment</button>
+                  <button id="github-toggle">Close</button>
+                  <button id="github-merge" class="hidden">Merge</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="github-privacy">The token is encrypted with a key stored on this device. Talos contacts GitHub only when you press a button in this tab; no source code is uploaded.</p>
         </div>
       </div>
     </div>

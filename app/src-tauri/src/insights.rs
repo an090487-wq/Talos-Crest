@@ -18,12 +18,25 @@ const MANIFEST_NAMES: &[&str] = &[
     "package-lock.json",
     "yarn.lock",
     "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
     "requirements.txt",
     "pyproject.toml",
-    "Cargo.toml",
-    "Cargo.lock",
+    "cargo.toml",
+    "cargo.lock",
     "go.mod",
     "go.sum",
+    "go.work",
+    "gemfile",
+    "gemfile.lock",
+    "composer.json",
+    "composer.lock",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "mix.exs",
+    "mix.lock",
+    "pubspec.yaml",
+    "pubspec.lock",
 ];
 
 #[derive(Serialize, Clone)]
@@ -273,7 +286,10 @@ pub fn measure_components(root: &str, paths: &[String]) -> Result<ComponentMeasu
         .canonicalize()
         .map_err(|error| format!("could not open project directory '{root}': {error}"))?;
     if !root.is_dir() {
-        return Err(format!("project root is not a directory: {}", root.display()));
+        return Err(format!(
+            "project root is not a directory: {}",
+            root.display()
+        ));
     }
 
     let mut warnings = Vec::new();
@@ -387,7 +403,10 @@ pub fn load_manifests(root: &str, paths: &[String]) -> Result<ManifestSet, Strin
         .canonicalize()
         .map_err(|error| format!("could not open project directory '{root}': {error}"))?;
     if !root.is_dir() {
-        return Err(format!("project root is not a directory: {}", root.display()));
+        return Err(format!(
+            "project root is not a directory: {}",
+            root.display()
+        ));
     }
 
     let mut warnings = Vec::new();
@@ -432,7 +451,10 @@ pub fn load_manifests(root: &str, paths: &[String]) -> Result<ManifestSet, Strin
         });
     }
 
-    Ok(ManifestSet { manifests, warnings })
+    Ok(ManifestSet {
+        manifests,
+        warnings,
+    })
 }
 
 #[cfg(test)]
@@ -446,7 +468,10 @@ mod tests {
             component_name(root, Path::new("/project/src/main.ts")),
             "src"
         );
-        assert_eq!(component_name(root, Path::new("/project/README.md")), "(root)");
+        assert_eq!(
+            component_name(root, Path::new("/project/README.md")),
+            "(root)"
+        );
     }
 
     #[test]
@@ -454,6 +479,17 @@ mod tests {
         let mut names = MANIFEST_NAMES.to_vec();
         names.retain(|name| !name.eq_ignore_ascii_case("package.json"));
         assert!(!names.contains(&"notes.txt"));
+    }
+
+    #[test]
+    fn manifest_names_are_lowercase_and_include_rust_projects() {
+        assert!(MANIFEST_NAMES
+            .iter()
+            .all(|name| *name == name.to_ascii_lowercase()));
+        assert!(MANIFEST_NAMES.contains(&"cargo.toml"));
+        assert!(MANIFEST_NAMES.contains(&"cargo.lock"));
+        assert!(MANIFEST_NAMES.contains(&"go.work"));
+        assert!(MANIFEST_NAMES.contains(&"gemfile"));
     }
 
     #[test]

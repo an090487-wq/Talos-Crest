@@ -911,6 +911,9 @@ impl ChronicleStore {
         .flatten()
         .collect::<Vec<_>>()
         .join("\n");
+        // Redact the indexed copy too; evidence excerpts have always been
+        // redacted, and FTS snippets must not leak the same sensitive lines.
+        let (body, _) = redact_excerpt(&body, 20_000);
         tx.execute(
             "INSERT INTO search_docs(
                  project_id, kind, entity_id, source_path, title, body, evidence_id, created_at
@@ -941,6 +944,10 @@ impl ChronicleStore {
     ) -> Result<ChronicleObservation, String> {
         input.validate()?;
         let max_evidence_chars = self.settings()?.max_evidence_chars as usize;
+        // Redact the stored value, not only the evidence excerpt. The same
+        // redacted text feeds the timeline summary and the FTS body so a
+        // sensitive line cannot resurface through search snippets.
+        let (value, _value_redacted) = redact_excerpt(&input.value, 20_000);
         let time = now_ms();
         let tx = self
             .conn
@@ -966,7 +973,7 @@ impl ChronicleStore {
                 self.project_id,
                 bounded(&input.kind, 100),
                 bounded(&input.predicate, 200),
-                bounded(&input.value, 20_000),
+                bounded(&value, 20_000),
                 input.confidence,
                 input.status,
                 bounded(&input.source_kind, 100),
@@ -991,7 +998,7 @@ impl ChronicleStore {
                 format!(
                     "Recorded {}: {}",
                     bounded(&input.predicate, 100),
-                    bounded(&input.value, 160)
+                    bounded(&value, 160)
                 ),
                 format!("{{\"observationId\":{observation_id}}}"),
                 bounded(&input.source_kind, 100),
@@ -1017,7 +1024,7 @@ impl ChronicleStore {
                     .as_deref()
                     .map(|value| bounded(value, 1_024)),
                 bounded(&input.predicate, 500),
-                bounded(&input.value, 20_000),
+                bounded(&value, 20_000),
                 evidence_id,
                 time
             ],
@@ -1062,13 +1069,44 @@ impl ChronicleStore {
             return Err(format!("decision {id} does not exist in this project"));
         }
 
-        let title: String = tx
+        let (title, context, decision, consequences, current_status, evidence_id): (
+            String,
+            Option<String>,
+            String,
+            Option<String>,
+            String,
+            Option<i64>,
+        ) = tx
             .query_row(
-                "SELECT title FROM decisions WHERE project_id = ?1 AND id = ?2",
+                "SELECT title, context, decision, consequences, status, evidence_id
+                 FROM decisions WHERE project_id = ?1 AND id = ?2",
                 params![self.project_id, id],
-                |row| row.get(0),
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                    ))
+                },
             )
             .map_err(|e| format!("could not read updated Chronicle decision: {e}"))?;
+        let body = [
+            context.as_deref(),
+            Some(decision.as_str()),
+            consequences.as_deref(),
+            Some(current_status.as_str()),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join("\n");
+        // Rebuild the body in Rust so the same redaction used on insert is
+        // applied after a status change; a raw SQL rebuild could re-expose a
+        // sensitive line in the FTS index.
+        let (body, _) = redact_excerpt(&body, 20_000);
         tx.execute(
             "DELETE FROM search_docs WHERE project_id = ?1 AND entity_id = ?2",
             params![self.project_id, format!("decision:{id}")],
@@ -1077,12 +1115,15 @@ impl ChronicleStore {
         tx.execute(
             "INSERT INTO search_docs(
                  project_id, kind, entity_id, source_path, title, body, evidence_id, created_at
-             ) SELECT project_id, 'decision', ?2, NULL, title,
-                      COALESCE(context, '') || '\n' || decision || '\n' || COALESCE(consequences, '') || '\n' || status,
-                      evidence_id, ?3
-               FROM decisions
-               WHERE project_id = ?1 AND id = ?4",
-            params![self.project_id, format!("decision:{id}"), time, id],
+             ) VALUES(?1, 'decision', ?2, NULL, ?3, ?4, ?5, ?6)",
+            params![
+                self.project_id,
+                format!("decision:{id}"),
+                bounded(&title, 500),
+                bounded(&body, 20_000),
+                evidence_id,
+                time
+            ],
         )
         .map_err(|e| format!("could not reindex updated decision: {e}"))?;
         tx.execute(
@@ -1140,45 +1181,69 @@ impl ChronicleStore {
     }
 }
 
-#[tauri::command]
-pub(crate) fn chronicle_status(root: String) -> Result<ChronicleStatus, String> {
-    let store = ChronicleStore::open_for_root(Path::new(&root))?;
-    store.status()
+/// All Chronicle commands run their SQLite/filesystem work on the shared
+/// blocking pool so a command invocation never performs open/migrate/query work
+/// on the async command thread.
+fn blocking_task_error(context: &str, error: impl std::fmt::Display) -> String {
+    format!("Chronicle {context} task failed: {error}")
 }
 
-#[tauri::command]
-pub(crate) fn chronicle_settings(root: String) -> Result<ChronicleSettings, String> {
-    let store = ChronicleStore::open_for_root(Path::new(&root))?;
-    store.settings()
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IndexTrigger {
+    /// The user pressed "Index" in the Chronicle dialog.
+    Manual,
+    /// The workspace-change watcher dispatched an incremental index.
+    WorkspaceChange,
 }
 
-#[tauri::command]
-pub(crate) fn chronicle_set_settings(
-    root: String,
-    settings: ChronicleSettings,
-) -> Result<ChronicleSettings, String> {
-    let store = ChronicleStore::open_for_root(Path::new(&root))?;
-    store.set_settings(settings)
+/// Decide whether an index request may proceed.
+///
+/// `settings.enabled` is the master gate for all indexing. A manual request
+/// reports a clear error so the user understands why nothing happened; the
+/// automatic workspace-change path is a silent no-op, because surfacing an
+/// error on every file save would be noisy and could land on a typing path.
+/// Automatic indexing additionally requires `index_on_workspace_change`.
+fn index_allowed(settings: &ChronicleSettings, trigger: IndexTrigger) -> Result<bool, String> {
+    if !settings.enabled {
+        return match trigger {
+            IndexTrigger::Manual => {
+                Err("Chronicle is disabled; enable it in Settings before indexing".to_string())
+            }
+            IndexTrigger::WorkspaceChange => Ok(false),
+        };
+    }
+    Ok(trigger == IndexTrigger::Manual || settings.index_on_workspace_change)
 }
 
-#[tauri::command]
-pub(crate) fn chronicle_index_start(
-    root: String,
-    app: AppHandle,
+/// Blocking half of both index-entry commands. The full file walk is already
+/// dispatched to `spawn_blocking` by `run_index_job`; this keeps the small DB
+/// read (settings) and root resolution off the command thread as well.
+fn queue_index_job(
+    root: &Path,
+    app: &AppHandle,
+    trigger: IndexTrigger,
 ) -> Result<ChronicleIndexJob, String> {
-    let root_path = PathBuf::from(&root);
-    let (project_id, _, _) = project_identity(&root_path)?;
+    let (project_id, _, _) = project_identity(root)?;
+    let settings = ChronicleStore::open_for_root(root)?.settings()?;
+
+    if !index_allowed(&settings, trigger)? {
+        return Ok(ChronicleIndexJob {
+            project_id,
+            job_id: 0,
+            accepted: false,
+        });
+    }
+
     let job_id = NEXT_INDEX_JOB.fetch_add(1, Ordering::Relaxed);
     let generation = begin_index_job(&project_id);
-
-    let accepted = ChronicleIndexJob {
+    let job = ChronicleIndexJob {
         project_id: project_id.clone(),
         job_id,
         accepted: true,
     };
 
     let app_for_job = app.clone();
-    let root_for_job = root_path.clone();
+    let root_for_job = root.to_path_buf();
     let project_for_job = project_id.clone();
     tauri::async_runtime::spawn_blocking(move || {
         run_index_job(
@@ -1191,7 +1256,7 @@ pub(crate) fn chronicle_index_start(
     });
 
     emit_progress(
-        &app,
+        app,
         &ChronicleProgress {
             project_id,
             job_id,
@@ -1205,70 +1270,159 @@ pub(crate) fn chronicle_index_start(
         },
     );
 
-    Ok(accepted)
+    Ok(job)
 }
 
 #[tauri::command]
-pub(crate) fn chronicle_index_cancel(root: String) -> Result<bool, String> {
-    let (project_id, _, _) = project_identity(Path::new(&root))?;
-    Ok(cancel_index_job(&project_id))
+pub(crate) async fn chronicle_status(root: String) -> Result<ChronicleStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let store = ChronicleStore::open_for_root(Path::new(&root))?;
+        store.status()
+    })
+    .await
+    .map_err(|error| blocking_task_error("status", error))?
 }
 
 #[tauri::command]
-pub(crate) fn chronicle_search(
+pub(crate) async fn chronicle_settings(root: String) -> Result<ChronicleSettings, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let store = ChronicleStore::open_for_root(Path::new(&root))?;
+        store.settings()
+    })
+    .await
+    .map_err(|error| blocking_task_error("settings", error))?
+}
+
+#[tauri::command]
+pub(crate) async fn chronicle_set_settings(
+    root: String,
+    settings: ChronicleSettings,
+) -> Result<ChronicleSettings, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let store = ChronicleStore::open_for_root(Path::new(&root))?;
+        store.set_settings(settings)
+    })
+    .await
+    .map_err(|error| blocking_task_error("set settings", error))?
+}
+
+#[tauri::command]
+pub(crate) async fn chronicle_index_start(
+    root: String,
+    app: AppHandle,
+) -> Result<ChronicleIndexJob, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        queue_index_job(Path::new(&root), &app, IndexTrigger::Manual)
+    })
+    .await
+    .map_err(|error| blocking_task_error("index start", error))?
+}
+
+/// Entry point for the workspace-change flow. The explorer calls this after
+/// applying a structured watcher event. It returns `accepted: false` without
+/// touching the filesystem when Chronicle is disabled or automatic indexing is
+/// turned off.
+#[tauri::command]
+pub(crate) async fn chronicle_index_on_workspace_change(
+    root: String,
+    app: AppHandle,
+) -> Result<ChronicleIndexJob, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        queue_index_job(Path::new(&root), &app, IndexTrigger::WorkspaceChange)
+    })
+    .await
+    .map_err(|error| blocking_task_error("workspace index", error))?
+}
+
+#[tauri::command]
+pub(crate) async fn chronicle_index_cancel(root: String) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (project_id, _, _) = project_identity(Path::new(&root))?;
+        Ok(cancel_index_job(&project_id))
+    })
+    .await
+    .map_err(|error| blocking_task_error("index cancel", error))?
+}
+
+#[tauri::command]
+pub(crate) async fn chronicle_search(
     root: String,
     query: String,
     limit: Option<i64>,
 ) -> Result<Vec<ChronicleSearchResult>, String> {
-    let store = ChronicleStore::open_for_root(Path::new(&root))?;
-    store.search(&query, limit)
+    tauri::async_runtime::spawn_blocking(move || {
+        let store = ChronicleStore::open_for_root(Path::new(&root))?;
+        store.search(&query, limit)
+    })
+    .await
+    .map_err(|error| blocking_task_error("search", error))?
 }
 
 #[tauri::command]
-pub(crate) fn chronicle_timeline(
+pub(crate) async fn chronicle_timeline(
     root: String,
     limit: Option<i64>,
 ) -> Result<Vec<ChronicleEvent>, String> {
-    let store = ChronicleStore::open_for_root(Path::new(&root))?;
-    store.timeline(limit)
+    tauri::async_runtime::spawn_blocking(move || {
+        let store = ChronicleStore::open_for_root(Path::new(&root))?;
+        store.timeline(limit)
+    })
+    .await
+    .map_err(|error| blocking_task_error("timeline", error))?
 }
 
 #[tauri::command]
-pub(crate) fn chronicle_decisions(
+pub(crate) async fn chronicle_decisions(
     root: String,
     limit: Option<i64>,
 ) -> Result<Vec<ChronicleDecision>, String> {
-    let store = ChronicleStore::open_for_root(Path::new(&root))?;
-    store.decisions(limit)
+    tauri::async_runtime::spawn_blocking(move || {
+        let store = ChronicleStore::open_for_root(Path::new(&root))?;
+        store.decisions(limit)
+    })
+    .await
+    .map_err(|error| blocking_task_error("decisions", error))?
 }
 
 #[tauri::command]
-pub(crate) fn chronicle_record_decision(
+pub(crate) async fn chronicle_record_decision(
     root: String,
     input: ChronicleDecisionInput,
 ) -> Result<ChronicleDecision, String> {
-    let mut store = ChronicleStore::open_for_root(Path::new(&root))?;
-    store.record_decision(input)
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut store = ChronicleStore::open_for_root(Path::new(&root))?;
+        store.record_decision(input)
+    })
+    .await
+    .map_err(|error| blocking_task_error("record decision", error))?
 }
 
 #[tauri::command]
-pub(crate) fn chronicle_observe(
+pub(crate) async fn chronicle_observe(
     root: String,
     input: ChronicleObservationInput,
 ) -> Result<ChronicleObservation, String> {
-    let mut store = ChronicleStore::open_for_root(Path::new(&root))?;
-    store.observe(input)
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut store = ChronicleStore::open_for_root(Path::new(&root))?;
+        store.observe(input)
+    })
+    .await
+    .map_err(|error| blocking_task_error("observe", error))?
 }
 
 #[tauri::command]
-pub(crate) fn chronicle_set_decision_status(
+pub(crate) async fn chronicle_set_decision_status(
     root: String,
     id: i64,
     status: String,
     supersedes_id: Option<i64>,
 ) -> Result<ChronicleDecision, String> {
-    let mut store = ChronicleStore::open_for_root(Path::new(&root))?;
-    store.set_decision_status(id, status, supersedes_id)
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut store = ChronicleStore::open_for_root(Path::new(&root))?;
+        store.set_decision_status(id, status, supersedes_id)
+    })
+    .await
+    .map_err(|error| blocking_task_error("set decision status", error))?
 }
 
 pub fn chronicle_dir() -> Result<PathBuf, String> {
@@ -1417,9 +1571,12 @@ fn fts_query(query: &str) -> Option<String> {
     let tokens = query
         .split_whitespace()
         .filter_map(|word| {
+            // Preserve Unicode word characters (CJK, accented Latin, ...).
+            // An ASCII-only filter turned non-ASCII queries into an empty
+            // token list, which the search path treats as "list latest".
             let token: String = word
                 .chars()
-                .filter(|character| character.is_ascii_alphanumeric() || *character == '_')
+                .filter(|character| character.is_alphanumeric() || *character == '_')
                 .collect();
             let token = bounded(&token, 40);
             if token.is_empty() {
@@ -1864,6 +2021,34 @@ fn index_project(
     )
 }
 
+/// Commit a completed batch and report progress. Shared by the normal path and
+/// the skip path so a run of unreadable files cannot grow a single transaction
+/// past `INDEX_BATCH_SIZE`. The caller opens the next transaction afterwards.
+fn commit_index_batch(
+    tx: Transaction<'_>,
+    counters: &IndexCounters,
+    project_id: &str,
+    job_id: u64,
+    progress: Option<&dyn Fn(&ChronicleProgress)>,
+) -> Result<(), String> {
+    tx.commit()
+        .map_err(|e| format!("could not commit Chronicle index batch: {e}"))?;
+    if let Some(callback) = progress {
+        callback(&ChronicleProgress {
+            project_id: project_id.to_string(),
+            job_id,
+            phase: "indexing".to_string(),
+            scanned: counters.scanned,
+            indexed: counters.indexed,
+            unchanged: counters.unchanged,
+            skipped: counters.skipped,
+            bytes: counters.bytes,
+            message: None,
+        });
+    }
+    Ok(())
+}
+
 fn index_project_in(
     data_dir: &Path,
     root: &Path,
@@ -1924,14 +2109,37 @@ fn index_project_in(
 
     for file in &files {
         if !is_current() {
+            // Least destructive cancellation: commit work already done, but
+            // deliberately skip the generation-based prune below. Existing
+            // index_state rows (and their last successful content) stay put,
+            // so status remains accurate and the next run simply rescans.
             tx.commit()
                 .map_err(|e| format!("could not commit partial Chronicle index: {e}"))?;
             return Err("cancelled".to_string());
         }
 
         counters.scanned += 1;
-        let metadata = fs::symlink_metadata(&file.path)
-            .map_err(|e| format!("could not read metadata for {}: {e}", file.rel_path))?;
+        let metadata = match fs::symlink_metadata(&file.path) {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                eprintln!(
+                    "Chronicle: skipping unreadable file {}: {error}",
+                    file.rel_path
+                );
+                counters.skipped += 1;
+                mark_file_seen(&tx, project_id, generation, &file.rel_path)?;
+                batch += 1;
+                if batch >= INDEX_BATCH_SIZE {
+                    commit_index_batch(tx, &counters, project_id, job_id, progress)?;
+                    tx = store
+                        .conn
+                        .transaction()
+                        .map_err(|e| format!("could not start Chronicle index transaction: {e}"))?;
+                    batch = 0;
+                }
+                continue;
+            }
+        };
         let size = metadata.len();
 
         if size > settings.max_file_bytes {
@@ -1963,8 +2171,26 @@ fn index_project_in(
             )?;
             batch += 1;
         } else {
-            let bytes = fs::read(&file.path)
-                .map_err(|e| format!("could not read {}: {e}", file.rel_path))?;
+            let bytes = match fs::read(&file.path) {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    eprintln!(
+                        "Chronicle: skipping unreadable file {}: {error}",
+                        file.rel_path
+                    );
+                    counters.skipped += 1;
+                    mark_file_seen(&tx, project_id, generation, &file.rel_path)?;
+                    batch += 1;
+                    if batch >= INDEX_BATCH_SIZE {
+                        commit_index_batch(tx, &counters, project_id, job_id, progress)?;
+                        tx = store.conn.transaction().map_err(|e| {
+                            format!("could not start Chronicle index transaction: {e}")
+                        })?;
+                        batch = 0;
+                    }
+                    continue;
+                }
+            };
             let hash = hex_digest(&bytes);
             let known_hash: Option<String> = tx
                 .query_row(
@@ -2029,9 +2255,7 @@ fn index_project_in(
         }
 
         if batch >= INDEX_BATCH_SIZE {
-            tx.commit()
-                .map_err(|e| format!("could not commit Chronicle index batch: {e}"))?;
-            report(&counters, "indexing", None);
+            commit_index_batch(tx, &counters, project_id, job_id, progress)?;
             tx = store
                 .conn
                 .transaction()
@@ -2045,9 +2269,12 @@ fn index_project_in(
         params![project_id],
     )
     .map_err(|e| format!("could not prune stale Chronicle index rows: {e}"))?;
+    // Prune only scan-derived rows. Restricting by kind keeps user-sourced
+    // decisions/observations alive even when their cited source file vanishes.
     tx.execute(
         "DELETE FROM search_docs
          WHERE project_id = ?1
+           AND kind = 'file'
            AND source_path NOT IN (
                SELECT path FROM index_state WHERE project_id = ?1
            )",
@@ -2103,10 +2330,27 @@ fn collect_files(
             ));
         }
 
-        let mut entries = fs::read_dir(&directory)
-            .map_err(|e| format!("could not read directory {}: {e}", directory.display()))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("could not read directory entry: {e}"))?;
+        // A directory can disappear or lose permissions between discovery and
+        // traversal. Skip just that directory instead of aborting the job.
+        let raw_entries = match fs::read_dir(&directory) {
+            Ok(entries) => entries,
+            Err(error) => {
+                eprintln!(
+                    "Chronicle: skipping unreadable directory {}: {error}",
+                    directory.display()
+                );
+                continue;
+            }
+        };
+        let mut entries = raw_entries
+            .filter_map(|entry| match entry {
+                Ok(entry) => Some(entry),
+                Err(error) => {
+                    eprintln!("Chronicle: skipping unreadable directory entry: {error}");
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
         entries.sort_by_key(|entry| entry.file_name());
 
         for entry in entries {
@@ -2115,13 +2359,20 @@ fn collect_files(
             }
 
             let path = entry.path();
-            let relative = path
-                .strip_prefix(root)
-                .map_err(|e| format!("could not resolve relative path {}: {e}", path.display()))?
-                .to_path_buf();
-            let metadata = entry
-                .metadata()
-                .map_err(|e| format!("could not inspect {}: {e}", path.display()))?;
+            let relative = match path.strip_prefix(root) {
+                Ok(relative) => relative.to_path_buf(),
+                Err(error) => {
+                    eprintln!("Chronicle: skipping {}: {error}", path.display());
+                    continue;
+                }
+            };
+            let metadata = match entry.metadata() {
+                Ok(metadata) => metadata,
+                Err(error) => {
+                    eprintln!("Chronicle: skipping {}: {error}", path.display());
+                    continue;
+                }
+            };
             if metadata.file_type().is_symlink() {
                 continue;
             }
@@ -2210,8 +2461,10 @@ fn persist_file(
         params![project_id, relative],
     )
     .map_err(|e| format!("could not replace Chronicle evidence for {relative}: {e}"))?;
+    // Only replace scan-derived rows for this path. User decisions and
+    // observations may cite the same source_path but must survive a reindex.
     tx.execute(
-        "DELETE FROM search_docs WHERE project_id = ?1 AND source_path = ?2",
+        "DELETE FROM search_docs WHERE project_id = ?1 AND source_path = ?2 AND kind = 'file'",
         params![project_id, relative],
     )
     .map_err(|e| format!("could not replace Chronicle search rows for {relative}: {e}"))?;
@@ -2278,6 +2531,25 @@ fn persist_file(
         language_for_path(Path::new(relative)),
         "indexed",
     )
+}
+
+/// A file that vanished or became unreadable mid-scan keeps its last good
+/// index_state row. Refreshing only the generation prevents the end-of-index
+/// prune from discarding still-valid metadata, and avoids inventing an empty
+/// content hash for a file we could not read.
+fn mark_file_seen(
+    tx: &Connection,
+    project_id: &str,
+    generation: u64,
+    relative: &str,
+) -> Result<(), String> {
+    tx.execute(
+        "UPDATE index_state SET last_seen_generation = ?3
+         WHERE project_id = ?1 AND path = ?2",
+        params![project_id, relative, generation.min(i64::MAX as u64) as i64],
+    )
+    .map_err(|e| format!("could not preserve Chronicle index state for {relative}: {e}"))?;
+    Ok(())
 }
 
 fn upsert_index_state(
@@ -2361,9 +2633,14 @@ fn extract_facts(
             .any(|marker| lower.contains(marker))
         {
             let (excerpt, redacted) = redact_excerpt(trimmed, max_excerpt_chars);
+            let value = if redacted {
+                excerpt.clone()
+            } else {
+                bounded(trimmed, 240)
+            };
             facts.push(ExtractedFact {
                 predicate: "todo_marker",
-                value: bounded(trimmed, 240),
+                value,
                 status: "inferred",
                 line: index + 1,
                 excerpt,
@@ -2373,9 +2650,14 @@ fn extract_facts(
 
         if lower.contains("@decision") || lower.contains("decision:") || lower.contains("adr-") {
             let (excerpt, redacted) = redact_excerpt(trimmed, max_excerpt_chars);
+            let value = if redacted {
+                excerpt.clone()
+            } else {
+                bounded(trimmed, 240)
+            };
             facts.push(ExtractedFact {
                 predicate: "decision_marker",
-                value: bounded(trimmed, 240),
+                value,
                 status: "proposed",
                 line: index + 1,
                 excerpt,
@@ -2385,9 +2667,14 @@ fn extract_facts(
 
         if let Some(name) = symbol_name(trimmed, language) {
             let (excerpt, redacted) = redact_excerpt(trimmed, max_excerpt_chars);
+            let value = if redacted {
+                excerpt.clone()
+            } else {
+                bounded(&name, 240)
+            };
             facts.push(ExtractedFact {
                 predicate: "contains_symbol",
-                value: name,
+                value,
                 status: "inferred",
                 line: index + 1,
                 excerpt,
@@ -2986,5 +3273,304 @@ mod tests {
         assert!(store
             .set_decision_status(decision.id, "invalid".to_string(), None)
             .is_err());
+    }
+
+    #[test]
+    fn fts_query_preserves_unicode_tokens() {
+        assert_eq!(fts_query("café naïve"), Some("café* naïve*".to_string()));
+        assert_eq!(
+            fts_query("日本語 テスト"),
+            Some("日本語* テスト*".to_string())
+        );
+        assert_eq!(fts_query("!!! ???"), None);
+
+        // Bounded token width and count still apply to Unicode input.
+        let long = "あ".repeat(80);
+        assert_eq!(
+            fts_query(&format!("{long} puzzle")),
+            Some(format!("{}* puzzle*", "あ".repeat(40)))
+        );
+        let many = vec!["café"; 20].join(" ");
+        let result = fts_query(&many).expect("query should produce tokens");
+        assert_eq!(result.split_whitespace().count(), 16);
+    }
+
+    #[test]
+    fn index_gate_respects_enabled_and_workspace_change_setting() {
+        let mut settings = ChronicleSettings::default();
+        assert!(index_allowed(&settings, IndexTrigger::Manual).unwrap());
+        assert!(index_allowed(&settings, IndexTrigger::WorkspaceChange).unwrap());
+
+        settings.index_on_workspace_change = false;
+        assert!(index_allowed(&settings, IndexTrigger::Manual).unwrap());
+        assert!(!index_allowed(&settings, IndexTrigger::WorkspaceChange).unwrap());
+
+        settings.enabled = false;
+        let error = index_allowed(&settings, IndexTrigger::Manual)
+            .expect_err("disabled manual index should report an error");
+        assert!(error.contains("disabled"));
+        assert!(!index_allowed(&settings, IndexTrigger::WorkspaceChange).unwrap());
+    }
+
+    #[test]
+    fn redaction_applies_to_observation_values_and_search_body() {
+        let temp = TestDir::new("redact-fields");
+        let root = project_dir(&temp, "project");
+        let mut store = ChronicleStore::open_in(&temp.path().join("data"), &root).unwrap();
+
+        let observation = store
+            .observe(ChronicleObservationInput {
+                kind: "user_fact".to_string(),
+                predicate: "deployment".to_string(),
+                value: "api_key=super-secret-value".to_string(),
+                confidence: 1.0,
+                status: "verified".to_string(),
+                source_kind: "user".to_string(),
+                source_path: None,
+                line: None,
+                evidence: None,
+            })
+            .expect("could not record observation");
+        assert_eq!(observation.value, "[redacted potentially sensitive line]");
+
+        let body: String = store
+            .conn
+            .query_row(
+                "SELECT body FROM search_docs WHERE entity_id = ?1",
+                params![format!("observation:{}", observation.id)],
+                |row| row.get(0),
+            )
+            .expect("could not read observation search body");
+        assert_eq!(body, "[redacted potentially sensitive line]");
+
+        let results = store.search("redacted", Some(10)).unwrap();
+        assert!(results
+            .iter()
+            .any(|result| result.snippet.contains("[redacted")));
+
+        // The user's decision text stays intact, but its indexed body does not
+        // leak the sensitive line.
+        let decision = store
+            .record_decision(ChronicleDecisionInput {
+                title: "Secrets live in the vault".to_string(),
+                context: None,
+                decision: "Store the token in the vault".to_string(),
+                consequences: None,
+                status: "accepted".to_string(),
+                supersedes_id: None,
+                evidence: None,
+                source_path: None,
+                line: None,
+            })
+            .expect("could not record decision");
+        assert!(decision.decision.contains("token"));
+
+        let body: String = store
+            .conn
+            .query_row(
+                "SELECT body FROM search_docs WHERE entity_id = ?1",
+                params![format!("decision:{}", decision.id)],
+                |row| row.get(0),
+            )
+            .expect("could not read decision search body");
+        assert_eq!(body, "[redacted potentially sensitive line]");
+
+        // A status change rebuilds the FTS row; it must stay redacted too.
+        store
+            .set_decision_status(decision.id, "superseded".to_string(), None)
+            .expect("could not change decision status");
+        let body: String = store
+            .conn
+            .query_row(
+                "SELECT body FROM search_docs WHERE entity_id = ?1",
+                params![format!("decision:{}", decision.id)],
+                |row| row.get(0),
+            )
+            .expect("could not read rebuilt decision search body");
+        assert_eq!(body, "[redacted potentially sensitive line]");
+    }
+
+    #[test]
+    fn scan_fact_values_are_redacted() {
+        let temp = TestDir::new("scan-redact");
+        let root = project_dir(&temp, "project");
+        write_file(&root, "notes.md", "TODO: rotate token=abc123\n");
+
+        run_test_index(&temp, &root, 1);
+        let store = ChronicleStore::open_in(&temp.path().join("data"), &root).unwrap();
+
+        let value: String = store
+            .conn
+            .query_row(
+                "SELECT value FROM observations
+                 WHERE project_id = ?1 AND predicate = 'todo_marker'",
+                params![store.project_id],
+                |row| row.get(0),
+            )
+            .expect("could not read scan observation value");
+        assert_eq!(value, "[redacted potentially sensitive line]");
+
+        let body: String = store
+            .conn
+            .query_row(
+                "SELECT body FROM search_docs WHERE project_id = ?1 AND kind = 'file'",
+                params![store.project_id],
+                |row| row.get(0),
+            )
+            .expect("could not read file search body");
+        assert!(body.contains("[redacted potentially sensitive line]"));
+        assert!(!body.contains("abc123"));
+    }
+
+    #[test]
+    fn reindex_preserves_user_sourced_search_rows() {
+        let temp = TestDir::new("reindex-user");
+        let root = project_dir(&temp, "project");
+        write_file(&root, "notes.md", "Decision: use SQLite\n");
+
+        {
+            let mut store = ChronicleStore::open_in(&temp.path().join("data"), &root).unwrap();
+            store
+                .record_decision(ChronicleDecisionInput {
+                    title: "Use SQLite".to_string(),
+                    context: None,
+                    decision: "Persist memory locally".to_string(),
+                    consequences: None,
+                    status: "accepted".to_string(),
+                    supersedes_id: None,
+                    evidence: None,
+                    source_path: Some("notes.md".to_string()),
+                    line: None,
+                })
+                .expect("could not record decision");
+            store
+                .observe(ChronicleObservationInput {
+                    kind: "user_fact".to_string(),
+                    predicate: "owner".to_string(),
+                    value: "platform team".to_string(),
+                    confidence: 1.0,
+                    status: "verified".to_string(),
+                    source_kind: "user".to_string(),
+                    source_path: Some("notes.md".to_string()),
+                    line: None,
+                    evidence: None,
+                })
+                .expect("could not record observation");
+        }
+
+        let first = run_test_index(&temp, &root, 1);
+        assert_eq!(first.indexed_files, 1);
+
+        let decision_count =
+            "SELECT COUNT(*) FROM search_docs WHERE project_id = ?1 AND kind = 'decision'";
+        let observation_count =
+            "SELECT COUNT(*) FROM search_docs WHERE project_id = ?1 AND kind = 'observation'";
+        let file_count = "SELECT COUNT(*) FROM search_docs WHERE project_id = ?1 AND kind = 'file'";
+
+        let store = ChronicleStore::open_in(&temp.path().join("data"), &root).unwrap();
+        assert_eq!(count_with_project(&store, decision_count), 1);
+        assert_eq!(count_with_project(&store, observation_count), 1);
+
+        // A changed file replaces only its scan-derived search row.
+        write_file(&root, "notes.md", "Decision: use SQLite, revised\n");
+        run_test_index(&temp, &root, 2);
+        let store = ChronicleStore::open_in(&temp.path().join("data"), &root).unwrap();
+        assert_eq!(count_with_project(&store, decision_count), 1);
+        assert_eq!(count_with_project(&store, observation_count), 1);
+        assert_eq!(count_with_project(&store, file_count), 1);
+
+        // Deleting the cited file prunes its scan row but leaves user rows.
+        fs::remove_file(root.join("notes.md")).expect("could not remove test file");
+        run_test_index(&temp, &root, 3);
+        let store = ChronicleStore::open_in(&temp.path().join("data"), &root).unwrap();
+        assert_eq!(count_with_project(&store, file_count), 0);
+        assert_eq!(count_with_project(&store, decision_count), 1);
+        assert_eq!(count_with_project(&store, observation_count), 1);
+    }
+
+    #[test]
+    fn cancellation_keeps_index_state_intact() {
+        let temp = TestDir::new("cancel-state");
+        let root = project_dir(&temp, "project");
+        for index in 0..6 {
+            write_file(&root, &format!("file{index}.rs"), "fn example() {}\n");
+        }
+        let indexed = run_test_index(&temp, &root, 1);
+        assert_eq!(indexed.indexed_files, 6);
+
+        let data_dir = temp.path().join("data");
+        let (project_id, _, _) = project_identity(&root).unwrap();
+        // collect_files uses one check for the root and one per entry; cancel
+        // partway through the file loop, after the generation reset committed.
+        let checks = AtomicU64::new(0);
+        let error = match index_project_in(&data_dir, &root, &project_id, 1, 2, None, &|| {
+            checks.fetch_add(1, Ordering::Relaxed) < 9
+        }) {
+            Ok(_) => panic!("cancelled index should fail"),
+            Err(error) => error,
+        };
+        assert_eq!(error, "cancelled");
+
+        let store = ChronicleStore::open_in(&data_dir, &root).unwrap();
+        assert_eq!(
+            count_with_project(
+                &store,
+                "SELECT COUNT(*) FROM index_state WHERE project_id = ?1"
+            ),
+            6
+        );
+        assert_eq!(store.status().unwrap().indexed_files, 6);
+    }
+
+    #[test]
+    fn mark_file_seen_preserves_last_good_state() {
+        let temp = TestDir::new("mark-seen");
+        let root = project_dir(&temp, "project");
+        let store = ChronicleStore::open_in(&temp.path().join("data"), &root).unwrap();
+        store
+            .conn
+            .execute(
+                "INSERT INTO index_state(
+                     project_id, path, content_hash, size_bytes, modified_ms,
+                     language, last_indexed_ms, status, last_seen_generation
+                 ) VALUES(?1, 'gone.rs', 'hash-123', 42, NULL, 'rust', 99, 'indexed', 0)",
+                params![store.project_id],
+            )
+            .unwrap();
+
+        mark_file_seen(&store.conn, &store.project_id, 4, "gone.rs").unwrap();
+
+        let (hash, size, status, generation): (String, i64, String, i64) = store
+            .conn
+            .query_row(
+                "SELECT content_hash, size_bytes, status, last_seen_generation
+                 FROM index_state WHERE project_id = ?1 AND path = 'gone.rs'",
+                params![store.project_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(hash, "hash-123");
+        assert_eq!(size, 42);
+        assert_eq!(status, "indexed");
+        assert_eq!(generation, 4);
+    }
+
+    #[test]
+    fn generation_registry_recovers_from_poison() {
+        let project_id = "poison-test";
+        let _ = std::panic::catch_unwind(|| {
+            let _guard = index_generations().lock().unwrap();
+            panic!("poison the generation registry");
+        });
+
+        let generation = begin_index_job(project_id);
+        assert!(is_index_current(project_id, generation));
+        assert!(cancel_index_job(project_id));
+        assert!(!is_index_current(project_id, generation));
+        finish_index_job(project_id, generation);
+        index_generations()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .remove(project_id);
     }
 }
