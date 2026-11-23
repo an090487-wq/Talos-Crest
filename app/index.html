@@ -428,7 +428,7 @@
       #canvas-header strong { font-size: var(--font-sm); font-weight: 700; letter-spacing: .14em; }
       #canvas-file { max-width: 320px; overflow: hidden; color: var(--muted); font: var(--font-sm) var(--mono-font); text-overflow: ellipsis; white-space: nowrap; }
       #canvas-header .mini { min-height: 28px; }
-      #canvas-body { display: grid; flex: 1; grid-template-columns: 72px minmax(0, 1fr) 310px; min-height: 0; }
+      #canvas-body { position: relative; display: grid; flex: 1; grid-template-columns: 72px minmax(0, 1fr) 310px; min-height: 0; }
       #canvas-tools { display: flex; flex-direction: column; gap: 5px; padding: 8px 6px; border-right: 1px solid var(--line); background: var(--panel); overflow-y: auto; }
       #canvas-tools button { min-height: 40px; padding: 4px; border-color: transparent; color: var(--muted); font: 17px var(--ui-font); transition: background-color .12s ease, border-color .12s ease, color .12s ease; }
       #canvas-tools button:hover { border-color: var(--line); background: var(--surface-raised); color: var(--text); }
@@ -442,10 +442,19 @@
         background-position: 0 0, 0 10px, 10px -10px, -10px 0;
         background-size: 20px 20px;
       }
-      #canvas-stage { position: relative; flex: 0 0 auto; outline: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line)); box-shadow: 0 14px 36px rgba(0, 0, 0, .34), 0 0 0 1px rgba(255, 255, 255, .02); }
-      #canvas-surface, #canvas-preview, #canvas-adjust-preview { position: absolute; inset: 0; display: block; width: 100%; height: 100%; max-width: none; touch-action: none; }
+      #canvas-stage { position: relative; flex: 0 0 auto; outline: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line)); box-shadow: 0 14px 36px rgba(0, 0, 0, .34), 0 0 0 1px rgba(255, 255, 255, .02); background-color: transparent; }
+      #canvas-stage[data-transparency="checker"] { background-image: conic-gradient(#d8dce3 25%, #ffffff 0 50%, #d8dce3 0 75%, #ffffff 0); background-size: 16px 16px; }
+      #canvas-stage[data-transparency="white"] { background-color: #fff; }
+      #canvas-stage[data-transparency="black"] { background-color: #000; }
+      #canvas-stage[data-transparency="magenta"] { background-color: #ff00ff; }
+      #canvas-stage[data-grid="true"]::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background-image: linear-gradient(to right, rgba(120,190,220,.22) 1px, transparent 1px), linear-gradient(to bottom, rgba(120,190,220,.22) 1px, transparent 1px); background-size: var(--canvas-grid-size, 32px 32px); }
+      #canvas-stage[data-guides="true"]::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(to right, transparent calc(50% - .5px), rgba(255,120,180,.7) 50%, transparent calc(50% + .5px)), linear-gradient(to bottom, transparent calc(50% - .5px), rgba(255,120,180,.7) 50%, transparent calc(50% + .5px)); }
+      #canvas-surface, #canvas-preview, #canvas-adjust-preview, #canvas-compare-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; max-width: none; touch-action: none; }
       #canvas-preview, #canvas-adjust-preview { pointer-events: none; }
       #canvas-adjust-preview { z-index: 1; display: none; }
+      #canvas-compare { position: absolute; inset: 0; z-index: 2; cursor: ew-resize; touch-action: none; }
+      #canvas-compare-divider { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--accent); pointer-events: none; }
+      #canvas-measure-label { position: absolute; z-index: 5; display: none; padding: 2px 6px; border: 1px solid var(--accent); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); font: var(--font-xs) var(--mono-font); white-space: nowrap; pointer-events: none; }
       #canvas-selection { position: absolute; z-index: 3; display: none; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); pointer-events: none; box-sizing: border-box; }
       #canvas-selection[data-interactive="true"] { pointer-events: auto; cursor: move; }
       .canvas-handle { position: absolute; display: none; width: 9px; height: 9px; border: 1px solid var(--accent); border-radius: 2px; background: var(--panel); transform: translate(-50%, -50%); }
@@ -469,6 +478,13 @@
       .canvas-section input[type="number"], .canvas-section select { width: 130px; min-height: 28px; font-size: var(--font-sm); }
       .canvas-section-actions { display: flex; flex-wrap: wrap; gap: 5px; }
       .canvas-section-actions .mini { min-height: 28px; }
+      .canvas-section select, .canvas-section input[type="number"], .canvas-section input[type="text"] { max-width: 100%; }
+      .canvas-section textarea { width: 100%; min-height: 110px; resize: vertical; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); font: var(--font-xs) var(--mono-font); }
+      .canvas-readout { padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); font: var(--font-xs) var(--mono-font); overflow-wrap: anywhere; }
+      #canvas-palette { display: flex; flex-wrap: wrap; gap: 5px; min-height: 26px; }
+      .canvas-swatch { width: 26px; height: 26px; border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; }
+      .canvas-swatch:hover { border-color: var(--accent); transform: translateY(-1px); }
+      .canvas-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
       #canvas-layers { display: flex; flex-direction: column; gap: 4px; min-height: 96px; max-height: 280px; overflow: auto; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); }
       .canvas-layer { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border: 1px solid transparent; border-left: 2px solid transparent; border-radius: var(--radius-sm); transition: background-color .12s ease, border-color .12s ease; }
       .canvas-layer:hover { background: var(--surface-raised); }
@@ -489,6 +505,7 @@
       @media (max-width: 900px) {
         #canvas-body { grid-template-columns: 64px minmax(0, 1fr); }
         #canvas-inspector { display: none; }
+        #canvas-inspector.inspector-open { position: absolute; z-index: 10; top: 0; right: 0; bottom: 0; display: flex; width: min(320px, 88vw); box-shadow: -12px 0 28px rgba(0, 0, 0, .35); }
         #canvas-header #canvas-file, #canvas-status-file { display: none; }
       }
 
@@ -1139,8 +1156,11 @@
         <span id="canvas-file">No image open</span>
         <span class="spacer"></span>
         <button id="canvas-open" type="button" class="mini" title="Open image (Ctrl+O)">Open image…</button>
+        <button id="canvas-full-res" type="button" class="mini hidden" title="Reopen this image at full resolution">Full size</button>
         <button id="canvas-undo" type="button" class="mini" disabled title="Undo (Ctrl+Z)">Undo</button>
         <button id="canvas-redo" type="button" class="mini" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
+        <button id="canvas-compare-toggle" type="button" class="mini" title="Compare with a captured baseline">Compare</button>
+        <button id="canvas-inspector-toggle" type="button" class="mini" title="Show or hide properties">Properties</button>
         <button id="canvas-zoom-out" type="button" class="mini" title="Zoom out (Ctrl+-)" aria-label="Zoom out">−</button>
         <button id="canvas-fit" type="button" class="mini" title="Fit image to screen (Ctrl+0)">Fit</button>
         <button id="canvas-zoom-in" type="button" class="mini" title="Zoom in (Ctrl++)" aria-label="Zoom in">+</button>
@@ -1149,25 +1169,39 @@
       </div>
       <div id="canvas-body">
         <div id="canvas-tools" role="toolbar" aria-label="Canvas tools">
-          <button type="button" data-canvas-tool="select" class="active" title="Select region (V)">↖</button>
-          <button type="button" data-canvas-tool="crop" title="Crop to selection (C)">▧</button>
+          <button type="button" data-canvas-tool="select" class="active" aria-pressed="true" title="Select region (V)">↖</button>
+          <button type="button" data-canvas-tool="crop" aria-pressed="false" title="Crop to selection (C)">▧</button>
           <div class="canvas-tool-divider"></div>
-          <button type="button" data-canvas-tool="brush" title="Brush (B)">✎</button>
-          <button type="button" data-canvas-tool="eraser" title="Eraser (X)">◌</button>
-          <button type="button" data-canvas-tool="text" title="Text (T)">T</button>
+          <button type="button" data-canvas-tool="brush" aria-pressed="false" title="Brush (B)">✎</button>
+          <button type="button" data-canvas-tool="eraser" aria-pressed="false" title="Eraser (X)">◌</button>
+          <button type="button" data-canvas-tool="text" aria-pressed="false" title="Text (T)">T</button>
           <div class="canvas-tool-divider"></div>
-          <button type="button" data-canvas-tool="line" title="Line (L)">╱</button>
-          <button type="button" data-canvas-tool="rect" title="Rectangle (R)">▭</button>
-          <button type="button" data-canvas-tool="ellipse" title="Ellipse (O)">◯</button>
+          <button type="button" data-canvas-tool="line" aria-pressed="false" title="Line (L)">╱</button>
+          <button type="button" data-canvas-tool="rect" aria-pressed="false" title="Rectangle (R)">▭</button>
+          <button type="button" data-canvas-tool="ellipse" aria-pressed="false" title="Ellipse (O)">◯</button>
+          <button type="button" data-canvas-tool="arrow" aria-pressed="false" title="Arrow annotation (A)">➤</button>
+          <button type="button" data-canvas-tool="triangle" aria-pressed="false" title="Triangle (N)">△</button>
+          <button type="button" data-canvas-tool="star" aria-pressed="false" title="Star (S)">☆</button>
+          <button type="button" data-canvas-tool="polygon" aria-pressed="false" title="Regular polygon (P)">⬡</button>
+          <button type="button" data-canvas-tool="callout" aria-pressed="false" title="Numbered callout (K)">①</button>
+          <button type="button" data-canvas-tool="highlight" aria-pressed="false" title="Highlight region (Y)">▨</button>
           <div class="canvas-tool-divider"></div>
-          <button type="button" data-canvas-tool="pan" title="Pan (H)">✥</button>
-          <button type="button" data-canvas-tool="zoom" title="Zoom (Z)">⤢</button>
+          <button type="button" data-canvas-tool="measure" aria-pressed="false" title="Measure pixels (M)">⌁</button>
+          <button type="button" data-canvas-tool="eyedropper" aria-pressed="false" title="Pick a color (I)">⊕</button>
+          <div class="canvas-tool-divider"></div>
+          <button type="button" data-canvas-tool="pan" aria-pressed="false" title="Pan (H)">✥</button>
+          <button type="button" data-canvas-tool="zoom" aria-pressed="false" title="Zoom (Z)">⤢</button>
         </div>
         <div id="canvas-viewport">
           <div id="canvas-stage">
             <canvas id="canvas-surface"></canvas>
             <canvas id="canvas-preview"></canvas>
             <canvas id="canvas-adjust-preview"></canvas>
+            <div id="canvas-compare" class="hidden" aria-label="Before and after comparison">
+              <canvas id="canvas-compare-canvas"></canvas>
+              <span id="canvas-compare-divider"></span>
+            </div>
+            <div id="canvas-measure-label"></div>
             <div id="canvas-selection">
               <span class="canvas-handle" data-handle="nw"></span>
               <span class="canvas-handle" data-handle="n"></span>
@@ -1205,14 +1239,46 @@
               <button id="canvas-flip-h" type="button" class="mini" title="Flip horizontally">⇋</button>
               <button id="canvas-flip-v" type="button" class="mini" title="Flip vertically">⇅</button>
             </div>
+            <label>Asset size
+              <select id="canvas-asset-preset" aria-label="Asset size preset">
+                <option value="">Choose a preset…</option>
+                <option value="favicon">Favicon 32×32</option>
+                <option value="icon-128">App icon 128×128</option>
+                <option value="icon-256">App icon 256×256</option>
+                <option value="icon-512">PWA icon 512×512</option>
+                <option value="avatar">Avatar 512×512</option>
+                <option value="og">Social card 1200×630</option>
+              </select>
+            </label>
+            <button id="canvas-apply-asset-preset" type="button" class="mini">Apply asset size</button>
           </section>
           <section class="canvas-section">
-            <header><h3>Adjustments</h3></header>
+            <header><h3>Color grading</h3></header>
             <label>Brightness <input id="canvas-brightness" type="range" min="-100" max="100" value="0" /></label>
             <label>Contrast <input id="canvas-contrast" type="range" min="-100" max="100" value="0" /></label>
             <label>Saturation <input id="canvas-saturation" type="range" min="-100" max="100" value="0" /></label>
-            <label>Exposure <input id="canvas-exposure" type="range" min="-100" max="100" value="0" /></label>
-            <button id="canvas-apply-adjust" type="button" class="mini">Apply adjustments</button>
+            <label>Exposure (EV) <input id="canvas-exposure" type="range" min="-100" max="100" value="0" /></label>
+            <label>Temperature <input id="canvas-temperature" type="range" min="-100" max="100" value="0" /></label>
+            <label>Tint <input id="canvas-tint" type="range" min="-100" max="100" value="0" /></label>
+            <label>Highlights <input id="canvas-highlights" type="range" min="-100" max="100" value="0" /></label>
+            <label>Shadows <input id="canvas-shadows" type="range" min="-100" max="100" value="0" /></label>
+            <label>Vibrance <input id="canvas-vibrance" type="range" min="-100" max="100" value="0" /></label>
+            <label>Hue <input id="canvas-hue" type="range" min="-180" max="180" value="0" /></label>
+            <label>Gamma <input id="canvas-gamma" type="range" min="-100" max="100" value="0" /></label>
+            <label>Look preset
+              <select id="canvas-grading-preset" aria-label="Color grading preset">
+                <option value="">Custom</option>
+                <option value="warm">Warm daylight</option>
+                <option value="cool">Cool shadows</option>
+                <option value="cinematic">Cinematic</option>
+                <option value="vintage">Vintage print</option>
+                <option value="noir">Noir</option>
+              </select>
+            </label>
+            <div class="canvas-section-actions">
+              <button id="canvas-apply-adjust" type="button" class="mini accent">Apply grading</button>
+              <button id="canvas-reset-adjust" type="button" class="mini">Reset</button>
+            </div>
             <label>Filter
               <select id="canvas-filter" aria-label="Image filter">
                 <option value="">None</option>
@@ -1221,15 +1287,70 @@
                 <option value="invert">Invert</option>
                 <option value="blur">Blur</option>
                 <option value="sharpen">Sharpen</option>
+                <option value="warm">Warm</option>
+                <option value="cool">Cool</option>
+                <option value="vintage">Vintage</option>
+                <option value="noir">Noir</option>
               </select>
             </label>
             <button id="canvas-apply-filter" type="button" class="mini">Apply filter</button>
           </section>
           <section class="canvas-section">
-            <header><h3>Brush &amp; text</h3></header>
+            <header><h3>Brush, shapes &amp; text</h3></header>
             <label>Color <input id="canvas-color" type="color" value="#59c7d4" aria-label="Brush color" /></label>
+            <label>Shape fill <input id="canvas-fill-color" type="color" value="#59c7d4" aria-label="Shape fill color" /></label>
             <label>Size <input id="canvas-brush-size" type="number" min="1" max="200" value="8" aria-label="Brush size" /></label>
+            <label>Opacity % <input id="canvas-opacity" type="number" min="1" max="100" value="100" aria-label="Brush opacity" /></label>
             <label>Font <input id="canvas-font-size" type="number" min="6" max="200" value="20" aria-label="Text font size" /></label>
+            <label class="canvas-two-col">Fill shapes <input id="canvas-shape-filled" type="checkbox" /></label>
+            <label>Polygon sides <input id="canvas-shape-sides" type="number" min="3" max="24" value="6" aria-label="Polygon sides" /></label>
+            <button id="canvas-reset-callouts" type="button" class="mini">Reset callout numbers</button>
+          </section>
+          <section class="canvas-section">
+            <header><h3>Color inspector</h3></header>
+            <label>HEX <input id="canvas-hex" type="text" value="#59C7D4" maxlength="7" aria-label="Hex color" /></label>
+            <output id="canvas-rgb" class="canvas-readout">rgb(89, 199, 212)</output>
+            <output id="canvas-hsl" class="canvas-readout">hsl(186°, 57%, 59%)</output>
+            <button id="canvas-extract-palette" type="button" class="mini">Extract palette from image</button>
+            <div id="canvas-palette" aria-label="Extracted colors"></div>
+            <div class="muted">Use the eyedropper tool (I) to sample any pixel.</div>
+          </section>
+          <section class="canvas-section hidden" id="canvas-svg-section">
+            <header><h3>SVG asset source</h3></header>
+            <textarea id="canvas-svg-source" aria-label="SVG source" spellcheck="false"></textarea>
+            <div class="canvas-two-col">
+              <label>Raster width <input id="canvas-svg-raster-width" type="number" min="1" max="20000" /></label>
+              <label>Raster height <input id="canvas-svg-raster-height" type="number" min="1" max="20000" /></label>
+            </div>
+            <div class="canvas-section-actions">
+              <button id="canvas-svg-apply" type="button" class="mini">Apply preview</button>
+              <button id="canvas-svg-save" type="button" class="mini">Save source to file</button>
+            </div>
+            <div class="muted">Editing SVG source updates the raster preview. Vector nodes are not editable; save writes the text back to the original file.</div>
+          </section>
+          <section class="canvas-section">
+            <header><h3>Grid, guides &amp; transparency</h3></header>
+            <label class="canvas-two-col">Show grid <input id="canvas-show-grid" type="checkbox" /></label>
+            <label>Grid spacing <input id="canvas-grid-spacing" type="number" min="2" max="500" value="32" /></label>
+            <label class="canvas-two-col">Snap to grid <input id="canvas-snap-grid" type="checkbox" /></label>
+            <label class="canvas-two-col">Center guides <input id="canvas-show-guides" type="checkbox" /></label>
+            <label>Checker background
+              <select id="canvas-transparency" aria-label="Transparency preview background">
+                <option value="checker">Transparency checker</option>
+                <option value="white">White</option>
+                <option value="black">Black</option>
+                <option value="magenta">Magenta</option>
+              </select>
+            </label>
+          </section>
+          <section class="canvas-section">
+            <header><h3>Comparison</h3></header>
+            <div class="canvas-section-actions">
+              <button id="canvas-compare-baseline" type="button" class="mini">Set baseline</button>
+              <button id="canvas-compare-clear" type="button" class="mini">Clear</button>
+            </div>
+            <label>Split <input id="canvas-compare-split" type="range" min="0" max="100" value="50" /></label>
+            <div class="muted">Baseline is a screen-resolution snapshot kept only for this editing session.</div>
           </section>
         </aside>
       </div>
@@ -1246,7 +1367,17 @@
       <header><strong>Export image</strong><span class="spacer"></span><button id="canvas-export-close" class="mini" aria-label="Close export dialog">×</button></header>
       <div class="workspace-dialog-status">Exports stay on this device. The original file is never replaced without confirmation.</div>
       <div class="canvas-export-grid">
-        <label style="grid-column: 1 / -1;">Destination<input id="canvas-export-path" type="text" readonly /></label>
+        <label style="grid-column: 1 / -1;">Preset
+          <select id="canvas-export-presets" aria-label="Export preset">
+            <option value="source">Source resolution (PNG)</option>
+            <option value="web">Web asset (WebP 90)</option>
+            <option value="photo">Photo (JPEG 88)</option>
+            <option value="favicon">Favicon 32×32 PNG</option>
+            <option value="avatar">Avatar 512×512 PNG</option>
+            <option value="og">Social card 1200×630 PNG</option>
+          </select>
+        </label>
+        <label style="grid-column: 1 / -1;">Destination<input id="canvas-export-path" type="text" /></label>
         <label>Format
           <select id="canvas-export-format">
             <option value="image/png">PNG</option>
@@ -1257,8 +1388,11 @@
         <label>Quality <input id="canvas-export-quality" type="range" min="10" max="100" value="92" /></label>
         <label>Width <input id="canvas-export-width" type="number" min="1" max="20000" /></label>
         <label>Height <input id="canvas-export-height" type="number" min="1" max="20000" /></label>
-        <label style="grid-column: 1 / -1;"><span id="canvas-export-extension">PNG</span></label>
+        <label class="canvas-two-col" style="grid-column: 1 / -1;">Lock aspect <input id="canvas-export-aspect" type="checkbox" checked /></label>
+        <label>Matte color <input id="canvas-export-background" type="color" value="#ffffff" /></label>
+        <label style="grid-column: 1 / -1;"><span id="canvas-export-extension">PNG</span> · quality is ignored by PNG</label>
       </div>
+      <div class="workspace-dialog-status" id="canvas-export-status" role="status">Ready.</div>
       <div class="confirm-actions">
         <label class="workspace-dialog-setting"><input id="canvas-export-overwrite" type="checkbox" /> Overwrite an existing file at this destination</label>
         <button id="canvas-export-cancel" value="cancel">Cancel</button>

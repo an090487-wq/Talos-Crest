@@ -127,20 +127,53 @@ is loaded only when the calculator opens. Results can be inserted into the
 active editor.
 
 **Canvas** (toolbar button, Ctrl+Shift+I, or opening a PNG/JPEG/WebP/SVG file)
-is a local raster image workspace. It supports selection and crop with draggable
-handles (press Enter or choose Apply crop to commit), pan and zoom (including
-Ctrl+wheel), brush/eraser/shape/text tools,
-rotation and flips, live low-resolution adjustment previews with full-resolution
-commit, filters, layers, undo/redo, and PNG/JPEG/WebP export. Tool shortcuts are
-`V` select, `C` crop, `H` pan, `Z` zoom, `B` brush, `X` eraser, `L` line, `R`
-rectangle, `O` ellipse, and `T` text; `[`/`]` change brush size and `0` fits the
-image to the screen. Image work runs in an `OffscreenCanvas` worker where
-available; very large images are opened at a reduced size with a status notice.
-Brush strokes use dirty-region compositing, and previews are cached and
-superseded so outdated work is discarded. Exports default to a new `-edited`
-file, and the original is never overwritten unless overwrite is explicitly
-confirmed. SVG files are rasterized on open; full vector-node editing is not
-implemented.
+is a local raster image and asset workspace. Nothing in Canvas contacts the
+network.
+
+- **Editing:** selection and crop with draggable handles (Enter or Apply crop
+  commits), pan and zoom including Ctrl+wheel, brush/eraser with opacity,
+  text, layers with visibility/order/opacity, undo/redo, rotation, flips,
+  resize, and crop. Brush strokes use dirty-region compositing; large image
+  work runs in an `OffscreenCanvas` worker with an identical local fallback.
+  Very large images open at reduced resolution; **Full size** reopens the file
+  from disk at full resolution when you need it.
+- **Shapes and annotation:** line, rectangle, ellipse, arrow, triangle, star,
+  regular polygon (3–24 sides), numbered callouts, translucent highlights,
+  and a pixel ruler. Hold Shift for 45° lines, squares, and centered polygons.
+  Filled shapes use the separate shape-fill color; callout numbering can be
+  reset. These tools cover screenshot annotation without an external service.
+- **Color grading:** exposure in photographic stops, brightness, contrast,
+  saturation, temperature, tint, highlights, shadows, vibrance, hue, and gamma.
+  Sliders produce a live low-resolution preview and are committed to the full
+  image only when you choose Apply grading; Reset restores neutral values.
+  Look presets (warm, cool, cinematic, vintage, noir) are editable starting
+  points, not baked-in filters. Extra pixel filters include warm, cool, vintage,
+  and noir; sharpen, grayscale, sepia, invert, and blur are also available.
+- **Color inspection:** eyedropper sampling of any pixel, HEX input, live RGB
+  and HSL readouts, and palette extraction from the current image. Clicking a
+  palette swatch makes it the active drawing color.
+- **Asset work:** asset size presets (favicon, app icons, PWA icon, avatar,
+  social card), configurable grid with optional snapping, center guides, and a
+  transparency preview background (checker, white, black, magenta). SVG files
+  can be opened and their source text edited in the inspector; Apply preview
+  rasterizes the edited source at a chosen size, and Save source to file
+  explicitly writes the text back to the original path. Vector node editing,
+  SVG export, and OCR are not implemented.
+- **Comparison:** capture a screen-resolution baseline and drag the divider to
+  compare it with the current image. The baseline is session-only and is not
+  written to disk.
+- **Export:** PNG, JPEG, or WebP with editable destination, export presets,
+  aspect lock, quality, resize, and a matte color for opaque formats. The
+  destination extension is corrected to match the encoded format before
+  writing. Exports default to a new `-edited` file; the original is never
+  replaced unless overwrite is explicitly confirmed.
+
+Tool shortcuts: `V` select, `C` crop, `H` pan, `Z` zoom, `B` brush, `X` eraser,
+`T` text, `L` line, `R` rectangle, `O` ellipse, `A` arrow, `N` triangle, `S`
+star, `P` polygon, `K` callout, `Y` highlight, `M` measure, `I` eyedropper.
+`[`/`]` change brush size, `0` fits the image, and Ctrl+Z/Ctrl+Shift+Z undo and
+redo. Shortcuts use physical key positions so they also work on non-QWERTY
+layouts.
 
 Both tools are offline-first and keep their state on the device.
 

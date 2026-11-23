@@ -27,6 +27,7 @@ export interface HistoryOptions<T> {
 }
 
 export const DEFAULT_MAX_PIXELS = 24_000_000;
+export const MAX_DOCUMENT_PIXELS = 100_000_000;
 export const DEFAULT_HISTORY_ENTRIES = 6;
 export const DEFAULT_HISTORY_BYTES = 64 * 1024 * 1024;
 export const DEFAULT_PREVIEW_PIXELS = 640_000;
@@ -134,7 +135,23 @@ export function resizeDimensions(
 export function fitWithin(width: number, height: number, maxPixels = DEFAULT_MAX_PIXELS): Size {
   if (!(width > 0) || !(height > 0) || !(maxPixels > 0)) return { width: 1, height: 1 };
   if (width * height <= maxPixels) return { width, height };
-  return resizeDimensions(width, height, Math.sqrt(maxPixels), Math.sqrt(maxPixels));
+  // Scale both axes by the same factor. Fitting each axis into a sqrt() box
+  // destroys the aspect ratio of panoramas and tall images.
+  const scale = Math.sqrt(maxPixels / (width * height));
+  let fittedWidth = Math.max(1, Math.floor(width * scale));
+  let fittedHeight = Math.max(1, Math.floor(height * scale));
+  // Rounding can overshoot the budget by a few pixels; step down deterministically.
+  while (fittedWidth > 1 && fittedHeight > 1 && fittedWidth * fittedHeight > maxPixels) {
+    if (fittedWidth / width > fittedHeight / height) fittedWidth -= 1;
+    else fittedHeight -= 1;
+  }
+  return { width: fittedWidth, height: fittedHeight };
+}
+
+export function isValidDocumentSize(size: Size, maxPixels = MAX_DOCUMENT_PIXELS): boolean {
+  return Number.isInteger(size.width) && Number.isInteger(size.height)
+    && size.width > 0 && size.height > 0 && size.width <= 20_000 && size.height <= 20_000
+    && size.width * size.height <= maxPixels;
 }
 
 export function rotateDimensions(size: Size, angle: 90 | 180 | 270): Size {
@@ -269,3 +286,197 @@ export function historyOptionsForBytes(bytes: number): { maxEntries: number; max
 export function estimateRgbaBytes(width: number, height: number): number {
   return Math.max(0, Math.floor(finite(width, 0))) * Math.max(0, Math.floor(finite(height, 0))) * 4;
 }
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface Measurement {
+  dx: number;
+  dy: number;
+  distance: number;
+  angle: number;
+}
+
+export function measureBetween(from: Point, to: Point): Measurement {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  return {
+    dx,
+    dy,
+    distance: Math.hypot(dx, dy),
+    angle: (Math.atan2(-dy, dx) * 180) / Math.PI,
+  };
+}
+
+export function snapPoint(point: Point, spacing: number, width: number, height: number): Point {
+  if (!(spacing >= 1)) return { x: point.x, y: point.y };
+  return {
+    x: Math.max(0, Math.min(width, Math.round(point.x / spacing) * spacing)),
+    y: Math.max(0, Math.min(height, Math.round(point.y / spacing) * spacing)),
+  };
+}
+
+/** Constrain a shape so rectangles/ellipses stay square and lines snap to 45°. */
+export function constrainShape(from: Point, to: Point): Point {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.abs(dx) >= Math.abs(dy) * 2) return { x: to.x, y: from.y };
+  if (Math.abs(dy) >= Math.abs(dx) * 2) return { x: from.x, y: to.y };
+  const side = Math.max(Math.abs(dx), Math.abs(dy));
+  return { x: from.x + Math.sign(dx || 1) * side, y: from.y + Math.sign(dy || 1) * side };
+}
+
+/** Keep a rectangle-like shape square without collapsing shallow drags. */
+export function constrainSquare(from: Point, to: Point): Point {
+  const side = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+  return {
+    x: from.x + (Math.sign(to.x - from.x) || 1) * side,
+    y: from.y + (Math.sign(to.y - from.y) || 1) * side,
+  };
+}
+
+export function lineEndpoints(from: Point, to: Point): [Point, Point] {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.abs(dx) >= Math.abs(dy) * 2) return [from, { x: to.x, y: from.y }];
+  if (Math.abs(dy) >= Math.abs(dx) * 2) return [from, { x: from.x, y: to.y }];
+  const constrained = constrainShape(from, to);
+  return [from, constrained];
+}
+
+export function regularPolygonPoints(center: Point, radius: number, sides: number, rotation = -Math.PI / 2): Point[] {
+  const count = Math.max(3, Math.min(24, Math.floor(finite(sides, 5))));
+  const r = Math.max(0, finite(radius, 0));
+  const points: Point[] = [];
+  for (let index = 0; index < count; index++) {
+    const angle = rotation + (index * Math.PI * 2) / count;
+    points.push({ x: center.x + Math.cos(angle) * r, y: center.y + Math.sin(angle) * r });
+  }
+  return points;
+}
+
+export function starPoints(center: Point, outerRadius: number, innerRadius: number, points = 5): Point[] {
+  const count = Math.max(3, Math.min(16, Math.floor(finite(points, 5))));
+  const outer = Math.max(0, finite(outerRadius, 0));
+  const inner = Math.max(0, finite(innerRadius, 0));
+  const result: Point[] = [];
+  for (let index = 0; index < count * 2; index++) {
+    const radius = index % 2 === 0 ? outer : inner;
+    const angle = -Math.PI / 2 + (index * Math.PI) / count;
+    result.push({ x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius });
+  }
+  return result;
+}
+
+export function arrowHeadPoints(tip: Point, from: Point, size: number): [Point, Point] {
+  const dx = tip.x - from.x;
+  const dy = tip.y - from.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const ux = dx / length;
+  const uy = dy / length;
+  const s = Math.max(2, finite(size, 12));
+  const backX = tip.x - ux * s;
+  const backY = tip.y - uy * s;
+  const spread = s * 0.5;
+  return [
+    { x: backX - uy * spread, y: backY + ux * spread },
+    { x: backX + uy * spread, y: backY - ux * spread },
+  ];
+}
+
+export const IMAGE_PATH_PATTERN = /\.(png|jpe?g|webp|svg)$/i;
+
+export function isImagePath(path: string): boolean {
+  return IMAGE_PATH_PATTERN.test(path);
+}
+
+export const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+export function normalizeColor(value: string | null | undefined, fallback = "#59c7d4"): string {
+  return value && HEX_COLOR.test(value.trim()) ? value.trim().toLowerCase() : fallback;
+}
+
+export interface RGB { r: number; g: number; b: number }
+export interface HSL { h: number; s: number; l: number }
+
+export function hexToRgb(hex: string): RGB {
+  const value = normalizeColor(hex);
+  return {
+    r: Number.parseInt(value.slice(1, 3), 16),
+    g: Number.parseInt(value.slice(3, 5), 16),
+    b: Number.parseInt(value.slice(5, 7), 16),
+  };
+}
+
+export function rgbToHex(r: number, g: number, b: number): string {
+  const part = (value: number) => Math.max(0, Math.min(255, Math.round(finite(value, 0)))).toString(16).padStart(2, "0");
+  return `#${part(r)}${part(g)}${part(b)}`;
+}
+
+export function rgbToHsl(r: number, g: number, b: number): HSL {
+  const rn = Math.max(0, Math.min(1, r / 255));
+  const gn = Math.max(0, Math.min(1, g / 255));
+  const bn = Math.max(0, Math.min(1, b / 255));
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const delta = max - min;
+  const l = (max + min) / 2;
+  if (delta === 0) return { h: 0, s: 0, l: l * 100 };
+  const s = delta / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (max === rn) h = ((gn - bn) / delta) % 6;
+  else if (max === gn) h = (bn - rn) / delta + 2;
+  else h = (rn - gn) / delta + 4;
+  h = (h * 60 + 360) % 360;
+  return { h, s: s * 100, l: l * 100 };
+}
+
+export function exportExtensionForMime(mime: string): "png" | "jpg" | "webp" {
+  if (mime === "image/jpeg") return "jpg";
+  if (mime === "image/webp") return "webp";
+  return "png";
+}
+
+export function normalizeExportPath(path: string, mime: string): string {
+  const extension = exportExtensionForMime(mime);
+  if (!path || /[\\/]$/.test(path)) return `${path}untitled.${extension}`;
+  if (!/\.[^./\\]+$/.test(path)) return `${path}.${extension}`;
+  return path.replace(/\.[^./\\]+$/, `.${extension}`);
+}
+
+export interface AssetPreset {
+  id: string;
+  label: string;
+  width: number;
+  height: number;
+}
+
+export const ASSET_PRESETS: AssetPreset[] = [
+  { id: "favicon", label: "Favicon 32×32", width: 32, height: 32 },
+  { id: "icon-128", label: "App icon 128×128", width: 128, height: 128 },
+  { id: "icon-256", label: "App icon 256×256", width: 256, height: 256 },
+  { id: "icon-512", label: "PWA icon 512×512", width: 512, height: 512 },
+  { id: "avatar", label: "Avatar 512×512", width: 512, height: 512 },
+  { id: "og", label: "Social card 1200×630", width: 1200, height: 630 },
+];
+
+export interface ExportPreset {
+  id: string;
+  label: string;
+  suffix: string;
+  width: number | null;
+  height: number | null;
+  mime: "image/png" | "image/jpeg" | "image/webp";
+  quality: number;
+}
+
+export const EXPORT_PRESETS: ExportPreset[] = [
+  { id: "source", label: "Source resolution (PNG)", suffix: "-edited", width: null, height: null, mime: "image/png", quality: 100 },
+  { id: "web", label: "Web asset (WebP 90)", suffix: "-web", width: null, height: null, mime: "image/webp", quality: 90 },
+  { id: "photo", label: "Photo (JPEG 88)", suffix: "-photo", width: null, height: null, mime: "image/jpeg", quality: 88 },
+  { id: "favicon", label: "Favicon 32×32 PNG", suffix: "-32", width: 32, height: 32, mime: "image/png", quality: 100 },
+  { id: "avatar", label: "Avatar 512×512 PNG", suffix: "-avatar", width: 512, height: 512, mime: "image/png", quality: 100 },
+  { id: "og", label: "Social card 1200×630 PNG", suffix: "-card", width: 1200, height: 630, mime: "image/png", quality: 100 },
+];

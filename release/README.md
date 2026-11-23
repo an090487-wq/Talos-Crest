@@ -18,7 +18,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`858310d7dd16047261c80b6d50fcfd05a96924a91a17c3f02ddd8f27b30e126c`
+`76f76279f2f7023edabf88d5265f8d1d3531190bbaf9ab65edc8837fa62d341d`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -35,7 +35,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`23d01bb2f89dafa941980a3a04d7c15a736ab9d80159611eaeb776aa9f2f6530`
+`5595e37734b28dac9536729e59a1484944d9d1b91647edc2d4517712c62875f7`
 
 ## Optional GitHub access
 
@@ -49,6 +49,14 @@ Both builds also include the Universal Project Workspace: a bounded local
 folder scanner with nested Explorer navigation, recent projects, structured
 file-change updates, shared ignore rules, and Chronicle project memory. No
 workspace content is uploaded or analyzed remotely.
+
+Canvas is also fully local. It includes screenshot annotation shapes and
+callouts, pixel measurement, palette extraction and HEX/RGB/HSL inspection,
+asset-size presets, grid snapping and guides, transparency preview, SVG source
+editing for local raster previews, before/after comparison, and export presets.
+Grading and filters run in an `OffscreenCanvas` worker where available, with an
+identical main-thread fallback. Large images open at reduced resolution by
+default and can be reopened at full size from disk; no image data is uploaded.
 
 ## GitHub publishing
 

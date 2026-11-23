@@ -1,17 +1,23 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import ts from "typescript";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const source = await readFile(resolve(appDir, "src/canvas/image-core.ts"), "utf8");
-const compiled = ts.transpileModule(source, {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-}).outputText;
-const canvasModule = { exports: {} };
-new Function("module", "exports", compiled)(canvasModule, canvasModule.exports);
+function loadTsModule(relativePath) {
+  const code = readFileSync(resolve(appDir, relativePath), "utf8");
+  const compiled = ts.transpileModule(code, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleObject = { exports: {} };
+  new Function("module", "exports", compiled)(moduleObject, moduleObject.exports);
+  return moduleObject;
+}
+
+const canvasModule = loadTsModule("src/canvas/image-core.ts");
+const pixelsModule = loadTsModule("src/canvas/image-pixels.ts");
 const {
   BoundedHistory,
   DEFAULT_MAX_PIXELS,
@@ -27,7 +33,35 @@ const {
   resizeDimensions,
   rotateDimensions,
   unionRect,
+  ASSET_PRESETS,
+  EXPORT_PRESETS,
+  arrowHeadPoints,
+  constrainShape,
+  constrainSquare,
+  exportExtensionForMime,
+  hexToRgb,
+  isImagePath,
+  isValidDocumentSize,
+  lineEndpoints,
+  measureBetween,
+  normalizeColor,
+  normalizeExportPath,
+  regularPolygonPoints,
+  rgbToHex,
+  rgbToHsl,
+  snapPoint,
+  starPoints,
 } = canvasModule.exports;
+
+const {
+  NEUTRAL_GRADING,
+  applyFilter,
+  applyGrading,
+  exposureMultiplier,
+  extractPalette,
+  isNeutralGrading,
+  normalizeGrading,
+} = pixelsModule.exports;
 
 test("crop rectangles stay inside the image and keep at least one pixel", () => {
   assert.deepEqual(clampRect({ x: -20, y: -20, width: 500, height: 500 }, 200, 100), {
@@ -157,4 +191,141 @@ test("RGBA byte estimates are bounded and non-negative", () => {
   assert.equal(estimateRgbaBytes(100, 100), 40_000);
   assert.equal(estimateRgbaBytes(-1, 100), 0);
   assert.equal(estimateRgbaBytes(Number.NaN, 100), 0);
+});
+
+test("downsampling preserves the aspect ratio of panoramas", () => {
+  const fitted = fitWithin(20_000, 2_000);
+  assert.ok(fitted.width * fitted.height <= DEFAULT_MAX_PIXELS);
+  assert.ok(Math.abs(fitted.width / fitted.height - 10) < 0.02);
+  assert.ok(fitted.width > 10_000, "a panorama must not be shrunk to a square");
+  assert.deepEqual(fitWithin(4_000, 3_000), { width: 4_000, height: 3_000 });
+});
+
+test("document sizes are bounded before a resize allocates memory", () => {
+  assert.equal(isValidDocumentSize({ width: 512, height: 512 }), true);
+  assert.equal(isValidDocumentSize({ width: 20_001, height: 10 }), false);
+  assert.equal(isValidDocumentSize({ width: 20_000, height: 20_000 }), false);
+  assert.equal(isValidDocumentSize({ width: 1.5, height: 10 }), false);
+});
+
+test("annotation geometry is deterministic", () => {
+  const measured = measureBetween({ x: 3, y: 7 }, { x: 6, y: 3 });
+  assert.equal(measured.distance, 5);
+  assert.equal(measured.dx, 3);
+  assert.equal(measured.dy, -4);
+  assert.ok(Math.abs(measured.angle - 53.13) < 0.01);
+  assert.deepEqual(constrainShape({ x: 0, y: 0 }, { x: 10, y: 2 }), { x: 10, y: 0 });
+  assert.deepEqual(constrainShape({ x: 0, y: 0 }, { x: 10, y: 8 }), { x: 10, y: 10 });
+  assert.deepEqual(constrainSquare({ x: 0, y: 0 }, { x: 10, y: 2 }), { x: 10, y: 10 });
+  assert.deepEqual(lineEndpoints({ x: 0, y: 0 }, { x: 10, y: 8 }), [{ x: 0, y: 0 }, { x: 10, y: 10 }]);
+  assert.equal(regularPolygonPoints({ x: 0, y: 0 }, 10, 6).length, 6);
+  assert.equal(starPoints({ x: 0, y: 0 }, 10, 5, 5).length, 10);
+  assert.equal(arrowHeadPoints({ x: 10, y: 0 }, { x: 0, y: 0 }, 6).length, 2);
+  assert.deepEqual(snapPoint({ x: 17, y: 19 }, 8, 100, 100), { x: 16, y: 16 });
+});
+
+test("colors round-trip through hex, RGB and HSL", () => {
+  assert.equal(normalizeColor("not-a-color", "#59c7d4"), "#59c7d4");
+  assert.equal(normalizeColor("#AABBCC"), "#aabbcc");
+  assert.deepEqual(hexToRgb("#ff0000"), { r: 255, g: 0, b: 0 });
+  assert.equal(rgbToHex(255, 0, 0), "#ff0000");
+  const hsl = rgbToHsl(255, 0, 0);
+  assert.equal(Math.round(hsl.h), 0);
+  assert.equal(Math.round(hsl.s), 100);
+  assert.equal(Math.round(hsl.l), 50);
+});
+
+test("export paths always match the encoded format", () => {
+  assert.equal(exportExtensionForMime("image/jpeg"), "jpg");
+  assert.equal(exportExtensionForMime("image/webp"), "webp");
+  assert.equal(normalizeExportPath("photo.svg", "image/png"), "photo.png");
+  assert.equal(normalizeExportPath("no-extension", "image/webp"), "no-extension.webp");
+  assert.equal(isImagePath("/tmp/Photo.JPEG"), true);
+  assert.equal(isImagePath("/tmp/notes.txt"), false);
+  for (const preset of ASSET_PRESETS) assert.ok(isValidDocumentSize({ width: preset.width, height: preset.height }));
+  for (const preset of EXPORT_PRESETS) {
+    assert.ok(["image/png", "image/jpeg", "image/webp"].includes(preset.mime));
+    if (preset.width) assert.ok(isValidDocumentSize({ width: preset.width, height: preset.height }));
+  }
+});
+
+function solid(width, height, r, g, b) {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let index = 0; index < width * height; index++) {
+    data[index * 4] = r;
+    data[index * 4 + 1] = g;
+    data[index * 4 + 2] = b;
+    data[index * 4 + 3] = 255;
+  }
+  return { width, height, data };
+}
+
+test("exposure is symmetric photographic stops", () => {
+  assert.equal(exposureMultiplier(0), 1);
+  assert.equal(exposureMultiplier(-100), 0.25);
+  assert.equal(exposureMultiplier(100), 4);
+});
+
+test("neutral grading is an identity transform", () => {
+  const source = solid(2, 2, 30, 90, 180);
+  assert.deepEqual(isNeutralGrading(NEUTRAL_GRADING), true);
+  assert.deepEqual(isNeutralGrading({ brightness: 1 }), false);
+  assert.deepEqual(applyGrading(source, NEUTRAL_GRADING).data, source.data);
+  assert.deepEqual(applyGrading(source, null).data, source.data);
+});
+
+test("color grading changes tonal and color channels predictably", () => {
+  const mid = solid(1, 1, 128, 128, 128);
+  const brighter = applyGrading(mid, { exposure: 50 });
+  assert.ok(brighter.data[0] > mid.data[0]);
+  const darker = applyGrading(mid, { exposure: -50 });
+  assert.ok(darker.data[0] < mid.data[0]);
+  const warmer = applyGrading(mid, { temperature: 100 });
+  assert.ok(warmer.data[0] > mid.data[0]);
+  assert.ok(warmer.data[0] > warmer.data[2]);
+  const cool = applyGrading(mid, { temperature: -100 });
+  assert.ok(cool.data[2] > cool.data[0]);
+  const grey = applyGrading(solid(1, 1, 200, 100, 40), { saturation: -100 });
+  assert.equal(grey.data[0], grey.data[1]);
+  assert.equal(grey.data[1], grey.data[2]);
+  const gamma = applyGrading(mid, { gamma: 50 });
+  assert.ok(gamma.data[0] > mid.data[0]);
+  const shadows = applyGrading(solid(1, 1, 20, 20, 20), { shadows: 100 });
+  const highlights = applyGrading(solid(1, 1, 20, 20, 20), { highlights: 100 });
+  assert.ok(shadows.data[0] - 20 > highlights.data[0] - 20);
+});
+
+test("filters transform pixels without a DOM", () => {
+  const source = solid(1, 1, 200, 100, 50);
+  assert.deepEqual([...applyFilter(source, "invert").data.slice(0, 3)], [55, 155, 205]);
+  const grey = applyFilter(source, "grayscale");
+  assert.equal(grey.data[0], grey.data[1]);
+  assert.equal(grey.data[1], grey.data[2]);
+  const sepia = applyFilter(source, "sepia");
+  assert.ok(sepia.data[0] > sepia.data[2]);
+  const graded = applyGrading(source, { contrast: 40, vibrance: 30, hue: 30, tint: 20 });
+  assert.ok([...graded.data.slice(0, 3)].every((value) => value >= 0 && value <= 255));
+  assert.equal(normalizeGrading({ brightness: 500 }).brightness, 100);
+  assert.equal(normalizeGrading({ hue: 180 }).hue, 180);
+});
+
+test("palette extraction is bounded and returns valid hex colors", () => {
+  const image = solid(8, 8, 40, 90, 160);
+  const palette = extractPalette(image, 6);
+  assert.equal(palette.length, 1);
+  assert.match(palette[0], /^#[0-9a-f]{6}$/);
+  const many = solid(16, 16, 0, 0, 0);
+  for (let index = 0; index < 16 * 16; index++) {
+    if (index % 4 === 0) many.data[index * 4] = 255;
+    if (index % 4 === 1) many.data[index * 4 + 1] = 255;
+  }
+  assert.ok(extractPalette(many, 12).length <= 12);
+});
+
+test("pixel results become real ImageData before canvas drawing", () => {
+  for (const file of ["src/canvas/canvas-ui.ts", "src/canvas/image-worker.ts"]) {
+    const code = readFileSync(resolve(appDir, file), "utf8");
+    assert.match(code, /new ImageData\(/, file);
+    assert.doesNotMatch(code, /putImageData\([^;]*\bas ImageData\b/, file);
+  }
 });

@@ -1,7 +1,10 @@
 // OffscreenCanvas worker for Talos Canvas. Image processing stays off the UI
 // thread; bitmaps and encoded bytes are transferred, never copied through JSON.
+// All pixel math comes from image-pixels.ts so the fallback cannot drift.
 
-import { fitWithin } from "./image-core";
+import { fitWithin, MAX_DOCUMENT_PIXELS } from "./image-core";
+import { applyFilter, applyGrading, BLUR_CSS, boxBlurPixels, extractPalette } from "./image-pixels";
+import type { ImageRequest, WorkerRequest } from "./image-requests";
 
 interface WorkerScope {
   postMessage(message: unknown, transfer?: Transferable[]): void;
@@ -10,39 +13,12 @@ interface WorkerScope {
 
 const scope = self as unknown as WorkerScope;
 
-type FilterName = "grayscale" | "sepia" | "invert" | "blur" | "sharpen";
-type Axis = "horizontal" | "vertical";
-
-interface LayerPayload {
-  bitmap: ImageBitmap;
-  opacity: number;
-  visible: boolean;
-}
-
 interface ProcessResult {
   bitmap?: ImageBitmap;
   bytes?: Uint8Array;
+  colors?: string[];
   downsampled?: boolean;
 }
-
-type CanvasRequest =
-  | { id: number; type: "decode"; bytes: Uint8Array; mime: string; maxPixels: number }
-  | { id: number; type: "resize"; bitmap: ImageBitmap; width: number; height: number }
-  | { id: number; type: "crop"; bitmap: ImageBitmap; x: number; y: number; width: number; height: number }
-  | { id: number; type: "rotate"; bitmap: ImageBitmap; angle: 90 | 180 | 270 }
-  | { id: number; type: "flip"; bitmap: ImageBitmap; axis: Axis }
-  | {
-      id: number;
-      type: "adjust";
-      bitmap: ImageBitmap;
-      brightness: number;
-      contrast: number;
-      saturation: number;
-      exposure: number;
-    }
-  | { id: number; type: "filter"; bitmap: ImageBitmap; filter: FilterName }
-  | { id: number; type: "encode"; bitmap: ImageBitmap; mime: string; quality: number }
-  | { id: number; type: "flatten"; layers: LayerPayload[]; width: number; height: number };
 
 function context(canvas: OffscreenCanvas): OffscreenCanvasRenderingContext2D {
   const ctx = canvas.getContext("2d");
@@ -54,110 +30,120 @@ function canvasFor(width: number, height: number): OffscreenCanvas {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
     throw new Error("Invalid image dimensions.");
   }
-  return new OffscreenCanvas(Math.max(1, Math.floor(width)), Math.max(1, Math.floor(height)));
+  if (width * height > MAX_DOCUMENT_PIXELS) throw new Error("The image is too large to process safely.");
+  return new OffscreenCanvas(Math.floor(width), Math.floor(height));
 }
 
-function sharpen(ctx: OffscreenCanvasRenderingContext2D, width: number, height: number): void {
-  const image = ctx.getImageData(0, 0, width, height);
-  const source = image.data;
-  const output = new Uint8ClampedArray(source);
-  const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      for (let channel = 0; channel < 3; channel++) {
-        let sum = 0;
-        for (let ky = -1; ky <= 1; ky++) {
-          for (let kx = -1; kx <= 1; kx++) {
-            sum += source[((y + ky) * width + x + kx) * 4 + channel] * kernel[(ky + 1) * 3 + kx + 1];
-          }
-        }
-        output[(y * width + x) * 4 + channel] = sum;
-      }
-    }
+function validateBitmap(bitmap: ImageBitmap): void {
+  if (!(bitmap.width > 0) || !(bitmap.height > 0) || bitmap.width * bitmap.height > MAX_DOCUMENT_PIXELS) {
+    throw new Error("The image has invalid dimensions.");
   }
-  image.data.set(output);
-  ctx.putImageData(image, 0, 0);
 }
 
-async function decode(request: Extract<CanvasRequest, { type: "decode" }>): Promise<ProcessResult> {
-  const blob = new Blob([request.bytes as BlobPart], { type: request.mime || "image/png" });
-  const bitmap = await createImageBitmap(blob);
-  const fitted = fitWithin(bitmap.width, bitmap.height, request.maxPixels);
-  if (fitted.width === bitmap.width && fitted.height === bitmap.height) {
-    return { bitmap, downsampled: false };
-  }
-  const resized = await createImageBitmap(bitmap, {
-    resizeWidth: fitted.width,
-    resizeHeight: fitted.height,
-  });
-  bitmap.close();
-  return { bitmap: resized, downsampled: true };
-}
-
-async function encode(request: Extract<CanvasRequest, { type: "encode" }>): Promise<ProcessResult> {
-  const canvas = canvasFor(request.bitmap.width, request.bitmap.height);
+/** Always release a transferred bitmap, even when validation or allocation fails. */
+function withBitmap<T>(bitmap: ImageBitmap, work: (source: ImageBitmap) => T): T {
   try {
-    const ctx = context(canvas);
-    ctx.drawImage(request.bitmap, 0, 0);
-    let blob: Blob;
+    return work(bitmap);
+  } finally {
+    bitmap.close();
+  }
+}
+
+async function decode(request: Extract<ImageRequest, { type: "decode" }>): Promise<ProcessResult> {
+  let bitmap: ImageBitmap | null = null;
+  try {
+    const blob = new Blob([request.bytes as BlobPart], { type: request.mime || "image/png" });
     try {
-      blob = await canvas.convertToBlob({ type: request.mime, quality: request.quality });
+      bitmap = await createImageBitmap(blob);
     } catch {
-      blob = await canvas.convertToBlob({ type: "image/png" });
+      // SVG is rasterized by the main-thread fallback (it needs an <img> element).
+      throw new Error("This format cannot be decoded in the image worker.");
+    }
+    validateBitmap(bitmap);
+    const fitted = fitWithin(bitmap.width, bitmap.height, request.maxPixels);
+    if (fitted.width === bitmap.width && fitted.height === bitmap.height) {
+      const result = bitmap;
+      bitmap = null;
+      return { bitmap: result, downsampled: false };
+    }
+    const resized = await createImageBitmap(bitmap, {
+      resizeWidth: fitted.width,
+      resizeHeight: fitted.height,
+      resizeQuality: "high",
+    });
+    return { bitmap: resized, downsampled: true };
+  } finally {
+    bitmap?.close();
+  }
+}
+
+async function encode(request: Extract<ImageRequest, { type: "encode" }>): Promise<ProcessResult> {
+  const bitmap = request.bitmap;
+  try {
+    const canvas = canvasFor(bitmap.width, bitmap.height);
+    const ctx = context(canvas);
+    // JPEG has no alpha channel; an explicit matte prevents black fringes.
+    if (request.mime === "image/jpeg") {
+      const background = request.background && /^#[0-9a-f]{6}$/i.test(request.background)
+        ? request.background : "#ffffff";
+      ctx.fillStyle = background;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    ctx.drawImage(bitmap, 0, 0);
+    const blob = await canvas.convertToBlob({ type: request.mime, quality: request.quality });
+    if (blob.type !== request.mime) {
+      throw new Error(`${request.mime} export is not supported by this browser. Choose PNG instead.`);
     }
     return { bytes: new Uint8Array(await blob.arrayBuffer()) };
   } finally {
-    request.bitmap.close();
+    bitmap.close();
   }
 }
 
-function process(request: CanvasRequest): ProcessResult {
+function pixels(ctx: OffscreenCanvasRenderingContext2D, width: number, height: number) {
+  return ctx.getImageData(0, 0, width, height);
+}
+
+function process(request: ImageRequest): ProcessResult {
   switch (request.type) {
     case "decode":
       throw new Error("Decode requests are handled asynchronously.");
-    case "resize": {
-      const canvas = canvasFor(request.width, request.height);
-      try {
+    case "resize":
+      return withBitmap(request.bitmap, (bitmap) => {
+        validateBitmap(bitmap);
+        const canvas = canvasFor(request.width, request.height);
         const ctx = context(canvas);
+        ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(request.bitmap, 0, 0, request.width, request.height);
+        ctx.drawImage(bitmap, 0, 0, request.width, request.height);
         return { bitmap: canvas.transferToImageBitmap() };
-      } finally {
-        request.bitmap.close();
-      }
-    }
-    case "crop": {
-      const canvas = canvasFor(request.width, request.height);
-      try {
+      });
+    case "crop":
+      return withBitmap(request.bitmap, (bitmap) => {
+        validateBitmap(bitmap);
+        const { rect } = request;
+        const canvas = canvasFor(rect.width, rect.height);
         const ctx = context(canvas);
-        ctx.drawImage(
-          request.bitmap,
-          request.x, request.y, request.width, request.height,
-          0, 0, request.width, request.height,
-        );
+        ctx.drawImage(bitmap, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
         return { bitmap: canvas.transferToImageBitmap() };
-      } finally {
-        request.bitmap.close();
-      }
-    }
-    case "rotate": {
-      const swaps = request.angle === 180;
-      const width = swaps ? request.bitmap.width : request.bitmap.height;
-      const height = swaps ? request.bitmap.height : request.bitmap.width;
-      const canvas = canvasFor(width, height);
-      try {
+      });
+    case "rotate":
+      return withBitmap(request.bitmap, (bitmap) => {
+        validateBitmap(bitmap);
+        const swaps = request.angle === 180;
+        const width = swaps ? bitmap.width : bitmap.height;
+        const height = swaps ? bitmap.height : bitmap.width;
+        const canvas = canvasFor(width, height);
         const ctx = context(canvas);
         ctx.translate(width / 2, height / 2);
         ctx.rotate((request.angle * Math.PI) / 180);
-        ctx.drawImage(request.bitmap, -request.bitmap.width / 2, -request.bitmap.height / 2);
+        ctx.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2);
         return { bitmap: canvas.transferToImageBitmap() };
-      } finally {
-        request.bitmap.close();
-      }
-    }
-    case "flip": {
-      const canvas = canvasFor(request.bitmap.width, request.bitmap.height);
-      try {
+      });
+    case "flip":
+      return withBitmap(request.bitmap, (bitmap) => {
+        validateBitmap(bitmap);
+        const canvas = canvasFor(bitmap.width, bitmap.height);
         const ctx = context(canvas);
         if (request.axis === "horizontal") {
           ctx.translate(canvas.width, 0);
@@ -166,51 +152,46 @@ function process(request: CanvasRequest): ProcessResult {
           ctx.translate(0, canvas.height);
           ctx.scale(1, -1);
         }
-        ctx.drawImage(request.bitmap, 0, 0);
+        ctx.drawImage(bitmap, 0, 0);
         return { bitmap: canvas.transferToImageBitmap() };
-      } finally {
-        request.bitmap.close();
-      }
-    }
-    case "adjust": {
-      const { brightness, contrast, saturation, exposure } = request;
-      const canvas = canvasFor(request.bitmap.width, request.bitmap.height);
-      try {
+      });
+    case "adjust":
+      return withBitmap(request.bitmap, (bitmap) => {
+        validateBitmap(bitmap);
+        const canvas = canvasFor(bitmap.width, bitmap.height);
         const ctx = context(canvas);
-        const light = Math.max(0.1, Math.min(3, 1 + brightness / 100 + exposure));
-        const contrastValue = Math.max(0, Math.min(3, 1 + contrast / 100));
-        const saturationValue = Math.max(0, Math.min(3, 1 + saturation / 100));
-        ctx.filter = `brightness(${light}) contrast(${contrastValue}) saturate(${saturationValue})`;
-        ctx.drawImage(request.bitmap, 0, 0);
+        ctx.drawImage(bitmap, 0, 0);
+        const result = applyGrading(pixels(ctx, canvas.width, canvas.height), request.grading);
+        ctx.putImageData(new ImageData(result.data, result.width, result.height), 0, 0);
         return { bitmap: canvas.transferToImageBitmap() };
-      } finally {
-        request.bitmap.close();
-      }
-    }
-    case "filter": {
-      const canvas = canvasFor(request.bitmap.width, request.bitmap.height);
-      try {
+      });
+    case "filter":
+      return withBitmap(request.bitmap, (bitmap) => {
+        validateBitmap(bitmap);
+        const canvas = canvasFor(bitmap.width, bitmap.height);
         const ctx = context(canvas);
-        const filters: Record<FilterName, string> = {
-          grayscale: "grayscale(1)",
-          sepia: "sepia(1)",
-          invert: "invert(1)",
-          blur: "blur(1.5px)",
-          sharpen: "none",
-        };
-        ctx.filter = filters[request.filter];
-        ctx.drawImage(request.bitmap, 0, 0);
-        if (request.filter === "sharpen") sharpen(ctx, canvas.width, canvas.height);
+        if (request.filter === "blur") {
+          if ("filter" in (ctx as object)) {
+            ctx.filter = BLUR_CSS;
+            ctx.drawImage(bitmap, 0, 0);
+            ctx.filter = "none";
+          } else {
+            ctx.drawImage(bitmap, 0, 0);
+            const blurred = boxBlurPixels(pixels(ctx, canvas.width, canvas.height));
+            ctx.putImageData(new ImageData(blurred.data, blurred.width, blurred.height), 0, 0);
+          }
+        } else {
+          ctx.drawImage(bitmap, 0, 0);
+          const result = applyFilter(pixels(ctx, canvas.width, canvas.height), request.filter);
+          ctx.putImageData(new ImageData(result.data, result.width, result.height), 0, 0);
+        }
         return { bitmap: canvas.transferToImageBitmap() };
-      } finally {
-        request.bitmap.close();
-      }
-    }
+      });
     case "encode":
       throw new Error("Encode requests are handled asynchronously.");
     case "flatten": {
-      const canvas = canvasFor(request.width, request.height);
       try {
+        const canvas = canvasFor(request.width, request.height);
         const ctx = context(canvas);
         for (const layer of request.layers) {
           if (!layer.visible || layer.opacity <= 0) continue;
@@ -223,6 +204,16 @@ function process(request: CanvasRequest): ProcessResult {
         for (const layer of request.layers) layer.bitmap.close();
       }
     }
+    case "palette":
+      return withBitmap(request.bitmap, (bitmap) => {
+        validateBitmap(bitmap);
+        const fitted = fitWithin(bitmap.width, bitmap.height, 640_000);
+        const canvas = canvasFor(fitted.width, fitted.height);
+        const ctx = context(canvas);
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(bitmap, 0, 0, fitted.width, fitted.height);
+        return { colors: extractPalette(pixels(ctx, fitted.width, fitted.height), request.count) };
+      });
     default: {
       const exhaustive: never = request;
       throw new Error(`Unsupported image operation: ${JSON.stringify(exhaustive)}`);
@@ -230,11 +221,11 @@ function process(request: CanvasRequest): ProcessResult {
   }
 }
 
-scope.addEventListener("message", (event: MessageEvent<CanvasRequest>) => {
+scope.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
   const request = event.data;
   void (async () => {
     try {
-      const result = request.type === "decode"
+      const result: ProcessResult = request.type === "decode"
         ? await decode(request)
         : request.type === "encode"
           ? await encode(request)
@@ -246,6 +237,8 @@ scope.addEventListener("message", (event: MessageEvent<CanvasRequest>) => {
         );
       } else if (result.bytes) {
         scope.postMessage({ id: request.id, bytes: result.bytes }, [result.bytes.buffer as ArrayBuffer]);
+      } else if (result.colors) {
+        scope.postMessage({ id: request.id, colors: result.colors });
       } else {
         throw new Error("The image worker returned no result.");
       }

@@ -78,6 +78,7 @@ import {
   writeText,
 } from "./platform";
 import type { CheckedWriteResult } from "./platform";
+import { isImagePath } from "./canvas/image-core";
 import { getWindowValue, removeWindowValue, setWindowValue } from "./window-state";
 import {
   documentKey,
@@ -290,6 +291,7 @@ async function openCanvasUi(path?: string): Promise<void> {
   canvasUiModulePromise ??= import("./canvas/canvas-ui");
   const module = await canvasUiModulePromise;
   module.openCanvas(path);
+  setActiveNav("canvas");
 }
 
 // Every keyboard shortcut lives here. "editor" entries are installed through
@@ -391,6 +393,14 @@ const SHORTCUTS: Shortcut[] = [
   { id: "canvas.line", label: "Canvas: line tool", keys: "L", group: "Canvas" },
   { id: "canvas.rect", label: "Canvas: rectangle tool", keys: "R", group: "Canvas" },
   { id: "canvas.ellipse", label: "Canvas: ellipse tool", keys: "O", group: "Canvas" },
+  { id: "canvas.arrow", label: "Canvas: arrow annotation", keys: "A", group: "Canvas" },
+  { id: "canvas.triangle", label: "Canvas: triangle tool", keys: "N", group: "Canvas" },
+  { id: "canvas.star", label: "Canvas: star tool", keys: "S", group: "Canvas" },
+  { id: "canvas.polygon", label: "Canvas: polygon tool", keys: "P", group: "Canvas" },
+  { id: "canvas.callout", label: "Canvas: numbered callout", keys: "K", group: "Canvas" },
+  { id: "canvas.highlight", label: "Canvas: highlight region", keys: "Y", group: "Canvas" },
+  { id: "canvas.measure", label: "Canvas: pixel measurement", keys: "M", group: "Canvas" },
+  { id: "canvas.eyedropper", label: "Canvas: color eyedropper", keys: "I", group: "Canvas" },
   { id: "canvas.text", label: "Canvas: text tool", keys: "T", group: "Canvas" },
   { id: "canvas.brush-smaller", label: "Canvas: decrease brush size", keys: "[", group: "Canvas" },
   { id: "canvas.brush-larger", label: "Canvas: increase brush size", keys: "]", group: "Canvas" },
@@ -1487,7 +1497,7 @@ async function openAny(path: string) {
     await openPdf(path);
     return;
   }
-  if (/\.(png|jpe?g|webp|svg)$/.test(name)) {
+  if (isImagePath(name)) {
     await openCanvasUi(path);
     return;
   }
@@ -2147,7 +2157,10 @@ $("btn-pdf").addEventListener("click", () => void guard(openPdfDialog));
 $("btn-calc").addEventListener("click", () => void guard(() => openCalcUi(currentSelection())));
 $("calc-dialog").addEventListener("close", () => view.focus());
 $("btn-canvas").addEventListener("click", () => void guard(() => openCanvasUi()));
-document.addEventListener("talos:canvas-close", () => view.focus());
+document.addEventListener("talos:canvas-close", () => {
+  setActiveNav("explorer");
+  view.focus();
+});
 $("btn-outline").addEventListener("click", () => toggleOutline());
 $("outline-close").addEventListener("click", () => toggleOutline(false));
 $("outline-refresh").addEventListener("click", renderOutline);
