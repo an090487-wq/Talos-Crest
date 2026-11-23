@@ -95,7 +95,7 @@ let documentVersion = 0;
 let transformToken = 0;
 let previewToken = 0;
 let previewTimer: number | null = null;
-let previewBase: HTMLCanvasElement | null = null;
+let previewBase: Layer[] | null = null;
 let previewBaseVersion = -1;
 let openToken = 0;
 let compareBaseline: HTMLCanvasElement | null = null;
@@ -109,6 +109,7 @@ let snapEnabled = false;
 let guidesVisible = false;
 let transparencyMode = "checker";
 let exportBusy = false;
+let transformBusy = false;
 let exportBasePath = "";
 let exportPathEdited = false;
 let requestId = 1;
@@ -373,6 +374,7 @@ function renderLayers(): void {
     slider.setAttribute("aria-label", `${layer.name} opacity`);
     slider.addEventListener("input", () => {
       layer.opacity = Number(slider.value) / 100;
+      clearAdjustmentPreview();
       previewBaseVersion = -1;
       if (compareEnabled) renderCompare();
       scheduleComposite();
@@ -710,8 +712,9 @@ async function requestEncode(bitmap: ImageBitmap, mime: string, quality: number,
 }
 
 async function transformDocument(build: (bitmap: ImageBitmap) => ImageRequest): Promise<boolean> {
-  if (!layers.length) return false;
+  if (!layers.length || exportBusy || transformBusy) return false;
   const token = ++transformToken;
+  transformBusy = true;
   clearAdjustmentPreview();
   status("Processing…");
   try {
@@ -747,6 +750,8 @@ async function transformDocument(build: (bitmap: ImageBitmap) => ImageRequest): 
   } catch (error) {
     if (token === transformToken) status(error instanceof Error ? error.message : String(error));
     return false;
+  } finally {
+    if (token === transformToken) transformBusy = false;
   }
 }
 
@@ -758,14 +763,21 @@ async function transformWithHistory(label: string, build: (bitmap: ImageBitmap) 
 
 async function flatten(): Promise<ImageBitmap | null> {
   if (!layers.length) return null;
+  // Capture document state before awaiting so a concurrent edit can never mix
+  // old layer bitmaps with new dimensions (or vice versa).
+  const sourceLayers = layers.slice();
+  const documentWidth = width;
+  const documentHeight = height;
   const bitmaps: ImageBitmap[] = [];
   try {
-    for (const layer of layers) bitmaps.push(await createImageBitmap(layer.canvas));
+    for (const layer of sourceLayers) bitmaps.push(await createImageBitmap(layer.canvas));
     return await requestBitmap({
       type: "flatten",
-      layers: bitmaps.map((bitmap, index) => ({ bitmap, opacity: layers[index].opacity, visible: layers[index].visible })),
-      width,
-      height,
+      layers: bitmaps.map((bitmap, index) => ({
+        bitmap, opacity: sourceLayers[index].opacity, visible: sourceLayers[index].visible,
+      })),
+      width: documentWidth,
+      height: documentHeight,
     });
   } catch (error) {
     for (const bitmap of bitmaps) {
@@ -893,6 +905,7 @@ function closeCanvas(): void {
   // Invalidate in-flight fallback transforms; a worker transform is rejected by
   // the pending-map cleanup below, but fallback promises are not in that map.
   transformToken += 1;
+  transformBusy = false;
   $("canvas").classList.add("hidden");
   clearTransientState();
   for (const layer of layers) {
@@ -1204,20 +1217,43 @@ async function renderAdjustmentPreview(grading: Grading): Promise<void> {
   try {
     if (!previewBase || previewBaseVersion !== documentVersion) {
       const fitted = fitWithin(width, height, DEFAULT_PREVIEW_PIXELS);
-      const base = createLayerCanvas(fitted.width, fitted.height);
-      context2d(base).drawImage(surface(), 0, 0, fitted.width, fitted.height);
-      previewBase = base;
+      // Grade each layer the same way Apply grading does, then composite. Grading
+      // the flattened surface first is not equivalent for layered images.
+      previewBase = layers.map((layer) => {
+        const canvas = createLayerCanvas(fitted.width, fitted.height);
+        const ctx = context2d(canvas);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(layer.canvas, 0, 0, fitted.width, fitted.height);
+        return { ...layer, canvas };
+      });
       previewBaseVersion = documentVersion;
     }
     const key = gradingKey(grading);
     let result = previewCache.get(key);
     if (!result) {
-      const source = await createImageBitmap(previewBase);
-      if (token !== previewToken) {
-        source.close();
-        return;
+      const first = previewBase[0];
+      if (!first) return;
+      const composite = createLayerCanvas(first.canvas.width, first.canvas.height);
+      const compositeCtx = context2d(composite);
+      for (const layer of previewBase) {
+        if (!layer.visible || layer.opacity <= 0) continue;
+        const source = await createImageBitmap(layer.canvas);
+        if (token !== previewToken) {
+          source.close();
+          return;
+        }
+        const graded = await requestBitmap({ type: "adjust", bitmap: source, grading });
+        if (token !== previewToken) {
+          graded.close();
+          return;
+        }
+        compositeCtx.globalAlpha = Math.max(0, Math.min(1, layer.opacity));
+        compositeCtx.drawImage(graded, 0, 0);
+        compositeCtx.globalAlpha = 1;
+        graded.close();
       }
-      result = await requestBitmap({ type: "adjust", bitmap: source, grading });
+      result = await createImageBitmap(composite);
       if (token !== previewToken) {
         result.close();
         return;
@@ -1634,6 +1670,10 @@ function exportExtension(): "png" | "jpg" | "webp" {
 
 function openExportDialog(): void {
   if (!layers.length) return;
+  if (transformBusy) {
+    status("Wait for the current image operation to finish.");
+    return;
+  }
   const base = sourcePath && /\.[^./\\]+$/.test(sourcePath)
     ? sourcePath.replace(/\.[^./\\]+$/, "") : (sourcePath ?? "untitled");
   const mime = EXPORT_PRESETS[0].mime;
@@ -1648,7 +1688,9 @@ function openExportDialog(): void {
   input("canvas-export-background").value = "#ffffff";
   input("canvas-export-aspect").checked = true;
   input("canvas-export-overwrite").checked = false;
+  select("canvas-export-format").value = mime;
   select("canvas-export-presets").value = "source";
+  updateExportExtension();
   $("canvas-export-status").textContent = "Ready.";
   $("canvas-export-dialog").classList.remove("hidden");
   ($("canvas-export-dialog") as HTMLDialogElement).showModal();
@@ -1685,6 +1727,10 @@ function updateExportExtension(): void {
 
 async function exportImage(): Promise<void> {
   if (exportBusy) return;
+  if (transformBusy) {
+    $("canvas-export-status").textContent = "Wait for the current image operation to finish.";
+    return;
+  }
   const target = input("canvas-export-path").value.trim();
   if (!target) {
     $("canvas-export-status").textContent = "Choose a destination.";
@@ -1824,14 +1870,10 @@ function applyGradingPreset(): void {
 }
 
 function onCanvasSurface(target: EventTarget | null): boolean {
-  const element = target as HTMLElement | null;
-  return !element
-    || element === document.body
-    || element === document.documentElement
-    || [
-      "canvas", "canvas-stage", "canvas-viewport", "canvas-adjust-preview", "canvas-selection",
-      "canvas-compare", "canvas-compare-canvas", "canvas-measure-label",
-    ].includes(element.id);
+  if (!(target instanceof Element)) return true;
+  return target === document.body
+    || target === document.documentElement
+    || target.closest("#canvas") !== null;
 }
 
 function initialize(): void {

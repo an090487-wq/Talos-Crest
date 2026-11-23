@@ -329,3 +329,21 @@ test("pixel results become real ImageData before canvas drawing", () => {
     assert.doesNotMatch(code, /putImageData\([^;]*\bas ImageData\b/, file);
   }
 });
+
+test("canvas center guides use a subtle grid-matched color", () => {
+  const html = readFileSync(resolve(appDir, "index.html"), "utf8");
+  const rule = html.split("\n").find((line) => line.includes('data-guides="true"]::after'));
+  assert.ok(rule, "center guide overlay rule exists");
+  assert.doesNotMatch(rule, /255\s*,\s*120\s*,\s*180/);
+  assert.match(rule, /120\s*,\s*190\s*,\s*220/);
+});
+
+test("canvas async, export, and keyboard invariants are enforced", () => {
+  const ui = readFileSync(resolve(appDir, "src/canvas/canvas-ui.ts"), "utf8");
+  assert.match(ui, /!layers\.length \|\| exportBusy \|\| transformBusy/);
+  assert.match(ui, /if \(token === transformToken\) transformBusy = false;/);
+  assert.match(ui, /const sourceLayers = layers\.slice\(\);/);
+  assert.match(ui, /target\.closest\("#canvas"\)/);
+  assert.match(ui, /select\("canvas-export-format"\)\.value = mime;/);
+  assert.match(ui, /previewBase = layers\.map\(/);
+});
