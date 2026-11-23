@@ -2,6 +2,7 @@ import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { linter } from "@codemirror/lint";
 import type { Diagnostic } from "@codemirror/lint";
 import type { EditorState } from "@codemirror/state";
+import { errorEngineAvailability, scanWithErrorEngine } from "./error-engine";
 
 export type Listener = (diags: readonly Diagnostic[], doc: EditorState["doc"]) => void;
 
@@ -12,11 +13,12 @@ export function setDiagnosticsLanguage(name: string) {
 }
 
 export function diagnosticsAvailability(name = languageName): string {
-  if (name === "JSON") {
-    return "Talos JSON parser diagnostics are active. Comment TODO notes are informational when supported.";
-  }
   const label = name || "Plain text";
-  return `No compiler or language-server diagnostics are configured for ${label}. Comment TODO notes are informational when supported.`;
+  const engine = errorEngineAvailability(label);
+  if (name === "JSON") {
+    return `Talos JSON parser diagnostics are active. ${engine}`;
+  }
+  return `${engine} No compiler or language-server diagnostics are configured; these are local pattern checks, not semantic analysis.`;
 }
 
 const commentNodes: Record<string, ReadonlySet<string>> = {
@@ -104,7 +106,12 @@ export function scanDiagnostics(
   name = languageName,
   limit = MAX_DIAGNOSTICS
 ): Diagnostic[] {
-  return scanTree(state, name, Math.max(1, limit));
+  const budget = Math.max(1, limit);
+  const parser = scanTree(state, name, budget);
+  const rules = scanWithErrorEngine(state, name, budget - parser.length);
+  return [...parser, ...rules]
+    .sort((left, right) => left.from - right.from || left.to - right.to)
+    .slice(0, budget);
 }
 
 export function basicLinter(onResult: Listener) {

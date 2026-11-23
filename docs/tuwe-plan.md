@@ -84,6 +84,22 @@ Additional Phase 2 defect fixes:
 - Record reproducible scan latency, watcher propagation, memory, and typing-responsiveness measurements.
 - Update README/release notes only with measured results and explicit limitations.
 
+## Additional defect fixes (editor increment)
+
+Two user-reported dead ends were addressed outside the workspace phases:
+
+- Binary files such as `arp_spoof.cpython-312.pyc` are no longer rejected with a
+  message only. `loadPath` opens a read-only preview backed by a new bounded
+  `binary_preview` Tauri command (64 KiB per page), with a hex dump and
+  printable-strings view. Formatting lives in pure, tested helpers in
+  `app/src/binary-view.ts`.
+- A real local error detection engine was added in `app/src/error-engine.ts`
+  with data-driven rules in `app/src/error-rules.ts`. It scans the CodeMirror
+  document with bounded regexes, ignores matches in comments/strings, merges
+  results into the Problems panel, and supports user-defined JSON rules saved
+  locally through a validated dialog. It is explicitly pattern-based, not a
+  compiler or language server.
+
 ## Non-goals for this increment
 
 - No dependency graph rewrite.

@@ -66,6 +66,29 @@ export async function readBytes(path: string): Promise<Uint8Array> {
   return new Uint8Array(await invoke<ArrayBuffer>("read_file_bytes", { path }));
 }
 
+export interface BinaryPreview {
+  size: number;
+  bytes: Uint8Array;
+}
+
+/** Read one bounded page for the read-only binary preview. */
+export async function readBinaryPreview(
+  path: string,
+  offset: number,
+  limit: number
+): Promise<BinaryPreview> {
+  if (await isAndroid()) {
+    const bytes = await fsReadFile(path);
+    return { size: bytes.length, bytes: bytes.slice(offset, offset + limit) };
+  }
+  const result = await invoke<{ size: number; bytes: number[] }>("binary_preview", {
+    path,
+    offset,
+    limit,
+  });
+  return { size: result.size, bytes: new Uint8Array(result.bytes) };
+}
+
 export async function writeText(
   path: string,
   contents: string,

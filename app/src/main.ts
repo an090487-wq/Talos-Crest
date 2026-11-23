@@ -58,6 +58,8 @@ import { listen } from "@tauri-apps/api/event";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { basicLinter, diagnosticsAvailability, setDiagnosticsLanguage } from "./diagnostics";
+import { openBinaryUi } from "./binary-preview";
+import { openErrorRulesDialog } from "./error-rules-ui";
 import { measure, LABEL, FUN } from "./meter";
 import type { Reading } from "./meter";
 import { openPdf, isPdfFocused, initPdfPane } from "./pdf";
@@ -327,6 +329,13 @@ const SHORTCUTS: Shortcut[] = [
     run: () => void guard(() => openNewWindow()),
   },
   { id: "file.open-pdf", label: "Open PDF", keys: "Mod+Shift+P", group: "File", run: () => void guard(openPdfDialog) },
+  {
+    id: "file.open-binary",
+    label: "Open binary file (hex preview)",
+    keys: "",
+    group: "File",
+    run: () => void guard(openBinaryDialog),
+  },
 
   { id: "edit.undo", label: "Undo", keys: "Mod+Z", group: "Edit", scope: "editor", run: () => void undo(view) },
   { id: "edit.redo", label: "Redo", keys: "Mod+Shift+Z", group: "Edit", scope: "editor", run: () => void redo(view) },
@@ -381,6 +390,13 @@ const SHORTCUTS: Shortcut[] = [
     run: () => void guard(() => openCalcUi(currentSelection())),
   },
   { id: "tools.canvas", label: "Open Talos Canvas", keys: "Mod+Shift+I", group: "Tools", run: () => void guard(() => openCanvasUi()) },
+  {
+    id: "tools.error-rules",
+    label: "Custom Error Detection Rules",
+    keys: "",
+    group: "Tools",
+    run: () => openErrorRulesDialog(),
+  },
 
   // Canvas-local tool keys are handled by canvas-ui while its workspace is
   // visible. They are registered here so F1 documents them, without run
@@ -1511,7 +1527,7 @@ async function loadPath(path: string) {
   const snapshot = await readFileSnapshot(path);
   if (!snapshot) throw new Error(`The file no longer exists: ${path}`);
   if (snapshot.binary) {
-    say(`Cannot open ${fileNameFromPath(path)}: this is a binary file. Talos opens UTF-8 text files in the editor.`);
+    await openBinaryUi(path);
     return;
   }
   await openSnapshotInTab(path, snapshot);
@@ -1549,6 +1565,17 @@ async function openPdfDialog() {
   closeHtmlPreview();
   toggleOutline(false);
   await openPdf(picked);
+}
+
+async function openBinaryDialog() {
+  const picked = await open({
+    multiple: false,
+    directory: false,
+    title: "Open binary file (read-only preview)",
+  });
+  if (typeof picked !== "string") return;
+  rememberRecent(picked);
+  await openBinaryUi(picked);
 }
 
 async function askFileConflict(path: string): Promise<"reload" | "overwrite" | "cancel"> {
@@ -2268,6 +2295,10 @@ $("btn-panel-max").addEventListener("click", () =>
   setPanelMaximized(!$("editor-region").classList.contains("panel-maximized"))
 );
 $("problems-severity").addEventListener("change", () => renderProblems());
+$("btn-error-rules").addEventListener("click", openErrorRulesDialog);
+document.addEventListener("talos:error-rules-changed", () => {
+  if (activeTab) forceLinting(view);
+});
 $("theme-select").addEventListener("change", () => {
   const id = ($("theme-select") as HTMLSelectElement).value as BuiltinThemeId;
   void clearExtensionThemePreference()

@@ -617,6 +617,32 @@
         #arch-details-pane h3 { display: none; }
         #arch-message { flex: 0 0 auto; max-height: 42px; overflow: auto; }
       }
+
+      /* Read-only binary preview and custom error rules */
+      dialog.binary-dialog { width: min(980px, calc(100vw - 24px)); max-height: min(820px, calc(100vh - 24px)); }
+      #binary-dialog > header { align-items: center; gap: 6px; }
+      #binary-name { font-weight: 600; margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #binary-dialog > header button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+      #binary-meta { padding: 7px 10px; color: var(--muted); font-size: 11px; border-bottom: 1px solid var(--line); }
+      #binary-view { margin: 0; padding: 10px; overflow: auto; max-height: min(650px, 72vh); font: 11px/1.5 var(--mono-font); white-space: pre; tab-size: 2; }
+      dialog.error-rules-dialog { width: min(900px, calc(100vw - 24px)); max-height: min(820px, calc(100vh - 24px)); }
+      #error-rules-dialog > header { align-items: center; }
+      #error-rules-dialog > header strong { margin-right: auto; }
+      #error-rules-status.error { color: var(--danger); }
+      .error-rules-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; padding: 0 10px 10px; }
+      .error-rules-panel { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+      .error-rules-panel > strong { font-size: 12px; }
+      #error-rules-json { width: 100%; min-height: 300px; resize: vertical; font: 11px/1.5 var(--mono-font); }
+      #error-rules-active { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 5px; }
+      .error-rule-row { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 2px 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 11px; }
+      .error-rule-row.disabled { opacity: .5; }
+      .error-rule-severity { font-weight: 600; text-transform: uppercase; font-size: 10px; }
+      .error-rule-severity.error { color: var(--danger); }
+      .error-rule-severity.warning { color: var(--warn, #d9a441); }
+      .error-rule-severity.info { color: var(--accent); }
+      .error-rule-detail { grid-column: 2; color: var(--muted); }
+      .error-rules-actions { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 10px 10px; }
+      @media (max-width: 760px) { .error-rules-layout { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
@@ -777,6 +803,7 @@
                 <option value="info">Information</option>
                 <option value="hint">Hints</option>
               </select>
+              <button id="btn-error-rules" class="mini" title="Edit custom error detection rules">Rules</button>
             </div>
             <div id="problems"></div>
             <pre id="output" class="hidden"></pre>
@@ -1412,6 +1439,42 @@
         <label class="workspace-dialog-setting"><input id="canvas-export-overwrite" type="checkbox" /> Overwrite an existing file at this destination</label>
         <button id="canvas-export-cancel" value="cancel">Cancel</button>
         <button id="canvas-export-save" class="accent" value="save">Export</button>
+      </div>
+    </dialog>
+    <dialog id="binary-dialog" class="workspace-dialog binary-dialog" aria-label="Binary file preview">
+      <header>
+        <span id="binary-name">Binary</span>
+        <button id="binary-mode-hex" class="mini" aria-pressed="true" title="Show hexadecimal bytes">Hex</button>
+        <button id="binary-mode-strings" class="mini" aria-pressed="false" title="Show printable strings">Strings</button>
+        <button id="binary-prev" class="mini" title="Previous page" aria-label="Previous page">&lsaquo;</button>
+        <span id="binary-page">1 / 1</span>
+        <button id="binary-next" class="mini" title="Next page" aria-label="Next page">&rsaquo;</button>
+        <button id="binary-close" class="mini" aria-label="Close binary preview" title="Close">&times;</button>
+      </header>
+      <div id="binary-meta"></div>
+      <pre id="binary-view" tabindex="0"></pre>
+    </dialog>
+    <dialog id="error-rules-dialog" class="workspace-dialog error-rules-dialog" aria-label="Custom Error Detection">
+      <header>
+        <strong>Custom Error Detection</strong>
+        <span class="spacer"></span>
+        <button id="error-rules-close" class="mini" aria-label="Close Custom Error Detection" title="Close">&times;</button>
+      </header>
+      <div id="error-rules-status" class="workspace-dialog-status" role="status"></div>
+      <div class="error-rules-layout">
+        <div class="error-rules-panel">
+          <strong>Custom rules (JSON)</strong>
+          <textarea id="error-rules-json" spellcheck="false" aria-label="Custom rules JSON"></textarea>
+        </div>
+        <div class="error-rules-panel">
+          <strong>Active rules</strong>
+          <div id="error-rules-active" role="list"></div>
+        </div>
+      </div>
+      <div class="error-rules-actions">
+        <button id="error-rules-example" class="mini" title="Load an example rule">Load example</button>
+        <button id="error-rules-reset" class="mini" title="Remove all custom rules">Remove custom rules</button>
+        <button id="error-rules-apply" class="accent" title="Validate and save custom rules">Save and apply</button>
       </div>
     </dialog>
     <div id="market" class="hidden">

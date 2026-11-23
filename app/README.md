@@ -225,11 +225,28 @@ geometry, or per-window panel dimensions.
 The Problems panel reports JSON syntax errors using the active CodeMirror JSON
 parser and marks TODO/FIXME/HACK/XXX comments as informational notes where a
 supported parser exposes comment nodes. Text inside strings is not treated as a
-TODO marker. Talos does not infer compiler errors from bracket-counting
-heuristics. The panel includes severity filtering, source labels,
+TODO marker. The panel includes severity filtering, source labels,
 file/line/column locations, and selecting a row moves the editor selection to
 its range. CodeMirror's linter supplies the inline underlines, gutter markers,
 and hover messages.
+
+Talos also includes a local, rule-driven **Custom Error Detection** engine. Its
+built-in rules flag common defects such as Python mutable default arguments and
+bare `except`, loose JavaScript equality and `var`, unbounded C string calls,
+and Rust `unwrap()`. Matches inside comments and strings are ignored. Open
+**Tools → Custom Error Detection Rules** or the **Rules** button in the Problems
+toolbar to see active rules or add your own JSON regex rules with a chosen
+severity and language list. Rules are validated before saving, stored only in
+this window, and never run code or contact a network. This is pattern-based
+checking, not compiler or language-server semantics: it can miss errors and can
+flag intentional code, and any rule can be disabled.
+
+Binary files such as compiled Python `.pyc` modules no longer produce a dead-end
+error. Talos opens them in a read-only preview with a paged hexadecimal dump and
+a printable-strings view, available from **File → Open binary file (hex
+preview)** or automatically when a binary file is opened from the Explorer.
+
+Talos does not infer compiler errors from bracket-counting heuristics.
 
 The optional Code Outline reads the active CodeMirror syntax tree and currently
 extracts class, function, method, interface, type, and top-level variable

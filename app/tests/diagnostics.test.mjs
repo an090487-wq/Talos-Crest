@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -9,18 +9,26 @@ import { EditorState } from "@codemirror/state";
 import { languages } from "@codemirror/language-data";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const sourcePath = resolve(appDir, "src/diagnostics.ts");
-const source = await readFile(sourcePath, "utf8");
-const compiled = ts.transpileModule(source, {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-}).outputText;
-const diagnosticsModule = { exports: {} };
-new Function("require", "module", "exports", compiled)(
-  createRequire(sourcePath),
-  diagnosticsModule,
-  diagnosticsModule.exports
-);
-const { scanDiagnostics } = diagnosticsModule.exports;
+
+function loadTs(relativePath, requireMap = {}) {
+  const sourcePath = resolve(appDir, relativePath);
+  const compiled = ts.transpileModule(readFileSync(sourcePath, "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const module = { exports: {} };
+  const nodeRequire = createRequire(sourcePath);
+  new Function("require", "module", "exports", compiled)(
+    (id) => requireMap[id] ?? nodeRequire(id),
+    module,
+    module.exports
+  );
+  return module.exports;
+}
+
+const rules = loadTs("src/error-rules.ts");
+const engine = loadTs("src/error-engine.ts", { "./error-rules": rules });
+const diagnosticsModule = loadTs("src/diagnostics.ts", { "./error-engine": engine });
+const { scanDiagnostics } = diagnosticsModule;
 
 async function stateFor(languageName, doc) {
   const description = languages.find((language) => language.name === languageName);

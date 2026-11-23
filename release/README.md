@@ -18,7 +18,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`a76b0b2224a91e6da54730693a47f5af3960dadfe86f195dfaf3e80926943a0f`
+`3a57871be480e53ad19e06875c04781b4d5438b317daec8e464c2579bae9bc1c`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -35,7 +35,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`0541e59d187b41359caa30078b323e31d3fd34d7d86ab76d9476172d8a8c2292`
+`b9f2dda509a59cfef428e7abd19d11ff0b72536403e315f7ad40e32d0e004f5f`
 
 ## Optional GitHub access
 
@@ -51,6 +51,13 @@ last folder per window, recent-project fallback, a workspace/status indicator,
 structured file-change updates with bounded queueing and watcher recovery, one
 shared ignore/security policy for Explorer, watcher, and Chronicle, and bounded
 Chronicle project memory. No workspace content is uploaded or analyzed remotely.
+
+The editor includes a local Custom Error Detection engine with built-in rules
+for common Python, JavaScript/TypeScript, C/C++, Rust, and Java defects, plus
+user-defined JSON regex rules stored only on this device. It is pattern-based
+checking, not a compiler or language server. Binary files such as compiled
+Python modules open in a read-only, paged hex and printable-strings preview
+instead of being rejected.
 
 Canvas is also fully local. It includes screenshot annotation shapes and
 callouts, pixel measurement, palette extraction and HEX/RGB/HSL inspection,

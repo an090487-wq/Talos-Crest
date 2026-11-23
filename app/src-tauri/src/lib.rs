@@ -2,6 +2,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use std::{
     collections::HashMap,
     fs,
+    io::{Read, Seek, SeekFrom},
     path::{Component, Path, PathBuf},
     process::Command,
     sync::{
@@ -188,6 +189,29 @@ fn read_file_bytes(path: String) -> Result<tauri::ipc::Response, String> {
     fs::read(&path)
         .map(tauri::ipc::Response::new)
         .map_err(|e| format!("{path}: {e}"))
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BinaryPreview {
+    size: u64,
+    bytes: Vec<u8>,
+}
+
+/// Bounded read for the read-only hex/strings preview. Only the requested page
+/// crosses the IPC boundary, so a large binary never floods the webview.
+#[tauri::command]
+fn binary_preview(path: String, offset: u64, limit: u64) -> Result<BinaryPreview, String> {
+    const MAX_PREVIEW_BYTES: u64 = 64 * 1024;
+    let mut file = fs::File::open(&path).map_err(|e| format!("{path}: {e}"))?;
+    let size = file.metadata().map_err(|e| format!("{path}: {e}"))?.len();
+    let length = limit.min(MAX_PREVIEW_BYTES);
+    let mut bytes = vec![0u8; length as usize];
+    file.seek(SeekFrom::Start(offset.min(size)))
+        .map_err(|e| format!("{path}: {e}"))?;
+    let read = file.read(&mut bytes).map_err(|e| format!("{path}: {e}"))?;
+    bytes.truncate(read);
+    Ok(BinaryPreview { size, bytes })
 }
 
 #[tauri::command]
@@ -3152,6 +3176,7 @@ pub fn run() {
             read_file_snapshot_command,
             write_file_checked,
             read_file_bytes,
+            binary_preview,
             write_file,
             write_file_bytes,
             startup_file,
