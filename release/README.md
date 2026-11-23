@@ -18,7 +18,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`049b684db7c5b05c4a8360f4f8d7c0601a946f16db7c6aad3a5442891debb23d`
+`a576b1a87736c515b573b189de282d88f7d72c066ecaef81c36648bb46222692`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -35,7 +35,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`4a6669c772ae08e798cb074250acaf1c1b18e7d05825bffa4b259eb5c6d8f8b8`
+`9d98d98dd5a632826c89700add5aced09e0c5cc1fac1b820cc82d9e17fe189b9`
 
 ## Optional GitHub access
 

@@ -111,6 +111,14 @@ test("programmer octal literals are parsed in base 8", () => {
   assert.equal(programmer("0o777", { bitWidth: 8, unsigned: true }).formatted, "255");
 });
 
+test("adjacent values imply multiplication", () => {
+  assert.equal(scientific("(9)3").formatted, "27");
+  assert.equal(scientific("3(9)").formatted, "27");
+  assert.equal(scientific("(9)(3)").formatted, "27");
+  assert.equal(scientific("2pi").formatted, scientific("2*pi").formatted);
+  assert.equal(programmer("(9)3", { bitWidth: 8, unsigned: true }).formatted, "27");
+});
+
 test("expression-safe programmer formatting stays re-evaluable", () => {
   const safe = formatValue(-1n, "programmer", { bitWidth: 8, base: 16, unsigned: false }, true);
   assert.equal(safe, "0xFF");

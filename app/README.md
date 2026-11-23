@@ -123,8 +123,9 @@ before its optional behavior is available.
 **Calc** (toolbar button, Ctrl+Shift+C, or Cmd+Shift+C on macOS) is a local
 calculator with scientific and programmer modes, expression history, memory,
 and unit conversion. It uses a small parser rather than JavaScript `eval`, and
-its code is loaded only when the calculator opens. Results can be inserted into
-the active editor.
+its code is loaded only when the calculator opens. Adjacent values imply
+multiplication (`(9)3`, `3(4)`, `2pi`). Results can be inserted into the active
+editor.
 
 **Canvas** (toolbar button, Ctrl+Shift+I, or opening a PNG/JPEG/WebP/SVG file)
 is a local raster image and asset workspace. Nothing in Canvas contacts the

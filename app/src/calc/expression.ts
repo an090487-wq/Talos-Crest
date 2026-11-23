@@ -58,6 +58,26 @@ const SCIENTIFIC_CONSTANTS: Record<string, number> = {
   e: Math.E,
 };
 
+/** Adjacent value tokens imply multiplication, e.g. `(9)3`, `3(4)` or `2pi`. */
+function addImplicitMultiplication(tokens: Token[]): Token[] {
+  const result: Token[] = [];
+  for (const token of tokens) {
+    const previous = result[result.length - 1];
+    const endsValue = previous !== undefined
+      && (previous.kind === "number"
+        || (previous.kind === "paren" && previous.text === ")")
+        || (previous.kind === "name" && previous.text in SCIENTIFIC_CONSTANTS));
+    const startsValue = token.kind === "number"
+      || token.kind === "name"
+      || (token.kind === "paren" && token.text === "(");
+    if (endsValue && startsValue) {
+      result.push({ kind: "operator", text: "*", position: token.position });
+    }
+    result.push(token);
+  }
+  return result;
+}
+
 function fail(message: string): never {
   throw new Error(message);
 }
@@ -100,8 +120,9 @@ function tokenizeScientific(input: string): Token[] {
     }
     fail(`Invalid character '${char}' at position ${index + 1}`);
   }
-  if (tokens.length > MAX_TOKENS) fail(`Expression has more than ${MAX_TOKENS} tokens`);
-  return tokens;
+  const expanded = addImplicitMultiplication(tokens);
+  if (expanded.length > MAX_TOKENS) fail(`Expression has more than ${MAX_TOKENS} tokens`);
+  return expanded;
 }
 
 function tokenizeProgrammer(input: string): Token[] {
@@ -147,8 +168,9 @@ function tokenizeProgrammer(input: string): Token[] {
     }
     fail(`Invalid character '${char}' at position ${index + 1}`);
   }
-  if (tokens.length > MAX_TOKENS) fail(`Expression has more than ${MAX_TOKENS} tokens`);
-  return tokens;
+  const expanded = addImplicitMultiplication(tokens);
+  if (expanded.length > MAX_TOKENS) fail(`Expression has more than ${MAX_TOKENS} tokens`);
+  return expanded;
 }
 
 class Parser {
