@@ -3407,6 +3407,23 @@ mod tests {
         assert!(validate_extension_manifest(&theme, "test-theme", "1.2").is_err());
         assert!(validate_extension_manifest(&theme, "other-theme", "1.2.3").is_err());
 
+        let icon_pack = serde_json::json!({
+            "id": "icon-pack-material",
+            "name": "Material Icons",
+            "kind": "icon-pack",
+            "version": "1.0.0",
+            "iconPack": {
+                "default": "file",
+                "mappings": { "py": "python", "js": "javascript" }
+            }
+        });
+        assert_eq!(
+            validate_extension_manifest(&icon_pack, "icon-pack-material", "1.0.0")
+                .unwrap()
+                .0,
+            "icon-pack"
+        );
+
         let malformed = serde_json::json!({
             "id": "bad",
             "name": "Bad",
