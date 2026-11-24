@@ -955,6 +955,7 @@ function renderFileTree() {
       row.classList.add("selected");
       renderDetails();
       focusTreeRow(index);
+      if (entry.kind === "file") void openSelected();
     });
     row.addEventListener("dblclick", () => {
       if (entry.kind === "file") void openSelected();
