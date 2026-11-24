@@ -2280,6 +2280,147 @@ fn stop_project_watch(window: tauri::WebviewWindow) -> Result<(), String> {
 /// Absolute last resort for window closing. The renderer calls this from a
 /// watchdog only if destroying the webview fails or times out, so no close
 /// request can leave the application running forever.
+#[derive(serde::Serialize)]
+struct GitFileStatus {
+    path: String,
+    status: String,
+    staged: bool,
+}
+
+#[tauri::command]
+async fn git_status(root: String) -> Result<Vec<GitFileStatus>, String> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .arg("status")
+        .arg("--porcelain")
+        .arg("-uall")
+        .output()
+        .map_err(|error| format!("could not run git: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git status failed: {stderr}"));
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut result = Vec::new();
+    for line in stdout.lines() {
+        if line.len() < 4 {
+            continue;
+        }
+        let staged_char = line.chars().next().unwrap_or(' ');
+        let unstaged_char = line.chars().nth(1).unwrap_or(' ');
+        let path = line[3..].to_string();
+        let path = if path.contains(" -> ") {
+            path.split(" -> ").last().unwrap_or(&path).to_string()
+        } else {
+            path
+        };
+
+        let (status, staged) = if staged_char != ' ' && staged_char != '?' {
+            let s = match staged_char {
+                'M' => "modified",
+                'A' => "added",
+                'D' => "deleted",
+                'R' => "renamed",
+                'C' => "copied",
+                _ => "modified",
+            };
+            (s.to_string(), true)
+        } else {
+            let s = match unstaged_char {
+                'M' => "modified",
+                'D' => "deleted",
+                '?' => "untracked",
+                _ => "modified",
+            };
+            (s.to_string(), false)
+        };
+
+        let (status, staged) = if staged_char != ' ' && unstaged_char != ' ' && unstaged_char != '?' {
+            ("modified".to_string(), false)
+        } else {
+            (status, staged)
+        };
+
+        result.push(GitFileStatus { path, status, staged });
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+async fn git_stage(root: String, paths: Vec<String>) -> Result<(), String> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+    let mut cmd = Command::new("git");
+    cmd.arg("-C").arg(&root).arg("add");
+    for path in &paths {
+        cmd.arg(path);
+    }
+    let output = cmd.output().map_err(|error| format!("could not run git: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git add failed: {stderr}"));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn git_unstage(root: String, paths: Vec<String>) -> Result<(), String> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+    let mut cmd = Command::new("git");
+    cmd.arg("-C").arg(&root).arg("restore").arg("--staged");
+    for path in &paths {
+        cmd.arg(path);
+    }
+    let output = cmd.output().map_err(|error| format!("could not run git: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git restore --staged failed: {stderr}"));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn git_commit(root: String, message: String) -> Result<String, String> {
+    if message.trim().is_empty() {
+        return Err("Commit message cannot be empty".into());
+    }
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .arg("commit")
+        .arg("-m")
+        .arg(&message)
+        .output()
+        .map_err(|error| format!("could not run git: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git commit failed: {stderr}"));
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout.to_string())
+}
+
+#[tauri::command]
+async fn git_diff(root: String, path: String) -> Result<String, String> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .arg("diff")
+        .arg("--")
+        .arg(&path)
+        .output()
+        .map_err(|error| format!("could not run git: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git diff failed: {stderr}"));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
 #[tauri::command]
 fn force_quit() {
     std::process::exit(0);
@@ -3992,6 +4133,11 @@ pub fn run() {
             load_project_manifests,
             watch_project,
             stop_project_watch,
+            git_status,
+            git_stage,
+            git_unstage,
+            git_commit,
+            git_diff,
             force_quit,
             github::github_token_status,
             github::github_set_token,
