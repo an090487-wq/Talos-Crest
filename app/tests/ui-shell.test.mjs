@@ -92,6 +92,12 @@ test("closing tool overlays restores the default navigation state", () => {
   assert.match(architecture, /document\.dispatchEvent\(new Event\("talos:explorer-close"\)\)/);
 });
 
+test("file-open failures surface globally and optional language failures never block opening", () => {
+  assert.match(architecture, /CustomEvent\("talos:open-error"/);
+  assert.match(main, /talos:open-error/);
+  assert.match(main, /as plain text/);
+});
+
 test("installed icon packs visibly change Explorer file icons", () => {
   assert.ok(architecture.includes("export function setExplorerIconPack"));
   assert.ok(architecture.includes("ICON_PACK_STYLES"));

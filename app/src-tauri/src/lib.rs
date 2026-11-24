@@ -92,6 +92,71 @@ fn file_revision(contents: &[u8]) -> String {
         .collect()
 }
 
+fn is_text_file_path(path: &Path) -> bool {
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if matches!(name.as_str(), "dockerfile" | "makefile" | "cmakelists.txt") {
+        return true;
+    }
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    matches!(extension.as_str(),
+        "bat" | "c" | "cc" | "cfg" | "clj" | "cmake" | "coffee" | "conf" | "cpp" |
+        "cs" | "css" | "csv" | "cxx" | "dart" | "dockerfile" | "ex" | "exs" | "go" |
+        "gradle" | "graphql" | "groovy" | "h" | "hpp" | "htm" | "html" | "ini" |
+        "java" | "js" | "json" | "jsx" | "kt" | "kts" | "less" | "lua" | "md" |
+        "mjs" | "php" | "pl" | "properties" | "py" | "pyi" | "rb" | "rs" | "sass" |
+        "scss" | "sh" | "sql" | "swift" | "toml" | "ts" | "tsx" | "txt" | "vue" |
+        "xml" | "yaml" | "yml" | "zsh"
+    )
+}
+
+fn decode_utf16_text(bytes: &[u8]) -> Option<String> {
+    let (offset, little_endian) = if bytes.starts_with(&[0xff, 0xfe]) {
+        (2usize, true)
+    } else if bytes.starts_with(&[0xfe, 0xff]) {
+        (2usize, false)
+    } else {
+        return None;
+    };
+    let payload = &bytes[offset..];
+    if payload.len() % 2 != 0 {
+        return None;
+    }
+    let units = payload
+        .chunks_exact(2)
+        .map(|chunk| {
+            if little_endian {
+                u16::from_le_bytes([chunk[0], chunk[1]])
+            } else {
+                u16::from_be_bytes([chunk[0], chunk[1]])
+            }
+        })
+        .collect::<Vec<u16>>();
+    let decoded = String::from_utf16(&units).ok()?;
+    (!decoded.contains('\0')).then_some(decoded)
+}
+
+fn decode_text_bytes(bytes: &[u8], path: &Path) -> Option<String> {
+    let bytes = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(bytes);
+    if let Ok(contents) = String::from_utf8(bytes.to_vec()) {
+        return (!contents.contains('\0')).then_some(contents);
+    }
+    if let Some(contents) = decode_utf16_text(bytes) {
+        return Some(contents);
+    }
+    if is_text_file_path(path) && !bytes.contains(&0) {
+        return Some(String::from_utf8_lossy(bytes).into_owned());
+    }
+    None
+}
+
 fn read_file_snapshot(path: &Path) -> Result<Option<FileSnapshot>, String> {
     match fs::metadata(path) {
         Ok(metadata) if metadata.len() > MAX_TEXT_FILE_BYTES => {
@@ -108,13 +173,13 @@ fn read_file_snapshot(path: &Path) -> Result<Option<FileSnapshot>, String> {
     match fs::read(path) {
         Ok(bytes) => {
             let revision = file_revision(&bytes);
-            match String::from_utf8(bytes) {
-                Ok(contents) if !contents.contains('\0') => Ok(Some(FileSnapshot {
+            match decode_text_bytes(&bytes, path) {
+                Some(contents) => Ok(Some(FileSnapshot {
                     contents,
                     revision,
                     binary: false,
                 })),
-                _ => Ok(Some(FileSnapshot {
+                None => Ok(Some(FileSnapshot {
                     contents: String::new(),
                     revision,
                     binary: true,
@@ -3384,6 +3449,57 @@ mod tests {
         assert!(snapshot.binary);
         assert!(snapshot.contents.is_empty());
         assert!(!snapshot.revision.is_empty());
+
+        fs::remove_dir_all(parent).unwrap();
+    }
+
+    #[test]
+    fn file_snapshots_open_java_and_kotlin_source() {
+        let parent = std::env::temp_dir().join(format!(
+            "talos-source-file-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&parent).unwrap();
+        let java = parent.join("Main.java");
+        let kotlin = parent.join("Main.kt");
+        fs::write(&java, "class Main {}\n").unwrap();
+        fs::write(&kotlin, "fun main() {}\n").unwrap();
+
+        for path in [&java, &kotlin] {
+            let snapshot = read_file_snapshot(path).unwrap().unwrap();
+            assert!(!snapshot.binary);
+            assert!(!snapshot.contents.is_empty());
+        }
+
+        fs::remove_dir_all(parent).unwrap();
+    }
+
+    #[test]
+    fn file_snapshots_decode_utf16_source_files() {
+        let parent = std::env::temp_dir().join(format!(
+            "talos-utf16-file-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&parent).unwrap();
+        let path = parent.join("Utf16.java");
+        let text = "class Main {}\n";
+        let mut bytes = vec![0xff, 0xfe];
+        for unit in text.encode_utf16() {
+            bytes.extend_from_slice(&unit.to_le_bytes());
+        }
+        fs::write(&path, bytes).unwrap();
+
+        let snapshot = read_file_snapshot(&path).unwrap().unwrap();
+        assert!(!snapshot.binary);
+        assert_eq!(snapshot.contents, text);
 
         fs::remove_dir_all(parent).unwrap();
     }

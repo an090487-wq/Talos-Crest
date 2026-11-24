@@ -1779,7 +1779,13 @@ async function openSnapshotInTab(path: string, snapshot: { contents: string; rev
   }
   activateEditorTab(tab);
   setWindowValue("talos.open-file", path);
-  await setLanguage(path);
+  try {
+    await setLanguage(path);
+  } catch (error) {
+    // The file itself is already open; a missing optional language package
+    // must never turn into a failed open.
+    say(`Opened ${fileNameFromPath(path)} as plain text: ${String(error)}`);
+  }
   renderDocumentTabs();
 }
 
@@ -2729,6 +2735,10 @@ document.addEventListener("talos:workspace-change", updateWorkspaceLabel);
 document.addEventListener("talos:open-path", (event) => {
   const path = (event as CustomEvent<string>).detail;
   if (typeof path === "string") void guard(() => openAny(path));
+});
+document.addEventListener("talos:open-error", (event) => {
+  const detail = (event as CustomEvent<string>).detail;
+  if (typeof detail === "string") say(detail);
 });
 $("btn-workspace").addEventListener("click", () => void guard(() => chooseWorkspace()));
 $("breadcrumb-root").addEventListener("click", () => openObservatory());

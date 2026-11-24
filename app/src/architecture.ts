@@ -407,6 +407,12 @@ function setMessage(text: string, error = false) {
   message.classList.toggle("error", error);
 }
 
+function reportOpenError(name: string, error: unknown) {
+  const detail = `Could not open ${name}: ${String(error)}`;
+  setMessage(detail, true);
+  document.dispatchEvent(new CustomEvent("talos:open-error", { detail }));
+}
+
 function humanSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   const units = ["KB", "MB", "GB"];
@@ -607,7 +613,7 @@ async function openSelected() {
     rememberRecent(entry.path);
     $("architecture").classList.add("hidden");
   } catch (error) {
-    setMessage(`Could not open ${entry.name}: ${String(error)}`, true);
+    reportOpenError(entry.name, error);
   }
 }
 
@@ -1086,7 +1092,7 @@ function renderFileTree() {
       if (entry.kind === "file" && onOpenFile) void onOpenFile(entry.path).then(() => {
         rememberRecent(entry.path);
         $("architecture").classList.add("hidden");
-      }).catch((error) => setMessage(`Could not open ${entry.name}: ${String(error)}`, true));
+      }).catch((error) => reportOpenError(entry.name, error));
     });
     row.addEventListener("dblclick", () => {
       if (entry.kind === "file") void openSelected();
@@ -2060,6 +2066,7 @@ async function openQuickEntry(entry: ProjectEntry) {
     ($("quick-open-dialog") as HTMLDialogElement).close();
   } catch (error) {
     $("quick-open-status").textContent = `Could not open ${relativePath(entry.path)}: ${String(error)}`;
+    reportOpenError(entry.name, error);
   }
 }
 
