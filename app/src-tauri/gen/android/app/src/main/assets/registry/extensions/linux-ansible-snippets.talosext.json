@@ -1,0 +1,23 @@
+{
+  "id": "linux-ansible-snippets",
+  "name": "Ansible Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for ansible snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "play",
+      "label": "Playbook start",
+      "description": "- hosts: ${1:all}\\n  become: true\\n  tasks:|package",
+      "body": "Install package",
+      "languages": [
+        "yaml",
+        "yml"
+      ]
+    }
+  ]
+}

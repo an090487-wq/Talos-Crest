@@ -1,0 +1,18 @@
+{
+  "id": "talos-workspace-bootstrap-template",
+  "name": "Workspace Bootstrap",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for workspace bootstrap.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Workspace notes",
+      "filename": "WORKSPACE.md",
+      "content": "# Workspace: ${1:name}\n\n## Open command\n${2:command}\n\n## Required tools\n- ${3:tool}\n\n## Files to review first\n- ${4:file}\n\n## Offline notes\n${5:notes}\n"
+    }
+  ]
+}

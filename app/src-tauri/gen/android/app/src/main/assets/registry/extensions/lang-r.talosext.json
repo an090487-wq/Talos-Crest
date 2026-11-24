@@ -1,0 +1,21 @@
+{
+  "id": "lang-r",
+  "name": "R script support",
+  "kind": "language",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Adds Run support for R script support files (user-approved command).",
+  "license": "MIT",
+  "free": true,
+  "language": {
+    "id": "lang-r",
+    "name": "R script support",
+    "extensions": [
+      ".r"
+    ],
+    "run": "Rscript {file}",
+    "build": null,
+    "paths": []
+  }
+}

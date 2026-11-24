@@ -1,0 +1,18 @@
+{
+  "id": "ai-rag-pipeline-template",
+  "name": "RAG Pipeline Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Local RAG scaffold template; it does not download models or call services by itself.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "RAG scaffold",
+      "filename": "rag.py",
+      "content": "from sentence_transformers import SentenceTransformer\n\nmodel = SentenceTransformer('${1:all-MiniLM-L6-v2}')\n\ndef embed(texts):\n    return model.encode(texts)\n\n# Replace this stub with your local vector store and retrieval policy.\ndef retrieve(query, documents):\n    return documents[:${2:5}]|NOTES.md\n"
+    }
+  ]
+}

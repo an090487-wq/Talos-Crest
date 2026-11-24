@@ -1,0 +1,229 @@
+{
+  "name": "Talos Registry (local starter)",
+  "extensions": [
+    {
+      "id": "talos-bronze",
+      "name": "Talos Bronze",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "Dark metal tones with bronze accents.",
+      "url": "extensions/talos-bronze.talosext.json",
+      "sha256": "648beebc0e0a125d8b8248ae381900b71eb089f9a8914b998edcdde53c3f4413"
+    },
+    {
+      "id": "midnight-blue",
+      "name": "Midnight Blue",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "Deep navy background with cool blue accents.",
+      "url": "extensions/midnight-blue.talosext.json",
+      "sha256": "153f5060e53e56900bab70cac7e73df4592d6157000ae3b2cd5ef93a85935921"
+    },
+    {
+      "id": "paper-light",
+      "name": "Paper Light",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "A clean light theme for bright rooms.",
+      "url": "extensions/paper-light.talosext.json",
+      "sha256": "f471ad5dea0aed77e76456a59035dba4dfb01eeafe8fc8ebc9d3f5a4154b332d"
+    },
+    {
+      "id": "solarized-dark",
+      "name": "Solarized Dark",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "A calm, low-contrast dark palette inspired by Solarized.",
+      "url": "extensions/solarized-dark.talosext.json",
+      "sha256": "c34b5fa90593cd9b1412b11df658814a854c0bdc7ee952b3740329852e1102e2"
+    },
+    {
+      "id": "dracula",
+      "name": "Dracula",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "A vivid dark theme with purple, pink, and aqua accents.",
+      "url": "extensions/dracula.talosext.json",
+      "sha256": "d05b761b85f7f5de995f93a24c22938d1f174aa7004ccf26e7e2999fd6f10489"
+    },
+    {
+      "id": "nord",
+      "name": "Nord",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "A cool blue-gray theme with soft arctic accents.",
+      "url": "extensions/nord.talosext.json",
+      "sha256": "1d4e24f6c6161aaf34bd88041ae138fcb02b4bb1ff8d0bc57603fb106282518d"
+    },
+    {
+      "id": "forest-green",
+      "name": "Forest Green",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "Deep evergreen surfaces with fresh green and warm amber accents.",
+      "url": "extensions/forest-green.talosext.json",
+      "sha256": "2ed3d230ee99d91a717cf6a4bbe73a9f55cb0eb804351df36c4add6d35c415f6"
+    },
+    {
+      "id": "rose-pine",
+      "name": "Rosé Pine",
+      "kind": "theme",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "A muted dusk palette with rose, iris, and pine accents.",
+      "url": "extensions/rose-pine.talosext.json",
+      "sha256": "58b0de2ffb1741a1cf7ce3580271ea0dbe3a42fa58a4226347f6bb4ba3822b1c"
+    },
+    {
+      "id": "lang-rust",
+      "name": "Rust support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "Adds Run support for Rust files (needs rustc installed).",
+      "url": "extensions/lang-rust.talosext.json",
+      "sha256": "61b36bc046d0d17779e5208b912f12e99cc31f22983cc360cc7c5b97f57a25d7"
+    },
+    {
+      "id": "lang-php",
+      "name": "PHP support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "Adds Run support for PHP files (needs php installed).",
+      "url": "extensions/lang-php.talosext.json",
+      "sha256": "a09f89a08b4ea04d7cbc5f688cd5aa11af0e00c9d17e83fdaa7d6fda76c40dc3"
+    },
+    {
+      "id": "lang-bash",
+      "name": "Bash support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "Adds Run support for Bash scripts (needs bash installed).",
+      "url": "extensions/lang-bash.talosext.json",
+      "sha256": "3f4c15db8bdb3e675d3ab0978466e6f4fc1d1a9b946cdf8fce0484ab1f4201af"
+    },
+    {
+      "id": "lang-perl",
+      "name": "Perl support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "Adds Run support for Perl files (needs perl installed).",
+      "url": "extensions/lang-perl.talosext.json",
+      "sha256": "d86bb98290d64212e0c086e1c63bfa2b6c2f6cd809db154cd69ff3f798018abb"
+    },
+    {
+      "id": "extra-templates",
+      "name": "More Starter Templates",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "Rust, Go, TypeScript, and Markdown starter files.",
+      "url": "extensions/extra-templates.talosext.json",
+      "sha256": "a3b3fab42b5b72e2f81a0d2b9f0ebcabfa31f14324df7dc2d285ffec12687ba2"
+    },
+    {
+      "id": "starter-templates",
+      "name": "Starter Templates",
+      "kind": "template",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "Python, C, Node and HTML starter files.",
+      "url": "extensions/starter-templates.talosext.json",
+      "sha256": "5c1d45d3c6e029fbadd7202ca2655ed5b107f98504a8e84956b39232569d6290"
+    },
+    {
+      "id": "lang-ruby",
+      "name": "Ruby support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "Adds Run support for Ruby files (needs ruby installed).",
+      "url": "extensions/lang-ruby.talosext.json",
+      "sha256": "9a4d569ebb182ad29bbe948dc57c36b949f4a1f4cf09e4f7983f0295985cd38b"
+    },
+    {
+      "id": "lang-lua",
+      "name": "Lua support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "Adds Run support for Lua files (needs lua installed).",
+      "url": "extensions/lang-lua.talosext.json",
+      "sha256": "20ed355ad0938fb4836cc239853d60809c7076fda2b2b259e8c44f502e694046"
+    },
+    {
+      "id": "lang-go",
+      "name": "Go support",
+      "kind": "language",
+      "version": "1.0.0",
+      "author": "Talos",
+      "description": "Adds Run support for Go files (needs go installed).",
+      "url": "extensions/lang-go.talosext.json",
+      "sha256": "82911d08e8f0ad6013a9c3b50968bac3ff76f987c55f7e7e3bae23b6e438eb41"
+    }
+  ],
+  "apis": [
+    {
+      "id": "open-meteo",
+      "name": "Open-Meteo Weather",
+      "description": "Free weather forecast API.",
+      "docs": "https://open-meteo.com/en/docs",
+      "auth": "none",
+      "baseUrl": "https://api.open-meteo.com/v1/forecast",
+      "snippets": {
+        "python": "import json\nimport urllib.request\n\nurl = \"https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current_weather=true\"\nwith urllib.request.urlopen(url) as response:\n    data = json.load(response)\nprint(data)\n",
+        "javascript": "const url = \"https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current_weather=true\";\nfetch(url)\n  .then((r) => r.json())\n  .then((data) => console.log(data));\n",
+        "curl": "curl \"https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current_weather=true\"\n"
+      }
+    },
+    {
+      "id": "jsonplaceholder",
+      "name": "JSONPlaceholder",
+      "description": "Fake REST API for testing and prototyping.",
+      "docs": "https://jsonplaceholder.typicode.com",
+      "auth": "none",
+      "baseUrl": "https://jsonplaceholder.typicode.com",
+      "snippets": {
+        "python": "import json\nimport urllib.request\n\nurl = \"https://jsonplaceholder.typicode.com/posts/1\"\nwith urllib.request.urlopen(url) as response:\n    data = json.load(response)\nprint(data)\n",
+        "javascript": "const url = \"https://jsonplaceholder.typicode.com/posts/1\";\nfetch(url)\n  .then((r) => r.json())\n  .then((data) => console.log(data));\n",
+        "curl": "curl \"https://jsonplaceholder.typicode.com/posts/1\"\n"
+      }
+    },
+    {
+      "id": "pokeapi",
+      "name": "PokeAPI",
+      "description": "Free Pokemon data API.",
+      "docs": "https://pokeapi.co/docs/v2",
+      "auth": "none",
+      "baseUrl": "https://pokeapi.co/api/v2",
+      "snippets": {
+        "python": "import json\nimport urllib.request\n\nurl = \"https://pokeapi.co/api/v2/pokemon/ditto\"\nwith urllib.request.urlopen(url) as response:\n    data = json.load(response)\nprint(data)\n",
+        "javascript": "const url = \"https://pokeapi.co/api/v2/pokemon/ditto\";\nfetch(url)\n  .then((r) => r.json())\n  .then((data) => console.log(data));\n",
+        "curl": "curl \"https://pokeapi.co/api/v2/pokemon/ditto\"\n"
+      }
+    },
+    {
+      "id": "github-rest",
+      "name": "GitHub REST API",
+      "description": "Public GitHub data (rate limited without a token).",
+      "docs": "https://docs.github.com/en/rest",
+      "auth": "optional token",
+      "baseUrl": "https://api.github.com",
+      "snippets": {
+        "python": "import json\nimport urllib.request\n\nurl = \"https://api.github.com/users/octocat\"\nreq = urllib.request.Request(url, headers={\"User-Agent\": \"talos\"})\nwith urllib.request.urlopen(req) as response:\n    data = json.load(response)\nprint(data)\n",
+        "javascript": "const url = \"https://api.github.com/users/octocat\";\nfetch(url)\n  .then((r) => r.json())\n  .then((data) => console.log(data));\n",
+        "curl": "curl \"https://api.github.com/users/octocat\"\n"
+      }
+    }
+  ]
+}

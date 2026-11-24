@@ -1,0 +1,92 @@
+{
+  "id": "snippets-java",
+  "name": "Java Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Free, MIT-licensed snippets for Java: classes, main methods, loops, exception handling, and streams.",
+  "license": "MIT",
+  "snippets": [
+    {
+      "prefix": "main",
+      "label": "main()",
+      "description": "Java entry point",
+      "body": "public static void main(String[] args) {\n    ${0:}\n}",
+      "languages": [
+        "java",
+        "Java"
+      ]
+    },
+    {
+      "prefix": "class",
+      "label": "public class",
+      "description": "Public class declaration",
+      "body": "public class ${1:Name} {\n    ${0:}\n}",
+      "languages": [
+        "java",
+        "Java"
+      ]
+    },
+    {
+      "prefix": "println",
+      "label": "System.out.println",
+      "description": "Print a line",
+      "body": "System.out.println(${0:value});",
+      "languages": [
+        "java",
+        "Java"
+      ]
+    },
+    {
+      "prefix": "for",
+      "label": "for loop",
+      "description": "Indexed for loop",
+      "body": "for (int ${1:i} = 0; ${1:i} < ${2:count}; ${1:i}++) {\n    ${0:}\n}",
+      "languages": [
+        "java",
+        "Java"
+      ]
+    },
+    {
+      "prefix": "foreach",
+      "label": "for-each",
+      "description": "Enhanced for loop",
+      "body": "for (${1:Type} ${2:item} : ${3:items}) {\n    ${0:}\n}",
+      "languages": [
+        "java",
+        "Java"
+      ]
+    },
+    {
+      "prefix": "try",
+      "label": "try/catch",
+      "description": "Exception handling",
+      "body": "try {\n    ${1:}\n} catch (${2:Exception} ${3:e}) {\n    ${0:e.printStackTrace();}\n}",
+      "languages": [
+        "java",
+        "Java"
+      ]
+    },
+    {
+      "prefix": "interface",
+      "label": "interface",
+      "description": "Interface declaration",
+      "body": "public interface ${1:Name} {\n    ${0:}\n}",
+      "languages": [
+        "java",
+        "Java"
+      ]
+    },
+    {
+      "prefix": "record",
+      "label": "record",
+      "description": "Java record declaration",
+      "body": "public record ${1:Name}(${2:Type} ${3:field}) {\n    ${0:}\n}",
+      "languages": [
+        "java",
+        "Java"
+      ]
+    }
+  ]
+}

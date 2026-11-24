@@ -1,0 +1,39 @@
+{
+  "id": "nord",
+  "kind": "theme",
+  "name": "Nord",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "A cool blue-gray theme with soft arctic accents.",
+  "theme": {
+    "dark": true,
+    "ui": {
+      "--bg": "#2e3440",
+      "--panel": "#3b4252",
+      "--line": "#4c566a",
+      "--text": "#eceff4",
+      "--muted": "#a3adbf",
+      "--bronze": "#88c0d0"
+    },
+    "editor": {
+      "background": "#2e3440",
+      "foreground": "#eceff4",
+      "selection": "#434c5e",
+      "cursor": "#88c0d0",
+      "gutterBackground": "#2e3440",
+      "gutterForeground": "#7b88a1",
+      "activeLine": "#3b4252"
+    },
+    "syntax": {
+      "keyword": "#81a1c1",
+      "string": "#a3be8c",
+      "comment": "#7b88a1",
+      "number": "#b48ead",
+      "function": "#88c0d0",
+      "type": "#8fbcbb",
+      "variable": "#eceff4",
+      "operator": "#81a1c1",
+      "constant": "#d08770"
+    }
+  }
+}

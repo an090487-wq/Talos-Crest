@@ -1,0 +1,24 @@
+{
+  "id": "api-rest-client-snippets",
+  "name": "REST Client Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for rest client snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "get",
+      "label": "GET JSON",
+      "description": "const data = await request('${1:/items}');|post",
+      "body": "POST JSON",
+      "languages": [
+        "javascript",
+        "typescript",
+        "python"
+      ]
+    }
+  ]
+}

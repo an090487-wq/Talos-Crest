@@ -1,0 +1,21 @@
+{
+  "id": "lang-haskell",
+  "name": "Haskell support",
+  "kind": "language",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Adds Run support for Haskell support files (user-approved command).",
+  "license": "MIT",
+  "free": true,
+  "language": {
+    "id": "lang-haskell",
+    "name": "Haskell support",
+    "extensions": [
+      ".hs"
+    ],
+    "run": "runghc {file}",
+    "build": null,
+    "paths": []
+  }
+}

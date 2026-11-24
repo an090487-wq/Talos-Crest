@@ -1,0 +1,23 @@
+{
+  "id": "sec-tls-check-snippets",
+  "name": "TLS Check Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for tls check snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "cert",
+      "label": "Inspect certificate",
+      "description": "openssl s_client -connect ${1:host}:443 -servername ${1:host} </dev/null 2>/dev/null | openssl x509 -noout -text|expiry",
+      "body": "Certificate expiry",
+      "languages": [
+        "bash",
+        "sh"
+      ]
+    }
+  ]
+}

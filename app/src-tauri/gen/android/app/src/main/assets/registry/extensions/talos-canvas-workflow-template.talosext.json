@@ -1,0 +1,18 @@
+{
+  "id": "talos-canvas-workflow-template",
+  "name": "Canvas Workflow Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for canvas workflow template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Canvas workflow",
+      "filename": "CANVAS.md",
+      "content": "# Canvas workflow\n\n1. Open Talos Canvas from the activity rail\n2. Import or create the source image\n3. Apply non-destructive edits and review the preview\n4. Commit the edit only after checking the result\n5. Export a PNG, JPEG, or WebP copy\n\nKeep original files outside the export destination.\n"
+    }
+  ]
+}

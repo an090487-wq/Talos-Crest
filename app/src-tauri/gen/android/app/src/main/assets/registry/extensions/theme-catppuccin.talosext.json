@@ -1,0 +1,42 @@
+{
+  "id": "theme-catppuccin",
+  "name": "Catppuccin Mocha",
+  "kind": "theme",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "A soft dark palette with pastel rose, teal, and lavender tones.",
+  "license": "MIT",
+  "free": true,
+  "theme": {
+    "dark": true,
+    "ui": {
+      "--bg": "#1e1e2e",
+      "--panel": "#313244",
+      "--line": "#45475a",
+      "--text": "#cdd6f4",
+      "--muted": "#a6adc8",
+      "--bronze": "#89b4fa"
+    },
+    "editor": {
+      "background": "#1e1e2e",
+      "foreground": "#cdd6f4",
+      "selection": "#45475a",
+      "cursor": "#89b4fa",
+      "gutterBackground": "#1e1e2e",
+      "gutterForeground": "#a6adc8",
+      "activeLine": "#313244"
+    },
+    "syntax": {
+      "keyword": "#cba6f7",
+      "string": "#a6e3a1",
+      "comment": "#6c7086",
+      "number": "#fab387",
+      "function": "#89b4fa",
+      "type": "#f9e2af",
+      "variable": "#cdd6f4",
+      "operator": "#cba6f7",
+      "constant": "#f38ba8"
+    }
+  }
+}

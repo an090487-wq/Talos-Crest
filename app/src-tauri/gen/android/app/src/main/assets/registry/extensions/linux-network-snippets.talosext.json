@@ -1,0 +1,23 @@
+{
+  "id": "linux-network-snippets",
+  "name": "Network Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for network snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "addr",
+      "label": "Show addresses",
+      "description": "ip addr show|routes",
+      "body": "Show routes",
+      "languages": [
+        "bash",
+        "sh"
+      ]
+    }
+  ]
+}

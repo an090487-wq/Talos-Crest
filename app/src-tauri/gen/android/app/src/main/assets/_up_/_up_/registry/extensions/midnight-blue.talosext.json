@@ -1,0 +1,39 @@
+{
+  "id": "midnight-blue",
+  "kind": "theme",
+  "name": "Midnight Blue",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "Deep navy background with cool blue accents.",
+  "theme": {
+    "dark": true,
+    "ui": {
+      "--bg": "#0b1220",
+      "--panel": "#111a2e",
+      "--line": "#1f2c47",
+      "--text": "#dbe4f5",
+      "--muted": "#7d8db0",
+      "--bronze": "#4aa3ff"
+    },
+    "editor": {
+      "background": "#0b1220",
+      "foreground": "#dbe4f5",
+      "selection": "#1d3557",
+      "cursor": "#4aa3ff",
+      "gutterBackground": "#0b1220",
+      "gutterForeground": "#566587",
+      "activeLine": "#111a2e"
+    },
+    "syntax": {
+      "keyword": "#6cb6ff",
+      "string": "#9ad59a",
+      "comment": "#566587",
+      "number": "#f0b27a",
+      "function": "#c4a7ff",
+      "type": "#7fd6d6",
+      "variable": "#dbe4f5",
+      "operator": "#9fb1d6",
+      "constant": "#f0b27a"
+    }
+  }
+}

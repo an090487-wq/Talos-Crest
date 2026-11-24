@@ -1,0 +1,100 @@
+{
+  "id": "snippets-ruby",
+  "name": "Ruby Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Free, MIT-licensed snippets for Ruby: classes, modules, blocks, each loops, and common idioms.",
+  "license": "MIT",
+  "snippets": [
+    {
+      "prefix": "class",
+      "label": "class ...",
+      "description": "Ruby class",
+      "body": "class ${1:Name}\n  def initialize(${2:args})\n    ${0:}\n  end\nend",
+      "languages": [
+        "ruby",
+        "rb",
+        "Ruby"
+      ]
+    },
+    {
+      "prefix": "def",
+      "label": "def ...",
+      "description": "Method definition",
+      "body": "def ${1:name}(${2:args})\n  ${0:}\nend",
+      "languages": [
+        "ruby",
+        "rb",
+        "Ruby"
+      ]
+    },
+    {
+      "prefix": "module",
+      "label": "module ...",
+      "description": "Module definition",
+      "body": "module ${1:Name}\n  ${0:}\nend",
+      "languages": [
+        "ruby",
+        "rb",
+        "Ruby"
+      ]
+    },
+    {
+      "prefix": "each",
+      "label": ".each do",
+      "description": "Each block",
+      "body": "${1:items}.each do |${2:item}|\n  ${0:}\nend",
+      "languages": [
+        "ruby",
+        "rb",
+        "Ruby"
+      ]
+    },
+    {
+      "prefix": "times",
+      "label": ".times do",
+      "description": "Times block",
+      "body": "${1:count}.times do |${2:i}|\n  ${0:}\nend",
+      "languages": [
+        "ruby",
+        "rb",
+        "Ruby"
+      ]
+    },
+    {
+      "prefix": "puts",
+      "label": "puts ...",
+      "description": "Print a line",
+      "body": "puts ${0:value}",
+      "languages": [
+        "ruby",
+        "rb",
+        "Ruby"
+      ]
+    },
+    {
+      "prefix": "require",
+      "label": "require ...",
+      "description": "Require a library",
+      "body": "require \"${1:library}\"",
+      "languages": [
+        "ruby",
+        "rb",
+        "Ruby"
+      ]
+    },
+    {
+      "prefix": "attr",
+      "label": "attr_accessor",
+      "description": "Attribute accessors",
+      "body": "attr_accessor :${1:field}",
+      "languages": [
+        "ruby",
+        "rb",
+        "Ruby"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "prod-npm-scripts-snippets",
+  "name": "npm Script Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for npm script snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "dev",
+      "label": "Dev script",
+      "description": "\\\"dev\\\": \\\"${1:vite}\\\"|build",
+      "body": "Build script",
+      "languages": [
+        "json"
+      ]
+    }
+  ]
+}

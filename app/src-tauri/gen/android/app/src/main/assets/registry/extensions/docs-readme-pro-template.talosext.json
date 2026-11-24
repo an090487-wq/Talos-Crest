@@ -1,0 +1,18 @@
+{
+  "id": "docs-readme-pro-template",
+  "name": "README Pro Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for readme pro template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Project README",
+      "filename": "README.md",
+      "content": "# ${1:Project}\n\n${2:One-sentence purpose}\n\n## Features\n- ${3:Feature}\n\n## Quick start\n\n    ${4:install command}\n    ${5:run command}\n\n## Configuration\n${6:Configuration notes}\n\n## Testing\n${7:Test command}\n\n## Offline notes\n${8:Local assets or dependencies}\n\n## License\n${9:License}\n"
+    }
+  ]
+}

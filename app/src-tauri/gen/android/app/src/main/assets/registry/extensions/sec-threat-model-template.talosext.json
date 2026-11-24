@@ -1,0 +1,18 @@
+{
+  "id": "sec-threat-model-template",
+  "name": "Threat Model Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for threat model template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Threat model",
+      "filename": "THREAT_MODEL.md",
+      "content": "# Threat model\n\n## Assets\n- ${1:Asset}\n\n## Trust boundaries\n- ${2:Boundary}\n\n## Threats\n| Threat | Impact | Mitigation | Owner |\n| --- | --- | --- | --- |\n| ${3:Threat} | ${4:High} | ${5:Mitigation} | ${6:Owner} |\n"
+    }
+  ]
+}

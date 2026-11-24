@@ -1,0 +1,23 @@
+{
+  "id": "linux-permissions-snippets",
+  "name": "Permission Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for permission snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "mode",
+      "label": "Numeric mode",
+      "description": "chmod ${1:755} ${2:path}|recursive",
+      "body": "Recursive mode",
+      "languages": [
+        "bash",
+        "sh"
+      ]
+    }
+  ]
+}

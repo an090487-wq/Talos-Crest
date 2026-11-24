@@ -1,0 +1,24 @@
+{
+  "id": "api-graphql-snippets",
+  "name": "GraphQL Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for graphql snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "query",
+      "label": "Query document",
+      "description": "query ${1:Name} { ${2:field} { ${3:id} } }|mutation",
+      "body": "Mutation document",
+      "languages": [
+        "graphql",
+        "javascript",
+        "typescript"
+      ]
+    }
+  ]
+}

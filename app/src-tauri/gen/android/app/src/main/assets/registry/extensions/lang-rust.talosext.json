@@ -1,0 +1,16 @@
+{
+  "id": "lang-rust",
+  "kind": "language",
+  "name": "Rust support",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "Adds Run support for Rust files (needs rustc installed).",
+  "language": {
+    "id": "rust",
+    "name": "Rust",
+    "extensions": [".rs"],
+    "run": "rustc {file} -o {file}.talos-bin && {file}.talos-bin",
+    "build": null,
+    "paths": []
+  }
+}

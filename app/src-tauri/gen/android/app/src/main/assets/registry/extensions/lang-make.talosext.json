@@ -1,0 +1,21 @@
+{
+  "id": "lang-make",
+  "name": "Makefile support",
+  "kind": "language",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Adds Run support for Makefile support files (user-approved command).",
+  "license": "MIT",
+  "free": true,
+  "language": {
+    "id": "lang-make",
+    "name": "Makefile support",
+    "extensions": [
+      ".mk"
+    ],
+    "run": "make -f {file}",
+    "build": null,
+    "paths": []
+  }
+}

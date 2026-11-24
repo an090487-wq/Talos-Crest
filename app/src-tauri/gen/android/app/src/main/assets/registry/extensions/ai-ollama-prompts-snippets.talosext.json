@@ -1,0 +1,23 @@
+{
+  "id": "ai-ollama-prompts-snippets",
+  "name": "Ollama Prompt Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for ollama prompt snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "run",
+      "label": "Run model",
+      "description": "ollama run ${1:llama3.2}|chat",
+      "body": "Chat prompt",
+      "languages": [
+        "markdown",
+        "text"
+      ]
+    }
+  ]
+}

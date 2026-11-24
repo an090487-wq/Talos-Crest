@@ -1,0 +1,18 @@
+{
+  "id": "talos-observatory-report-template",
+  "name": "Observatory Report Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for observatory report template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Architecture report",
+      "filename": "ARCHITECTURE.md",
+      "content": "# Architecture report\n\n## Entry points\n- ${1:Entry}\n\n## Dependencies\n- ${2:Dependency}\n\n## File structure\n- ${3:Area}\n\n## Notes\n${4:Notes}\n"
+    }
+  ]
+}

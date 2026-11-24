@@ -1,0 +1,22 @@
+{
+  "id": "ai-embeddings-snippets",
+  "name": "Embedding Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for embedding snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "model",
+      "label": "Sentence transformer",
+      "description": "from sentence_transformers import SentenceTransformer\\nmodel = SentenceTransformer('${1:all-MiniLM-L6-v2}')|encode",
+      "body": "Encode text",
+      "languages": [
+        "python"
+      ]
+    }
+  ]
+}

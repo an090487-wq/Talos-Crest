@@ -1,0 +1,18 @@
+{
+  "id": "sec-owasp-checklist-template",
+  "name": "OWASP Checklist",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for owasp checklist.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "OWASP checklist",
+      "filename": "OWASP.md",
+      "content": "# OWASP review checklist\n\n- [ ] Injection: parameterized queries only\n- [ ] Broken auth: session rotation and MFA considered\n- [ ] Sensitive data: encrypted in transit and at rest\n- [ ] XXE: external entity resolution disabled\n- [ ] Access control: deny by default\n- [ ] Security misconfiguration: defaults removed\n- [ ] XSS: output encoding and CSP\n- [ ] CSRF: tokens on state-changing requests\n"
+    }
+  ]
+}

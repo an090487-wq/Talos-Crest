@@ -234,6 +234,7 @@ let cachedTreeRows: {
   query: string;
   version: number;
   showHidden: boolean;
+  showIgnored: boolean;
   rows: ProjectEntry[];
 } | null = null;
 let cachedArchitectureRows: {
@@ -247,6 +248,7 @@ let cachedArchitectureRows: {
 let entryByPath = new Map<string, ProjectEntry>();
 let draggedEntryPath = "";
 let showHidden = getWindowValue("talos.show-hidden-files") === "true";
+let showIgnored = getWindowValue("talos.show-ignored-files") === "true";
 let quickOpenIndex = 0;
 let quickOpenWorker: Worker | null = null;
 let quickOpenRequestId = 0;
@@ -688,6 +690,7 @@ async function toggleDirectory(entry: ProjectEntry, index: number): Promise<void
       path: entry.path,
       exclusions: currentExclusions(),
       showHidden,
+      showIgnored,
     });
     if (generation !== scanGeneration || scan !== snapshot || !scan) return;
     const children = listing.entries.map((child) => ({
@@ -781,7 +784,8 @@ function visibleEntries(): ProjectEntry[] {
     cachedTreeRows?.snapshot === scan &&
     cachedTreeRows.query === query &&
     cachedTreeRows.version === expandedVersion &&
-    cachedTreeRows.showHidden === showHidden
+    cachedTreeRows.showHidden === showHidden &&
+    cachedTreeRows.showIgnored === showIgnored
   ) {
     return cachedTreeRows.rows;
   }
@@ -822,7 +826,7 @@ function visibleEntries(): ProjectEntry[] {
       for (let i = descendants.length - 1; i >= 0; i--) stack.push(descendants[i]);
     }
   }
-  cachedTreeRows = { snapshot: scan, query, version: expandedVersion, showHidden, rows: result };
+  cachedTreeRows = { snapshot: scan, query, version: expandedVersion, showHidden, showIgnored, rows: result };
   return result;
 }
 
@@ -1973,6 +1977,7 @@ async function scanProject(root: string, forceWatch = false, options: ScanProjec
           path: root,
           exclusions: currentExclusions(),
           showHidden,
+          showIgnored,
         }).then((listing) => ({
           id: listing.root,
           root: listing.root,
@@ -1988,6 +1993,7 @@ async function scanProject(root: string, forceWatch = false, options: ScanProjec
           root,
           exclusions: currentExclusions(),
           showHidden: showHidden,
+          showIgnored: showIgnored,
         }).then((scanResult) => ({
           ...scanResult,
           lazy: false as const,
@@ -2488,6 +2494,17 @@ export function initArchitectureExplorer(
     render();
     updateQuickOpenIndex();
     if (($("quick-open-dialog") as HTMLDialogElement).open) renderQuickOpen();
+  });
+  const ignoredToggle = $("arch-show-ignored") as HTMLInputElement;
+  ignoredToggle.checked = showIgnored;
+  ignoredToggle.addEventListener("change", () => {
+    showIgnored = ignoredToggle.checked;
+    try {
+      setWindowValue("talos.show-ignored-files", String(showIgnored));
+    } catch (error) {
+      setMessage(`Could not save ignored-file preference: ${String(error)}`, true);
+    }
+    if (scan) void refreshTree(scan.root);
   });
   $("btn-quick-open").addEventListener("click", openQuickOpen);
   $("quick-open-close").addEventListener("click", () =>

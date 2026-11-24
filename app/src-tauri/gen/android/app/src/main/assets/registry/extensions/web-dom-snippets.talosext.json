@@ -1,0 +1,109 @@
+{
+  "id": "web-dom-snippets",
+  "name": "DOM Utility Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "8 offline CodeMirror snippets for dom utility snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "query",
+      "label": "Query selector",
+      "description": "Typed element lookup",
+      "body": "const el = document.querySelector<HTMLElement>('${1:.selector}');",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "on",
+      "label": "Event listener",
+      "description": "Add click listener",
+      "body": "document.querySelector('${1:button}')?.addEventListener('click', (event) => { ${0} });",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "delegate",
+      "label": "Delegated event",
+      "description": "Delegate clicks to parent",
+      "body": "document.addEventListener('click', (event) => {\n  const target = (event.target as Element).closest('${1:.item}');\n  if (target) ${0}\n});",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "class",
+      "label": "Toggle class",
+      "description": "Toggle a UI state",
+      "body": "document.querySelector('${1:el}')?.classList.toggle('${2:active}');",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "attr",
+      "label": "Attribute",
+      "description": "Read data attribute",
+      "body": "const value = el?.getAttribute('data-${1:key}');",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "create",
+      "label": "Create element",
+      "description": "Build a DOM node",
+      "body": "const node = document.createElement('${1:div}');\nnode.textContent = '${2:Hello}';\ndocument.body.appendChild(node);",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "observer",
+      "label": "Mutation observer",
+      "description": "Watch DOM changes",
+      "body": "const observer = new MutationObserver(() => ${0});\nobserver.observe(document.body, { childList: true, subtree: true });",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "ready",
+      "label": "DOM ready",
+      "description": "Run after DOM loads",
+      "body": "document.addEventListener('DOMContentLoaded', () => { ${0} });",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    }
+  ]
+}

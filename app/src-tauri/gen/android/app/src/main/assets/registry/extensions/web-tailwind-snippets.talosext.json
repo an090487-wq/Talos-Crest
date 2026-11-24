@@ -1,0 +1,109 @@
+{
+  "id": "web-tailwind-snippets",
+  "name": "Tailwind Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "8 offline CodeMirror snippets for tailwind snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "card",
+      "label": "Utility card",
+      "description": "Simple Tailwind card",
+      "body": "<div class=\\\"rounded-lg border p-4 shadow-sm\\\">${0}</div>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "btn",
+      "label": "Button",
+      "description": "Primary Tailwind button",
+      "body": "<button class=\\\"rounded bg-teal-600 px-3 py-2 text-white hover:bg-teal-700\\\">${1:Label}</button>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "grid",
+      "label": "Grid",
+      "description": "Responsive Tailwind grid",
+      "body": "<div class=\\\"grid grid-cols-1 gap-4 md:grid-cols-3\\\">${0}</div>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "form",
+      "label": "Form field",
+      "description": "Tailwind labeled input",
+      "body": "<label class=\\\"block text-sm\\\">${1:Label}<input class=\\\"mt-1 w-full rounded border p-2\\\" /></label>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "dark",
+      "label": "Dark mode",
+      "description": "Dark-mode variants",
+      "body": "<div class=\\\"bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100\\\">${0}</div>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "center",
+      "label": "Center",
+      "description": "Centered flex box",
+      "body": "<div class=\\\"flex min-h-screen items-center justify-center\\\">${0}</div>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "badge",
+      "label": "Badge",
+      "description": "Small status badge",
+      "body": "<span class=\\\"rounded-full bg-emerald-100 px-2 py-1 text-xs text-emerald-800\\\">${1:OK}</span>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    },
+    {
+      "prefix": "container",
+      "label": "Container",
+      "description": "Centered page container",
+      "body": "<main class=\\\"mx-auto max-w-5xl px-4\\\">${0}</main>",
+      "languages": [
+        "html",
+        "jsx",
+        "tsx",
+        "vue"
+      ]
+    }
+  ]
+}

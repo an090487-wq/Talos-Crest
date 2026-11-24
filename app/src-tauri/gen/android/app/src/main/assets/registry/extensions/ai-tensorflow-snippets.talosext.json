@@ -1,0 +1,22 @@
+{
+  "id": "ai-tensorflow-snippets",
+  "name": "TensorFlow Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for tensorflow snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "import",
+      "label": "Import TensorFlow",
+      "description": "import tensorflow as tf|layers",
+      "body": "Sequential model",
+      "languages": [
+        "python"
+      ]
+    }
+  ]
+}

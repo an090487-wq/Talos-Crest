@@ -1,0 +1,39 @@
+{
+  "id": "forest-green",
+  "kind": "theme",
+  "name": "Forest Green",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "Deep evergreen surfaces with fresh green and warm amber accents.",
+  "theme": {
+    "dark": true,
+    "ui": {
+      "--bg": "#101a16",
+      "--panel": "#192720",
+      "--line": "#2d4538",
+      "--text": "#e4eee7",
+      "--muted": "#91a99a",
+      "--bronze": "#a3c96c"
+    },
+    "editor": {
+      "background": "#101a16",
+      "foreground": "#e4eee7",
+      "selection": "#294235",
+      "cursor": "#c5d86d",
+      "gutterBackground": "#101a16",
+      "gutterForeground": "#71877a",
+      "activeLine": "#192720"
+    },
+    "syntax": {
+      "keyword": "#c5d86d",
+      "string": "#a3c98b",
+      "comment": "#71877a",
+      "number": "#e3b567",
+      "function": "#7fc8a9",
+      "type": "#82b5a5",
+      "variable": "#e4eee7",
+      "operator": "#b5c5b9",
+      "constant": "#e3b567"
+    }
+  }
+}

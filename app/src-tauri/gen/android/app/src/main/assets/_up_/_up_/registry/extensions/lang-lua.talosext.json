@@ -1,0 +1,18 @@
+{
+  "id": "lang-lua",
+  "kind": "language",
+  "name": "Lua support",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "Adds Run support for Lua files (needs lua installed).",
+  "language": {
+    "id": "lua",
+    "name": "Lua",
+    "extensions": [
+      ".lua"
+    ],
+    "run": "lua {file}",
+    "build": null,
+    "paths": []
+  }
+}

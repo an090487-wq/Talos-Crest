@@ -1,0 +1,22 @@
+{
+  "id": "design-css-variables-snippets",
+  "name": "CSS Design Token Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for css design token snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "tokens",
+      "label": "Root tokens",
+      "description": ":root {\\n  --${1:space}: ${2:0.5rem};\\n  --${3:radii}: ${4:0.5rem};\\n  --${5:accent}: ${6:#42c7b5};\\n}|use",
+      "body": "Use token",
+      "languages": [
+        "css"
+      ]
+    }
+  ]
+}

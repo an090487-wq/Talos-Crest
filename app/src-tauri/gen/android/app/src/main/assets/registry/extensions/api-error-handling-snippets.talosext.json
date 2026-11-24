@@ -1,0 +1,24 @@
+{
+  "id": "api-error-handling-snippets",
+  "name": "API Error Handling Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for api error handling snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "status",
+      "label": "Status guard",
+      "description": "if (res.status >= 500) throw new Error('Server error');|jsonerr",
+      "body": "JSON error body",
+      "languages": [
+        "javascript",
+        "typescript",
+        "python"
+      ]
+    }
+  ]
+}

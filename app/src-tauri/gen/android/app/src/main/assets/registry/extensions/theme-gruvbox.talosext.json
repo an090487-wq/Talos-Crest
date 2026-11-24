@@ -1,0 +1,42 @@
+{
+  "id": "theme-gruvbox",
+  "name": "Gruvbox",
+  "kind": "theme",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "A warm retro dark palette with muted yellow and orange accents.",
+  "license": "MIT",
+  "free": true,
+  "theme": {
+    "dark": true,
+    "ui": {
+      "--bg": "#282828",
+      "--panel": "#3c3836",
+      "--line": "#504945",
+      "--text": "#ebdbb2",
+      "--muted": "#a89984",
+      "--bronze": "#fabd2f"
+    },
+    "editor": {
+      "background": "#282828",
+      "foreground": "#ebdbb2",
+      "selection": "#665c54",
+      "cursor": "#fabd2f",
+      "gutterBackground": "#282828",
+      "gutterForeground": "#a89984",
+      "activeLine": "#3c3836"
+    },
+    "syntax": {
+      "keyword": "#fb4934",
+      "string": "#b8bb26",
+      "comment": "#7c6f64",
+      "number": "#d3869b",
+      "function": "#fabd2f",
+      "type": "#83a598",
+      "variable": "#ebdbb2",
+      "operator": "#fb4934",
+      "constant": "#fe8019"
+    }
+  }
+}

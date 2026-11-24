@@ -1,0 +1,39 @@
+{
+  "id": "paper-light",
+  "kind": "theme",
+  "name": "Paper Light",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "A clean light theme for bright rooms.",
+  "theme": {
+    "dark": false,
+    "ui": {
+      "--bg": "#fafaf7",
+      "--panel": "#efeee9",
+      "--line": "#d9d7cf",
+      "--text": "#222222",
+      "--muted": "#6b6b6b",
+      "--bronze": "#a0561c"
+    },
+    "editor": {
+      "background": "#fafaf7",
+      "foreground": "#222222",
+      "selection": "#e6d9c4",
+      "cursor": "#a0561c",
+      "gutterBackground": "#f3f2ed",
+      "gutterForeground": "#9a988f",
+      "activeLine": "#f1efe8"
+    },
+    "syntax": {
+      "keyword": "#a0561c",
+      "string": "#3b7a3b",
+      "comment": "#8a8a82",
+      "number": "#b3541e",
+      "function": "#1f5fa8",
+      "type": "#8a3a8a",
+      "variable": "#222222",
+      "operator": "#555555",
+      "constant": "#b3541e"
+    }
+  }
+}

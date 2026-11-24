@@ -1,0 +1,22 @@
+{
+  "id": "ai-langchain-snippets",
+  "name": "LangChain Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for langchain snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "chain",
+      "label": "Simple chain",
+      "description": "from langchain_core.prompts import ChatPromptTemplate\\nprompt = ChatPromptTemplate.from_template('${1:Answer: {question}}')|llm",
+      "body": "Ollama LLM",
+      "languages": [
+        "python"
+      ]
+    }
+  ]
+}

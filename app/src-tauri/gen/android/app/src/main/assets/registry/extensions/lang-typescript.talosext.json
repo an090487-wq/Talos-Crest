@@ -1,0 +1,21 @@
+{
+  "id": "lang-typescript",
+  "name": "TypeScript support",
+  "kind": "language",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Adds Run support for TypeScript support files (user-approved command).",
+  "license": "MIT",
+  "free": true,
+  "language": {
+    "id": "lang-typescript",
+    "name": "TypeScript support",
+    "extensions": [
+      ".ts"
+    ],
+    "run": "tsx {file}",
+    "build": null,
+    "paths": []
+  }
+}

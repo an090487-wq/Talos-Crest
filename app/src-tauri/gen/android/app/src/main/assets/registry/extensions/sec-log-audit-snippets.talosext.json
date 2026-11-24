@@ -1,0 +1,23 @@
+{
+  "id": "sec-log-audit-snippets",
+  "name": "Log Audit Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for log audit snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "json",
+      "label": "Parse JSON logs",
+      "description": "jq 'select(.level == \"error\")' ${1:app.log}|status",
+      "body": "Count status codes",
+      "languages": [
+        "bash",
+        "sh"
+      ]
+    }
+  ]
+}

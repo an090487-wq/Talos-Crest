@@ -1,0 +1,39 @@
+{
+  "id": "solarized-dark",
+  "kind": "theme",
+  "name": "Solarized Dark",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "A calm, low-contrast dark palette inspired by Solarized.",
+  "theme": {
+    "dark": true,
+    "ui": {
+      "--bg": "#002b36",
+      "--panel": "#073642",
+      "--line": "#164854",
+      "--text": "#eee8d5",
+      "--muted": "#839496",
+      "--bronze": "#b58900"
+    },
+    "editor": {
+      "background": "#002b36",
+      "foreground": "#eee8d5",
+      "selection": "#164854",
+      "cursor": "#b58900",
+      "gutterBackground": "#002b36",
+      "gutterForeground": "#586e75",
+      "activeLine": "#073642"
+    },
+    "syntax": {
+      "keyword": "#859900",
+      "string": "#2aa198",
+      "comment": "#586e75",
+      "number": "#d33682",
+      "function": "#268bd2",
+      "type": "#b58900",
+      "variable": "#eee8d5",
+      "operator": "#93a1a1",
+      "constant": "#cb4b16"
+    }
+  }
+}

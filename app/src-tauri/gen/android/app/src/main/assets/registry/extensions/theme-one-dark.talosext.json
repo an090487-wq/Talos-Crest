@@ -1,0 +1,42 @@
+{
+  "id": "theme-one-dark",
+  "name": "One Dark",
+  "kind": "theme",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "A balanced dark palette inspired by the classic one-dark look.",
+  "license": "MIT",
+  "free": true,
+  "theme": {
+    "dark": true,
+    "ui": {
+      "--bg": "#1e2229",
+      "--panel": "#282c34",
+      "--line": "#3b4048",
+      "--text": "#e7eef1",
+      "--muted": "#98a3b3",
+      "--bronze": "#61afef"
+    },
+    "editor": {
+      "background": "#1e2229",
+      "foreground": "#e7eef1",
+      "selection": "#3a4452",
+      "cursor": "#61afef",
+      "gutterBackground": "#1e2229",
+      "gutterForeground": "#98a3b3",
+      "activeLine": "#282c34"
+    },
+    "syntax": {
+      "keyword": "#c678dd",
+      "string": "#98c379",
+      "comment": "#7f848e",
+      "number": "#d19a66",
+      "function": "#61afef",
+      "type": "#e5c07b",
+      "variable": "#e7eef1",
+      "operator": "#c678dd",
+      "constant": "#56b6c2"
+    }
+  }
+}

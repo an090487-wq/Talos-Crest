@@ -1,0 +1,30 @@
+{
+  "id": "extra-templates",
+  "kind": "template",
+  "name": "More Starter Templates",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "Rust, Go, TypeScript, and Markdown starter files.",
+  "templates": [
+    {
+      "label": "Rust program",
+      "filename": "main.rs",
+      "content": "fn main() {\n    println!(\"Hello from Talos\");\n}\n"
+    },
+    {
+      "label": "Go program",
+      "filename": "main.go",
+      "content": "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"Hello from Talos\")\n}\n"
+    },
+    {
+      "label": "TypeScript script",
+      "filename": "index.ts",
+      "content": "const message: string = \"Hello from Talos\";\nconsole.log(message);\n"
+    },
+    {
+      "label": "Markdown notes",
+      "filename": "README.md",
+      "content": "# Project notes\n\n## Overview\n\nDescribe your project here.\n\n## Next steps\n\n- [ ] Add your first task\n"
+    }
+  ]
+}

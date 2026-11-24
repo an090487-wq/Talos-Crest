@@ -1,0 +1,18 @@
+{
+  "id": "docs-diataxis-template",
+  "name": "Diátaxis Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for diátaxis template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Doc map",
+      "filename": "DOCUMENTATION.md",
+      "content": "# Documentation map\n\n- Tutorial: learning-oriented\n- How-to guide: goal-oriented\n- Reference: information-oriented\n- Explanation: understanding-oriented\n\nChoose one purpose per page to keep docs focused.\n"
+    }
+  ]
+}

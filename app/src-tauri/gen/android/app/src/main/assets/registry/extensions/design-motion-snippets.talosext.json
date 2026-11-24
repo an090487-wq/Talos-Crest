@@ -1,0 +1,22 @@
+{
+  "id": "design-motion-snippets",
+  "name": "Motion Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for motion snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "transition",
+      "label": "Transition",
+      "description": "transition: ${1:background-color} ${2:120ms} ease;|fade",
+      "body": "Fade in",
+      "languages": [
+        "css"
+      ]
+    }
+  ]
+}

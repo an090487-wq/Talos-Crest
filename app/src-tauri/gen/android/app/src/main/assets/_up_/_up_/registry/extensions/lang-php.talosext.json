@@ -1,0 +1,16 @@
+{
+  "id": "lang-php",
+  "kind": "language",
+  "name": "PHP support",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "Adds Run support for PHP files (needs php installed).",
+  "language": {
+    "id": "php",
+    "name": "PHP",
+    "extensions": [".php"],
+    "run": "php {file}",
+    "build": null,
+    "paths": []
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "id": "docs-changelog-template",
+  "name": "Changelog Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for changelog template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Changelog",
+      "filename": "CHANGELOG.md",
+      "content": "# Changelog\n\n## [Unreleased]\n### Added\n- ${1:Change}\n\n### Changed\n- ${2:Change}\n\n### Fixed\n- ${3:Change}\n\n## [1.0.0] - ${4:YYYY-MM-DD}\n### Added\n- Initial release\n"
+    }
+  ]
+}

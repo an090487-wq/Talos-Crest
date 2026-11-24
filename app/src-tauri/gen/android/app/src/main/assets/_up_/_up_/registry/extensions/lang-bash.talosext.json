@@ -1,0 +1,16 @@
+{
+  "id": "lang-bash",
+  "kind": "language",
+  "name": "Bash support",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "Adds Run support for Bash scripts (needs bash installed).",
+  "language": {
+    "id": "bash",
+    "name": "Bash",
+    "extensions": [".sh", ".bash"],
+    "run": "bash {file}",
+    "build": null,
+    "paths": []
+  }
+}

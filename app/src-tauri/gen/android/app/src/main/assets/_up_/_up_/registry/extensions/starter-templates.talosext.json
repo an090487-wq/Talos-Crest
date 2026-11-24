@@ -1,0 +1,30 @@
+{
+  "id": "starter-templates",
+  "kind": "template",
+  "name": "Starter Templates",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "Python, C, Node and HTML starter files.",
+  "templates": [
+    {
+      "label": "Python script",
+      "filename": "main.py",
+      "content": "def main():\n    print(\"Hello from Talos\")\n\n\nif __name__ == \"__main__\":\n    main()\n"
+    },
+    {
+      "label": "C program",
+      "filename": "main.c",
+      "content": "#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello from Talos\\n\");\n    return 0;\n}\n"
+    },
+    {
+      "label": "Node script",
+      "filename": "index.js",
+      "content": "console.log(\"Hello from Talos\");\n"
+    },
+    {
+      "label": "HTML page",
+      "filename": "index.html",
+      "content": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <title>New page</title>\n  </head>\n  <body>\n    <h1>Hello from Talos</h1>\n  </body>\n</html>\n"
+    }
+  ]
+}

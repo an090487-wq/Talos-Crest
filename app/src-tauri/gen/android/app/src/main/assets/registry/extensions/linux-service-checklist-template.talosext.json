@@ -1,0 +1,18 @@
+{
+  "id": "linux-service-checklist-template",
+  "name": "Service Checklist",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for service checklist.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Service checklist",
+      "filename": "SERVICE.md",
+      "content": "# ${1:service} checklist\n\n- [ ] Unit file syntax checked\n- [ ] Service starts after reboot\n- [ ] Logs are readable\n- [ ] Restart policy set\n- [ ] Resource limits considered\n- [ ] Backup and restore tested\n- [ ] Rollback command documented\n"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "docs-api-reference-template",
+  "name": "API Reference Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for api reference template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "API reference",
+      "filename": "API.md",
+      "content": "# ${1:API} reference\n\n## Base URL\n`${2:https://example.invalid}`\n\n## Authentication\n${3:None or token header}\n\n## Endpoints\n\n### GET ${4:/resource}\nReturns ${5:resource objects}.\n\n### POST ${4:/resource}\nCreates a ${5:resource}.\n\n## Errors\n- 400: invalid request\n- 401: unauthorized\n- 500: server error\n"
+    }
+  ]
+}

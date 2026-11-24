@@ -1,0 +1,18 @@
+{
+  "id": "prod-dockerfile-template",
+  "name": "Dockerfile Starter",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for dockerfile starter.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Multi-stage Dockerfile",
+      "filename": "Dockerfile",
+      "content": "FROM ${1:node:20-alpine} AS build\nWORKDIR /app\nCOPY . .\nRUN ${2:npm ci && npm run build}\n\nFROM ${3:node:20-alpine}\nWORKDIR /app\nCOPY --from=build /app/dist ./dist\nCMD [\\\"${4:node}\\\", \\\"dist/index.js\\\"]|.dockerignore\n"
+    }
+  ]
+}

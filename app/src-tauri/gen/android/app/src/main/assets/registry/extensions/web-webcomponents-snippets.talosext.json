@@ -1,0 +1,109 @@
+{
+  "id": "web-webcomponents-snippets",
+  "name": "Web Components Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "8 offline CodeMirror snippets for web components snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "define",
+      "label": "Define element",
+      "description": "Custom element class",
+      "body": "class ${1:MyElement} extends HTMLElement { connectedCallback() { ${0} } }\ncustomElements.define('${2:my-element}', ${1:MyElement});",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "shadow",
+      "label": "Shadow root",
+      "description": "Attach shadow DOM",
+      "body": "const shadow = this.attachShadow({ mode: 'open' });\nshadow.innerHTML = '${1:<p>Hello</p>}';",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "template",
+      "label": "HTML template",
+      "description": "Clone a template element",
+      "body": "const tpl = document.querySelector('#${1:tpl}') as HTMLTemplateElement;\nconst node = tpl.content.cloneNode(true);",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "attrs",
+      "label": "Observed attrs",
+      "description": "Watch attributes",
+      "body": "static get observedAttributes() { return ['${1:value}']; }\nattributeChangedCallback(name, oldValue, newValue) { ${0} }",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "props",
+      "label": "Property setter",
+      "description": "Reflect a property",
+      "body": "set value(next: string) { this.setAttribute('value', next); }\nget value() { return this.getAttribute('value') ?? ''; }",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "slot",
+      "label": "Named slot",
+      "description": "Enable slotted content",
+      "body": "<slot name=\\\"${1:title}\\\">Default title</slot>",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "connect",
+      "label": "Lifecycle",
+      "description": "Connected callback",
+      "body": "connectedCallback() { ${0} }\ndisconnectedCallback() { ${1:cleanup} }",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    },
+    {
+      "prefix": "emit",
+      "label": "Custom event",
+      "description": "Dispatch an event",
+      "body": "this.dispatchEvent(new CustomEvent('${1:change}', { detail: ${2:{}}, bubbles: true }));",
+      "languages": [
+        "javascript",
+        "typescript",
+        "js",
+        "ts"
+      ]
+    }
+  ]
+}

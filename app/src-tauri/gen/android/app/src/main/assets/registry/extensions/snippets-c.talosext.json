@@ -1,0 +1,100 @@
+{
+  "id": "snippets-c",
+  "name": "C Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Free, MIT-licensed snippets for C: main, includes, loops, structs, pointers, and switch.",
+  "license": "MIT",
+  "snippets": [
+    {
+      "prefix": "main",
+      "label": "main()",
+      "description": "C program entry point",
+      "body": "int main(int argc, char **argv) {\n\t${0:return 0;}\n}",
+      "languages": [
+        "c",
+        "h",
+        "C"
+      ]
+    },
+    {
+      "prefix": "inc",
+      "label": "#include <...>",
+      "description": "System header include",
+      "body": "#include <${1:stdio.h}>",
+      "languages": [
+        "c",
+        "h",
+        "C"
+      ]
+    },
+    {
+      "prefix": "for",
+      "label": "for loop",
+      "description": "Counted for loop",
+      "body": "for (int ${1:i} = 0; ${1:i} < ${2:count}; ${1:i}++) {\n\t${0:/* body */}\n}",
+      "languages": [
+        "c",
+        "h",
+        "C"
+      ]
+    },
+    {
+      "prefix": "printf",
+      "label": "printf(...)",
+      "description": "Formatted output",
+      "body": "printf(\"${1:format}\\n\", ${0:value});",
+      "languages": [
+        "c",
+        "h",
+        "C"
+      ]
+    },
+    {
+      "prefix": "struct",
+      "label": "struct",
+      "description": "Structure declaration",
+      "body": "struct ${1:Name} {\n\t${0:/* fields */}\n};",
+      "languages": [
+        "c",
+        "h",
+        "C"
+      ]
+    },
+    {
+      "prefix": "enum",
+      "label": "enum",
+      "description": "Enumeration declaration",
+      "body": "enum ${1:Name} {\n\t${2:VALUE},\n\t${0:LAST}\n};",
+      "languages": [
+        "c",
+        "h",
+        "C"
+      ]
+    },
+    {
+      "prefix": "switch",
+      "label": "switch",
+      "description": "Switch statement",
+      "body": "switch (${1:value}) {\ncase ${2:constant}:\n\t${0:/* body */}\n\tbreak;\ndefault:\n\tbreak;\n}",
+      "languages": [
+        "c",
+        "h",
+        "C"
+      ]
+    },
+    {
+      "prefix": "malloc",
+      "label": "malloc + check",
+      "description": "Allocate memory with a null check",
+      "body": "${1:type} *${2:name} = malloc(sizeof(*${2:name}) * ${3:count});\nif (${2:name} == NULL) {\n\t${0:/* handle failure */}\n}",
+      "languages": [
+        "c",
+        "h",
+        "C"
+      ]
+    }
+  ]
+}

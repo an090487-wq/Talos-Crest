@@ -1,0 +1,100 @@
+{
+  "id": "snippets-r",
+  "name": "R Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Free, MIT-licensed snippets for R: functions, pipes, data frames, plotting, and modeling.",
+  "license": "MIT",
+  "snippets": [
+    {
+      "prefix": "fun",
+      "label": "function(...)",
+      "description": "R function",
+      "body": "${1:name} <- function(${2:args}) {\n  ${0:}\n}",
+      "languages": [
+        "r",
+        "R",
+        "Rscript"
+      ]
+    },
+    {
+      "prefix": "lib",
+      "label": "library(...)",
+      "description": "Load a package",
+      "body": "library(${1:package})",
+      "languages": [
+        "r",
+        "R",
+        "Rscript"
+      ]
+    },
+    {
+      "prefix": "pipe",
+      "label": "|>",
+      "description": "Native pipe chain",
+      "body": "${1:data} |>\n  ${2:transform()}|>\n  ${0:summary()}",
+      "languages": [
+        "r",
+        "R",
+        "Rscript"
+      ]
+    },
+    {
+      "prefix": "readcsv",
+      "label": "read.csv(...)",
+      "description": "Read a CSV file",
+      "body": "${1:data} <- read.csv(\"${2:file.csv}\", stringsAsFactors = ${3:FALSE})",
+      "languages": [
+        "r",
+        "R",
+        "Rscript"
+      ]
+    },
+    {
+      "prefix": "plot",
+      "label": "plot(...)",
+      "description": "Base plot",
+      "body": "plot(${1:x}, ${2:y}, main = \"${3:Title}\", xlab = \"${4:X}\", ylab = \"${5:Y}\")",
+      "languages": [
+        "r",
+        "R",
+        "Rscript"
+      ]
+    },
+    {
+      "prefix": "ggplot",
+      "label": "ggplot(...)",
+      "description": "ggplot2 scaffold",
+      "body": "ggplot(${1:data}, aes(x = ${2:x}, y = ${3:y})) +\n  geom_${4:point}() +\n  ${0:theme_minimal()}",
+      "languages": [
+        "r",
+        "R",
+        "Rscript"
+      ]
+    },
+    {
+      "prefix": "lm",
+      "label": "lm(...)",
+      "description": "Linear model",
+      "body": "${1:model} <- lm(${2:y} ~ ${3:x}, data = ${4:data})\nsummary(${0:model})",
+      "languages": [
+        "r",
+        "R",
+        "Rscript"
+      ]
+    },
+    {
+      "prefix": "setseed",
+      "label": "set.seed(...)",
+      "description": "Reproducible randomness",
+      "body": "set.seed(${1:42})",
+      "languages": [
+        "r",
+        "R",
+        "Rscript"
+      ]
+    }
+  ]
+}

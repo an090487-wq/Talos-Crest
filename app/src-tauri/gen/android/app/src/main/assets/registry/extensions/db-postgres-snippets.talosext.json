@@ -1,0 +1,22 @@
+{
+  "id": "db-postgres-snippets",
+  "name": "PostgreSQL Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for postgresql snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "jsonb",
+      "label": "JSONB query",
+      "description": "SELECT ${1:data}->>'${2:key}' AS ${2:key} FROM ${3:table};|ilike",
+      "body": "Case-insensitive match",
+      "languages": [
+        "sql"
+      ]
+    }
+  ]
+}

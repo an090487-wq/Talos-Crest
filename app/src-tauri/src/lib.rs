@@ -871,6 +871,7 @@ fn scan_project_tree(
     root: &str,
     exclusions: &[String],
     show_hidden: bool,
+    show_ignored: bool,
     registry: Option<&Registry>,
 ) -> Result<ProjectScan, String> {
     const MAX_ENTRIES: usize = 50_000;
@@ -905,7 +906,20 @@ fn scan_project_tree(
         child_count: 0,
         file_count: 0,
     }];
-    let policy = workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?;
+    let policy = if show_ignored {
+        workspace::WorkspacePolicy::load_with_options(
+            &root,
+            workspace::WorkspacePolicyOptions {
+                exclusions: &[],
+                show_hidden,
+                respect_gitignore: false,
+                respect_ignore: false,
+                respect_talos_ignore: false,
+            },
+        )?
+    } else {
+        workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?
+    };
     let mut stack = vec![(root.clone(), 0usize)];
     let mut warnings = Vec::new();
     let mut child_counts: HashMap<String, usize> = HashMap::new();
@@ -1041,11 +1055,12 @@ async fn scan_project(
     root: String,
     exclusions: Vec<String>,
     show_hidden: bool,
+    show_ignored: bool,
 ) -> Result<ProjectScan, String> {
     let resource_dir = app.path().resource_dir().ok();
     tauri::async_runtime::spawn_blocking(move || {
         let registry = language_registry(resource_dir.as_deref());
-        scan_project_tree(&root, &exclusions, show_hidden, registry.as_ref())
+        scan_project_tree(&root, &exclusions, show_hidden, show_ignored, registry.as_ref())
     })
     .await
     .map_err(|error| format!("project scan task failed: {error}"))?
@@ -1071,6 +1086,7 @@ fn list_project_directory_at(
     path: &str,
     exclusions: &[String],
     show_hidden: bool,
+    show_ignored: bool,
     registry: Option<&Registry>,
 ) -> Result<ProjectDirectory, String> {
     const MAX_DIRECTORY_ENTRIES: usize = 10_000;
@@ -1096,7 +1112,20 @@ fn list_project_directory_at(
         return Err(format!("workspace entry is not a directory: {}", directory.display()));
     }
 
-    let policy = workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?;
+    let policy = if show_ignored {
+        workspace::WorkspacePolicy::load_with_options(
+            &root,
+            workspace::WorkspacePolicyOptions {
+                exclusions: &[],
+                show_hidden,
+                respect_gitignore: false,
+                respect_ignore: false,
+                respect_talos_ignore: false,
+            },
+        )?
+    } else {
+        workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?
+    };
     let relative = directory.strip_prefix(&root).unwrap_or(Path::new(""));
     if !relative.as_os_str().is_empty() && policy.is_ignored(relative, true) {
         return Err(format!("directory is excluded by workspace policy: {}", relative.display()));
@@ -1224,11 +1253,12 @@ async fn list_project_directory(
     path: String,
     exclusions: Vec<String>,
     show_hidden: bool,
+    show_ignored: bool,
 ) -> Result<ProjectDirectory, String> {
     let resource_dir = app.path().resource_dir().ok();
     tauri::async_runtime::spawn_blocking(move || {
         let registry = language_registry(resource_dir.as_deref());
-        list_project_directory_at(&root, &path, &exclusions, show_hidden, registry.as_ref())
+        list_project_directory_at(&root, &path, &exclusions, show_hidden, show_ignored, registry.as_ref())
     })
     .await
     .map_err(|error| format!("directory listing task failed: {error}"))?
@@ -1825,7 +1855,7 @@ fn search_workspace_text_at(
     }
     let candidates: Vec<String> = match paths {
         Some(paths) => snapshot_file_paths(root, paths, exclusions, show_hidden)?,
-        None => scan_project_tree(root, exclusions, show_hidden, None)?
+        None => scan_project_tree(root, exclusions, show_hidden, false, None)?
             .entries
             .into_iter()
             .filter(|entry| entry.kind == "file")
@@ -3431,7 +3461,7 @@ mod tests {
             "vendor",
         ]
         .map(str::to_string);
-        let scan = scan_project_tree(root.to_str().unwrap(), &exclusions, true, None).unwrap();
+        let scan = scan_project_tree(root.to_str().unwrap(), &exclusions, true, false, None).unwrap();
         assert_eq!(scan.entries[0].path, root.to_string_lossy());
         assert!(scan
             .entries
@@ -3475,7 +3505,7 @@ mod tests {
         let exclusions = ["node_modules".to_string()];
         let root_text = root.to_string_lossy().into_owned();
         let listing =
-            list_project_directory_at(&root_text, "", &exclusions, false, None).unwrap();
+            list_project_directory_at(&root_text, "", &exclusions, false, false, None).unwrap();
         assert_eq!(listing.path, root_text);
         assert_eq!(listing.entry.depth, 0);
         assert_eq!(listing.entry.child_count, listing.entries.len());
@@ -3495,7 +3525,7 @@ mod tests {
             .any(|entry| entry.name == "outside-link" && entry.kind == "link"));
 
         let src_text = root.join("src").to_string_lossy().into_owned();
-        let src = list_project_directory_at(&root_text, &src_text, &exclusions, false, None).unwrap();
+        let src = list_project_directory_at(&root_text, &src_text, &exclusions, false, false, None).unwrap();
         assert_eq!(src.entry.depth, 1);
         assert!(src
             .entries
@@ -3511,6 +3541,7 @@ mod tests {
             &root.join("node_modules").to_string_lossy(),
             &exclusions,
             false,
+            false,
             None,
         )
         .expect_err("an excluded directory must not be listable");
@@ -3521,6 +3552,7 @@ mod tests {
             &root.join("src/main.ts").to_string_lossy(),
             &exclusions,
             false,
+            false,
             None,
         )
         .expect_err("a file is not a directory");
@@ -3530,6 +3562,7 @@ mod tests {
             &root_text,
             &outside.to_string_lossy(),
             &exclusions,
+            false,
             false,
             None,
         )
@@ -3742,6 +3775,7 @@ mod tests {
             root.to_str().unwrap(),
             &["node_modules".to_string()],
             false,
+            false,
             Some(&registry),
         )
         .unwrap();
@@ -3762,7 +3796,7 @@ mod tests {
         assert_eq!(main.extension, "py");
         assert_eq!(main.language, "python");
 
-        let shown = scan_project_tree(root.to_str().unwrap(), &[], true, None).unwrap();
+        let shown = scan_project_tree(root.to_str().unwrap(), &[], true, false, None).unwrap();
         assert!(shown.entries.iter().any(|entry| entry.name == "notes.py"));
         fs::remove_dir_all(root).unwrap();
     }
@@ -3905,7 +3939,7 @@ mod tests {
         }
 
         let started = Instant::now();
-        let scan = scan_project_tree(root.to_str().unwrap(), &[], true, None).unwrap();
+        let scan = scan_project_tree(root.to_str().unwrap(), &[], true, false, None).unwrap();
         let elapsed = started.elapsed();
         eprintln!(
             "large_workspace_scan_stays_bounded: {} entries in {} ms",

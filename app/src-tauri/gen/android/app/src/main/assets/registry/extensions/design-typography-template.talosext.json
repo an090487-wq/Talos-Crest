@@ -1,0 +1,18 @@
+{
+  "id": "design-typography-template",
+  "name": "Typography Template",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 local file templates for typography template.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Type scale",
+      "filename": "type.css",
+      "content": ":root {\n  --font-ui: ${1:system-ui, sans-serif};\n  --font-mono: ${2:ui-monospace, monospace};\n  --font-xs: ${3:10px};\n  --font-sm: ${4:11px};\n  --font-md: ${5:13px};\n  --font-lg: ${6:18px};\n}|TYPE.md\n"
+    }
+  ]
+}

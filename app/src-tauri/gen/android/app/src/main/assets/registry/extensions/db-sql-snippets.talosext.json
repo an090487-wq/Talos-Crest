@@ -1,0 +1,22 @@
+{
+  "id": "db-sql-snippets",
+  "name": "SQL Snippets",
+  "kind": "snippets",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "1 offline CodeMirror snippets for sql snippets.",
+  "license": "MIT",
+  "free": true,
+  "snippets": [
+    {
+      "prefix": "select",
+      "label": "SELECT query",
+      "description": "SELECT ${1:columns} FROM ${2:table} WHERE ${3:condition};|join",
+      "body": "INNER JOIN",
+      "languages": [
+        "sql"
+      ]
+    }
+  ]
+}

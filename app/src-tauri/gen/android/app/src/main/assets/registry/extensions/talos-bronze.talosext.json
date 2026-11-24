@@ -1,0 +1,39 @@
+{
+  "id": "talos-bronze",
+  "kind": "theme",
+  "name": "Talos Bronze",
+  "version": "1.0.0",
+  "author": "Talos",
+  "description": "Dark metal tones with bronze accents.",
+  "theme": {
+    "dark": true,
+    "ui": {
+      "--bg": "#14161a",
+      "--panel": "#1b1e24",
+      "--line": "#2a2e36",
+      "--text": "#e8e6e1",
+      "--muted": "#8b8f98",
+      "--bronze": "#c9863a"
+    },
+    "editor": {
+      "background": "#14161a",
+      "foreground": "#e8e6e1",
+      "selection": "#3d3224",
+      "cursor": "#c9863a",
+      "gutterBackground": "#14161a",
+      "gutterForeground": "#6b6f78",
+      "activeLine": "#1b1e24"
+    },
+    "syntax": {
+      "keyword": "#d9953f",
+      "string": "#a6c48a",
+      "comment": "#6b6f78",
+      "number": "#e6b673",
+      "function": "#8fb4d9",
+      "type": "#d9a5a5",
+      "variable": "#e8e6e1",
+      "operator": "#b8b5ad",
+      "constant": "#e6b673"
+    }
+  }
+}

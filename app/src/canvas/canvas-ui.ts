@@ -68,6 +68,8 @@ let sourcePath: string | null = null;
 let svgSource: string | null = null;
 let zoom = 1;
 let fitToViewport = true;
+let cachedSurfaceRect: DOMRect | null = null;
+let cachedSurfaceRectAt = 0;
 let tool: Tool = "select";
 let dragTool: Tool | null = null;
 let color = "#59c7d4";
@@ -266,6 +268,7 @@ function applyZoom(): void {
   drawSelection();
   drawMeasurement();
   renderCompare();
+  invalidateSurfaceRect();
 }
 
 function setZoom(next: number, anchor?: Point): void {
@@ -936,8 +939,22 @@ function closeCanvas(): void {
   document.dispatchEvent(new Event("talos:canvas-close"));
 }
 
+function surfaceRect(): DOMRect {
+  const now = performance.now();
+  if (!cachedSurfaceRect || now - cachedSurfaceRectAt > 16) {
+    cachedSurfaceRect = surface().getBoundingClientRect();
+    cachedSurfaceRectAt = now;
+  }
+  return cachedSurfaceRect;
+}
+
+function invalidateSurfaceRect(): void {
+  cachedSurfaceRect = null;
+  cachedSurfaceRectAt = 0;
+}
+
 function canvasPoint(event: PointerEvent): Point {
-  const rect = surface().getBoundingClientRect();
+  const rect = surfaceRect();
   const point = {
     x: ((event.clientX - rect.left) / Math.max(1, rect.width)) * width,
     y: ((event.clientY - rect.top) / Math.max(1, rect.height)) * height,
@@ -1964,6 +1981,7 @@ function initialize(): void {
 
   let fitResizeFrame = 0;
   window.addEventListener("resize", () => {
+    invalidateSurfaceRect();
     if (!canvasVisible() || !fitToViewport || !width || !height || fitResizeFrame) return;
     fitResizeFrame = requestAnimationFrame(() => {
       fitResizeFrame = 0;

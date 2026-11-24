@@ -1,0 +1,18 @@
+{
+  "id": "prod-precommit-template",
+  "name": "Pre-commit Hooks",
+  "kind": "template",
+  "version": "1.0.0",
+  "author": "Talos Community",
+  "publisher": "Talos Community",
+  "description": "Shell hook template for local checks. Talos does not install the hook automatically.",
+  "license": "MIT",
+  "free": true,
+  "templates": [
+    {
+      "label": "Pre-commit hook",
+      "filename": "pre-commit",
+      "content": "#!/bin/sh\nset -eu\n${1:git diff --check}\n${2:npm test}\n"
+    }
+  ]
+}
