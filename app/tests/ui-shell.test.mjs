@@ -91,3 +91,18 @@ test("closing tool overlays restores the default navigation state", () => {
   assert.match(main, /talos:explorer-close/);
   assert.match(architecture, /document\.dispatchEvent\(new Event\("talos:explorer-close"\)\)/);
 });
+
+test("installed icon packs visibly change Explorer file icons", () => {
+  assert.ok(architecture.includes("export function setExplorerIconPack"));
+  assert.ok(architecture.includes("ICON_PACK_STYLES"));
+  assert.ok(architecture.includes("iconPackGlyph("));
+  assert.ok(architecture.includes("styleExplorerIcon(icon)"));
+  assert.ok(main.includes("setIconPack: (pack) => setExplorerIconPack(pack)"));
+  for (const id of [
+    "icon-pack-material", "icon-pack-seti", "icon-pack-vscode", "icon-pack-feather",
+    "icon-pack-phosphor", "icon-pack-heroicons", "icon-pack-lucide", "icon-pack-tabler",
+    "icon-pack-remix", "icon-pack-simple",
+  ]) {
+    assert.ok(architecture.includes(`"${id}"`), `missing visible style for ${id}`);
+  }
+});

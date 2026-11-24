@@ -169,42 +169,117 @@ export interface ActiveIconPack {
   mappings: Record<string, string>;
 }
 
+interface IconPackStyle {
+  color: string;
+  glyphs?: Record<string, string>;
+}
+
 let activeIconPack: ActiveIconPack | null = null;
 
-const ICON_PACK_GLYPHS: Record<string, string> = {
-  file: "FILE",
-  folder: "DIR",
-  python: "PY",
-  javascript: "JS",
-  typescript: "TS",
-  react: "RE",
-  java: "JV",
-  c: "C",
-  cpp: "C++",
-  csharp: "C#",
-  rust: "RS",
-  go: "GO",
-  ruby: "RB",
-  php: "PHP",
-  swift: "SW",
-  kotlin: "KT",
-  shell: "SH",
-  html: "HT",
-  css: "CS",
-  sass: "SA",
-  json: "{}",
-  xml: "XM",
-  yaml: "YM",
-  markdown: "MD",
-  sql: "DB",
-  docker: "DK",
-  config: "CF",
-  text: "TX",
-  log: "LG",
-  image: "IMG",
-  svg: "SV",
-  pdf: "PDF",
+const DEFAULT_ICON_PACK_STYLE: IconPackStyle = { color: "#8db4e2" };
+
+const ICON_PACK_TOKEN_GLYPHS: Record<string, string> = {
+  file: "📄",
+  folder: "📁",
+  link: "🔗",
+  python: "🐍",
+  javascript: "🟨",
+  typescript: "🔷",
+  react: "⚛️",
+  java: "☕",
+  c: "🇨",
+  cpp: "⚙️",
+  csharp: "🟣",
+  rust: "🦀",
+  go: "🐹",
+  ruby: "💎",
+  php: "🐘",
+  swift: "🕊️",
+  kotlin: "🟪",
+  shell: "🖥️",
+  html: "🌐",
+  css: "🎨",
+  sass: "💅",
+  json: "🧩",
+  xml: "📐",
+  yaml: "📋",
+  markdown: "📝",
+  sql: "🗄️",
+  docker: "🐳",
+  config: "⚙️",
+  text: "📄",
+  log: "📜",
+  image: "🖼️",
+  svg: "✏️",
+  pdf: "📕",
 };
+
+const ICON_PACK_STYLES: Record<string, IconPackStyle> = {
+  "icon-pack-material": { color: "#64b5f6" },
+  "icon-pack-simple": { color: "#f59e0b" },
+  "icon-pack-seti": {
+    color: "#c678dd",
+    glyphs: { python: "◆", javascript: "◇", typescript: "◇", react: "✦", java: "◈", rust: "⬢", go: "◉", html: "▱", css: "▰", json: "◧", markdown: "▤", sql: "▦", folder: "▰" },
+  },
+  "icon-pack-vscode": {
+    color: "#4fc1ff",
+    glyphs: { python: "PY", javascript: "JS", typescript: "TS", react: "RE", java: "JV", rust: "RS", go: "GO", html: "HT", css: "CS", json: "{}", markdown: "MD", sql: "DB", folder: "DIR" },
+  },
+  "icon-pack-feather": {
+    color: "#9fb3c8",
+    glyphs: { python: "◌", javascript: "○", typescript: "◬", react: "✧", java: "◎", rust: "⬡", go: "◍", html: "◇", css: "▢", json: "▤", markdown: "▧", sql: "▥", folder: "▣" },
+  },
+  "icon-pack-phosphor": {
+    color: "#f088d0",
+    glyphs: { python: "◐", javascript: "◑", typescript: "◒", react: "✺", java: "◓", rust: "◕", go: "◔", html: "◯", css: "◗", json: "◫", markdown: "◪", sql: "◩", folder: "◼" },
+  },
+  "icon-pack-heroicons": {
+    color: "#7dd3fc",
+    glyphs: { python: "■", javascript: "□", typescript: "▣", react: "✦", java: "▧", rust: "▦", go: "▥", html: "▤", css: "▨", json: "▩", markdown: "▱", sql: "▰", folder: "▣" },
+  },
+  "icon-pack-lucide": {
+    color: "#a3e635",
+    glyphs: { python: "✦", javascript: "✧", typescript: "✳", react: "✺", java: "✷", rust: "✶", go: "✵", html: "◇", css: "◈", json: "◫", markdown: "✎", sql: "▤", folder: "▧" },
+  },
+  "icon-pack-tabler": {
+    color: "#fbbf24",
+    glyphs: { python: "▣", javascript: "▢", typescript: "▥", react: "✦", java: "▤", rust: "▦", go: "◉", html: "▧", css: "▨", json: "◫", markdown: "▩", sql: "▪", folder: "▣" },
+  },
+  "icon-pack-remix": {
+    color: "#c4b5fd",
+    glyphs: { python: "◈", javascript: "◇", typescript: "◈", react: "✧", java: "◉", rust: "⬡", go: "◍", html: "▱", css: "▰", json: "◫", markdown: "▤", sql: "▦", folder: "◼" },
+  },
+};
+
+function activeIconPackStyle(): IconPackStyle {
+  return (activeIconPack && ICON_PACK_STYLES[activeIconPack.id]) || DEFAULT_ICON_PACK_STYLE;
+}
+
+function iconPackToken(entry: ProjectEntry): string {
+  if (entry.kind === "directory") return "folder";
+  if (entry.kind === "link") return "link";
+  const mappings = activeIconPack?.mappings ?? {};
+  return mappings[entry.extension.toLowerCase()]
+    ?? mappings[entry.name.toLowerCase()]
+    ?? mappings[entry.language]
+    ?? mappings.default
+    ?? "file";
+}
+
+function iconPackGlyph(token: string): string {
+  const style = activeIconPackStyle();
+  return style.glyphs?.[token] ?? ICON_PACK_TOKEN_GLYPHS[token] ?? ICON_PACK_TOKEN_GLYPHS.file;
+}
+
+function styleExplorerIcon(icon: HTMLElement): void {
+  if (!activeIconPack) {
+    icon.style.removeProperty("color");
+    icon.style.removeProperty("font-size");
+    return;
+  }
+  icon.style.color = activeIconPackStyle().color;
+  icon.style.fontSize = "14px";
+}
 
 export function setExplorerIconPack(pack: ActiveIconPack | null): void {
   activeIconPack = pack;
@@ -981,6 +1056,7 @@ function renderFileTree() {
     const icon = document.createElement("span");
     icon.className = `arch-tree-icon ${entry.kind}`;
     icon.textContent = entryIcon(entry);
+    styleExplorerIcon(icon);
     icon.setAttribute("aria-hidden", "true");
     const name = document.createElement("span");
     name.className = "arch-tree-name";
@@ -1047,19 +1123,10 @@ function renderFileTree() {
 }
 
 function entryIcon(entry: ProjectEntry): string {
-  if (entry.kind === "directory") return activeIconPack ? (ICON_PACK_GLYPHS.folder ?? "DIR") : "DIR";
-  if (entry.kind === "link") return "LNK";
+  if (entry.kind === "directory") return activeIconPack ? iconPackGlyph("folder") : "DIR";
+  if (entry.kind === "link") return activeIconPack ? iconPackGlyph("link") : "LNK";
 
-  if (activeIconPack) {
-    const name = entry.name.toLowerCase();
-    const extension = entry.extension.toLowerCase();
-    const token = activeIconPack.mappings[extension]
-      ?? activeIconPack.mappings[name]
-      ?? activeIconPack.mappings[entry.language]
-      ?? activeIconPack.mappings["default"]
-      ?? "file";
-    return ICON_PACK_GLYPHS[token] ?? token.slice(0, 3).toUpperCase();
-  }
+  if (activeIconPack) return iconPackGlyph(iconPackToken(entry));
 
   const icons: Record<string, string> = {
     ts: "TS", tsx: "TS", js: "JS", jsx: "JS", mjs: "JS", py: "PY",
