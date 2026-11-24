@@ -387,6 +387,7 @@ function extensionCategory(entry: IndexEntry): string | null {
   if (entry.kind === "theme") return "themes";
   if (entry.kind === "template") return "productivity";
   if (entry.kind === "extension-pack") return "extension-packs";
+  if (entry.kind === "icon-pack") return "icon-packs";
   return null;
 }
 
