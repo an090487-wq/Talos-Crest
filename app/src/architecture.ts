@@ -2090,6 +2090,8 @@ async function scanProject(root: string, forceWatch = false, options: ScanProjec
     $("arch-graph-viewport").scrollTop = 0;
     render();
     if (result.lazy) void restoreLazyExpansion(scanGeneration);
+    // Keep the file tree visible after opening or restoring a workspace.
+    if (changedRoot) showArchitectureWindow();
     if (($("quick-open-dialog") as HTMLDialogElement).open) renderQuickOpen();
     if (mode === "dependencies") void analyzeCurrentProject();
     if (isInsightMode(mode)) void loadInsights();
@@ -2159,6 +2161,8 @@ async function analyzeCurrentProject() {
 
 function setMode(next: ArchMode) {
   mode = next;
+  const arch = $("architecture");
+  arch.classList.toggle("fullscreen", next !== "structure");
   setWindowValue("talos.arch-mode", next);
   focusMode = false;
   setWindowValue("talos.arch-focus", "false");
