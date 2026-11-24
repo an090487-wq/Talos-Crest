@@ -892,6 +892,7 @@ function clearTransientState(): void {
   hideTextInput();
   clearAdjustmentPreview();
   selection = null;
+  drawSelection();
   dragStart = null;
   dragCurrent = null;
   dragTool = null;
