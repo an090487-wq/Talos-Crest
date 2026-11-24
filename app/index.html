@@ -261,8 +261,8 @@
       .card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 4px; }
       .note { grid-column: 1 / -1; color: var(--muted); padding: 6px 2px; }
 
-      #architecture { position: fixed; top: 0; left: 0; bottom: 0; z-index: 60; display: flex; width: min(320px, 32vw); max-width: 420px; padding: 0; background: var(--panel); border-right: 1px solid var(--line); box-shadow: var(--shadow-md); }
-      #architecture.fullscreen { inset: 0; width: auto; max-width: none; padding: 3vh 3vw; background: var(--overlay); border-right: 0; }
+      #architecture { position: fixed; top: 0; left: 48px; bottom: 0; z-index: 60; display: flex; width: min(300px, 28vw); max-width: 380px; padding: 0; background: var(--panel); border-right: 1px solid var(--line); box-shadow: var(--shadow-md); }
+      #architecture.fullscreen { inset: 0; left: 0; width: auto; max-width: none; padding: 3vh 3vw; background: var(--overlay); border-right: 0; }
       #arch-window { display: flex; flex-direction: column; min-width: 0; min-height: 0; width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow-md); }
       #arch-header, #arch-toolbar { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
       #arch-header strong { color: var(--text); white-space: nowrap; }
@@ -377,6 +377,8 @@
       #architecture:not(.fullscreen) #arch-details-pane { display: none; }
       #architecture:not(.fullscreen) #arch-toolbar { padding: 6px 8px; }
       #architecture:not(.fullscreen) #arch-modes { display: none; }
+      #architecture:not(.fullscreen) #arch-header { display: none; }
+      #architecture:not(.fullscreen) #arch-graph-pane { padding: 0; }
       #arch-details-pane h3 { margin: 0; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
       #arch-details { display: flex; flex-direction: column; gap: 12px; overflow-wrap: anywhere; }
       .arch-actions { display: flex; flex-wrap: wrap; gap: 5px; }
