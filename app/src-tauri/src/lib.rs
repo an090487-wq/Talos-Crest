@@ -615,7 +615,7 @@ fn validate_extension_manifest(
         .get("kind")
         .and_then(serde_json::Value::as_str)
         .ok_or("extension has no kind")?;
-    if !matches!(kind, "theme" | "language" | "template" | "snippets") {
+    if !matches!(kind, "theme" | "language" | "template" | "snippets" | "icon-pack") {
         return Err(format!("unsupported extension kind '{kind}'"));
     }
     if let Some(permissions) = manifest.get("permissions") {
