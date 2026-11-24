@@ -768,8 +768,10 @@ async function refreshTree(root: string, forceWatch = false): Promise<boolean> {
 }
 
 function isPathInside(path: string, ancestor: string): boolean {
-  const prefix = ancestor.endsWith("/") || ancestor.endsWith("\\\\") ? ancestor : `${ancestor}/`;
-  return path === ancestor || path.startsWith(prefix);
+  if (path === ancestor) return true;
+  const separator = ancestor.includes("\\\\") && !ancestor.includes("/") ? "\\\\" : "/";
+  const prefix = ancestor.endsWith(separator) ? ancestor : `${ancestor}${separator}`;
+  return path.startsWith(prefix);
 }
 
 function visibleEntries(): ProjectEntry[] {
