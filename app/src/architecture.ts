@@ -223,6 +223,7 @@ function showArchitectureWindow() {
   explorerOpen = true;
   setWindowValue("talos.explorer-open", "true");
   $("architecture").classList.remove("hidden");
+  document.body.classList.add("explorer-open");
 }
 let panStart: { x: number; y: number; left: number; top: number } | null = null;
 let spaceHeld = false;
@@ -959,7 +960,10 @@ function renderFileTree() {
       row.classList.add("selected");
       renderDetails();
       focusTreeRow(index);
-      if (entry.kind === "file") void openSelected();
+      if (entry.kind === "file" && onOpenFile) void onOpenFile(entry.path).then(() => {
+        rememberRecent(entry.path);
+        $("architecture").classList.add("hidden");
+      }).catch((error) => setMessage(`Could not open ${entry.name}: ${String(error)}`, true));
     });
     row.addEventListener("dblclick", () => {
       if (entry.kind === "file") void openSelected();
@@ -2429,6 +2433,7 @@ export function initArchitectureExplorer(
     explorerOpen = false;
     setWindowValue("talos.explorer-open", "false");
     $("architecture").classList.add("hidden");
+    document.body.classList.remove("explorer-open");
     document.dispatchEvent(new Event("talos:explorer-close"));
     if (refreshTimer) window.clearTimeout(refreshTimer);
     refreshTimer = 0;
