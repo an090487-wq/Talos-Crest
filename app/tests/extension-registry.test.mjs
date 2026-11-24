@@ -24,6 +24,7 @@ const requiredCategories = [
   "documentation",
   "design-creative",
   "talos-exclusive",
+  "icon-packs",
 ];
 const dependencyKinds = new Set(["executable", "system-tool", "service", "python-module"]);
 const executableName = /^[A-Za-z0-9_][A-Za-z0-9_.+-]{0,63}$/;
@@ -42,13 +43,13 @@ function requirementsOf(entry) {
   );
 }
 
-test("the bundled local registry is the complete 135-extension catalogue", async () => {
+test("the bundled local registry is the complete 145-extension catalogue", async () => {
   const registry = await loadRegistry();
   assert.equal(registry.schemaVersion, 1);
   assert.ok(Array.isArray(registry.extensions));
   assert.ok(Array.isArray(registry.apis));
-  assert.equal(registry.extensions.length, 135);
-  assert.equal(new Set(registry.extensions.map(({ id }) => id)).size, 135);
+  assert.equal(registry.extensions.length, 145);
+  assert.equal(new Set(registry.extensions.map(({ id }) => id)).size, 145);
 
   for (const entry of registry.extensions) {
     assert.match(entry.id, /^[a-z0-9][a-z0-9._-]{0,63}$/);
@@ -118,6 +119,10 @@ test("every registry package exists locally and matches its declared checksum", 
     } else if (entry.kind === "template") {
       assert.ok(Array.isArray(manifest.templates));
       assert.ok(manifest.templates.length >= 1 && manifest.templates.length <= 100);
+    } else if (entry.kind === "icon-pack") {
+      assert.ok(manifest.iconPack && typeof manifest.iconPack === "object");
+      assert.ok(manifest.iconPack.mappings && typeof manifest.iconPack.mappings === "object");
+      assert.ok(Object.keys(manifest.iconPack.mappings).length >= 10);
     }
   }
 });
@@ -204,7 +209,7 @@ test("catalogue does not claim ratings, reviews, or extension-host compatibility
   }
 });
 
-test("the Android asset registry ships the same 135 extension IDs offline", async () => {
+test("the Android asset registry ships the same 145 extension IDs offline", async () => {
   const source = await loadRegistry();
   const android = await loadRegistry(androidRegistryPath);
   assert.equal(android.extensions.length, source.extensions.length);

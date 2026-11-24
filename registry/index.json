@@ -3586,7 +3586,11 @@
       "url": "extensions/icon-pack-material.talosext.json",
       "sha256": "8a99fe33fbf61e02105f0337673245ed7f9f53366d5891a93d955e85a61fd94f",
       "license": "MIT",
-      "free": true
+      "free": true,
+      "updatedAt": "2026-11-24",
+      "dependencies": [],
+      "permissions": [],
+      "externalExecutables": []
     },
     {
       "id": "icon-pack-seti",
@@ -3605,7 +3609,11 @@
       "url": "extensions/icon-pack-seti.talosext.json",
       "sha256": "4fb62e7be31d145fd661b0031be55095ad234a64f1eb61df38ddf40f8c0c3f0d",
       "license": "MIT",
-      "free": true
+      "free": true,
+      "updatedAt": "2026-11-24",
+      "dependencies": [],
+      "permissions": [],
+      "externalExecutables": []
     },
     {
       "id": "icon-pack-vscode",
@@ -3624,7 +3632,11 @@
       "url": "extensions/icon-pack-vscode.talosext.json",
       "sha256": "d07694739b67a95bdc220fdd267de848b763d5ee412c76bfef05eb8f2d23e540",
       "license": "MIT",
-      "free": true
+      "free": true,
+      "updatedAt": "2026-11-24",
+      "dependencies": [],
+      "permissions": [],
+      "externalExecutables": []
     },
     {
       "id": "icon-pack-feather",
@@ -3643,7 +3655,11 @@
       "url": "extensions/icon-pack-feather.talosext.json",
       "sha256": "4b0ef5d1aedd9eb4e9dd57e0c92f53ae690364ac614f4db108e6e48ac6fc98a6",
       "license": "MIT",
-      "free": true
+      "free": true,
+      "updatedAt": "2026-11-24",
+      "dependencies": [],
+      "permissions": [],
+      "externalExecutables": []
     },
     {
       "id": "icon-pack-phosphor",
@@ -3662,7 +3678,11 @@
       "url": "extensions/icon-pack-phosphor.talosext.json",
       "sha256": "b19cab21edac67249dffb5fef653b3dd9b9f799a0bfc06e7aea80bf5f1bec128",
       "license": "MIT",
-      "free": true
+      "free": true,
+      "updatedAt": "2026-11-24",
+      "dependencies": [],
+      "permissions": [],
+      "externalExecutables": []
     },
     {
       "id": "icon-pack-heroicons",
@@ -3681,7 +3701,11 @@
       "url": "extensions/icon-pack-heroicons.talosext.json",
       "sha256": "cb9ee38d53b632c3e6ea6a7ea68f7d9c5eff295534b74391d4872f7116ba9512",
       "license": "MIT",
-      "free": true
+      "free": true,
+      "updatedAt": "2026-11-24",
+      "dependencies": [],
+      "permissions": [],
+      "externalExecutables": []
     },
     {
       "id": "icon-pack-lucide",
@@ -3700,7 +3724,11 @@
       "url": "extensions/icon-pack-lucide.talosext.json",
       "sha256": "9436c60b60ddfc571278ff4bc3223d60cff77cee289e2aeeecebd6e58c6963b8",
       "license": "MIT",
-      "free": true
+      "free": true,
+      "updatedAt": "2026-11-24",
+      "dependencies": [],
+      "permissions": [],
+      "externalExecutables": []
     },
     {
       "id": "icon-pack-tabler",
@@ -3719,7 +3747,11 @@
       "url": "extensions/icon-pack-tabler.talosext.json",
       "sha256": "fae44c4d85ada1e0326099cde0c420d7238de623097895d8365aa90ab9c4fb23",
       "license": "MIT",
-      "free": true
+      "free": true,
+      "updatedAt": "2026-11-24",
+      "dependencies": [],
+      "permissions": [],
+      "externalExecutables": []
     },
     {
       "id": "icon-pack-remix",
@@ -3738,7 +3770,11 @@
       "url": "extensions/icon-pack-remix.talosext.json",
       "sha256": "1f114cc7e3dc8bb44d4c21706e23b24234d2bc0580343c5a453386f22a8bf81a",
       "license": "MIT",
-      "free": true
+      "free": true,
+      "updatedAt": "2026-11-24",
+      "dependencies": [],
+      "permissions": [],
+      "externalExecutables": []
     },
     {
       "id": "icon-pack-simple",
@@ -3757,7 +3793,11 @@
       "url": "extensions/icon-pack-simple.talosext.json",
       "sha256": "456b572b472b03dfa386450afa52d4fd641ef9be939dac630fb0aadecd89effd",
       "license": "MIT",
-      "free": true
+      "free": true,
+      "updatedAt": "2026-11-24",
+      "dependencies": [],
+      "permissions": [],
+      "externalExecutables": []
     }
   ],
   "apis": [

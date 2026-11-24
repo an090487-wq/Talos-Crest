@@ -7,6 +7,7 @@ import type { ThemeDef } from "./theme";
 
 export interface Hooks {
   setTheme: (def: ThemeDef | null) => void;
+  setIconPack: (pack: { id: string; mappings: Record<string, string> } | null) => void;
   newFromTemplate: (filename: string, content: string) => Promise<void>;
   insertText: (text: string) => void;
 }
@@ -26,6 +27,7 @@ interface Manifest {
   rollbackVersion?: string;
   language?: { run?: string };
   snippets?: SnippetDef[];
+  iconPack?: { default?: string; mappings?: Record<string, string> };
   [k: string]: unknown;
 }
 
@@ -113,6 +115,7 @@ interface TemplateDef {
 interface Settings {
   registry?: string;
   theme?: string;
+  iconPack?: string;
 }
 
 type MTab = "extensions" | "apis" | "installed" | "templates";
@@ -475,6 +478,22 @@ function applyThemeById(id: string | null) {
   render();
 }
 
+function applyIconPackById(id: string | null) {
+  if (id === null) {
+    hooks.setIconPack(null);
+    delete settings.iconPack;
+  } else {
+    const manifest = installed.find((item) => item.id === id);
+    if (!manifest?.enabled) throw new Error("Enable this extension before applying its icon pack.");
+    if (manifest.kind !== "icon-pack") throw new Error("This extension is not an icon pack.");
+    if (!manifest.iconPack) throw new Error("Icon pack data missing for " + id);
+    hooks.setIconPack({ id, mappings: manifest.iconPack.mappings ?? {} });
+    settings.iconPack = id;
+  }
+  void saveSettings().catch((error: unknown) => setMsg("Could not save icon pack preference: " + String(error)));
+  render();
+}
+
 export async function clearExtensionThemePreference() {
   await initialization;
   if (!settings.theme) return;
@@ -538,7 +557,9 @@ async function installExt(e: IndexEntry) {
   });
   await refreshInstalled();
   selectedDetails = null;
-  if (settings.theme === e.id) applyThemeById(e.id);
+  if (e.kind === "icon-pack" && !settings.iconPack) applyIconPackById(e.id);
+  else if (settings.theme === e.id) applyThemeById(e.id);
+  else if (settings.iconPack === e.id) applyIconPackById(e.id);
   else render();
 }
 
@@ -568,8 +589,10 @@ async function setExtensionEnabled(extension: Manifest, enabled: boolean) {
     permissions: [...approved],
   });
   if (!enabled && settings.theme === extension.id) applyThemeById(null);
+  if (!enabled && settings.iconPack === extension.id) applyIconPackById(null);
   await refreshInstalled();
-  render();
+  if (enabled && extension.kind === "icon-pack" && !settings.iconPack) applyIconPackById(extension.id);
+  else render();
 }
 
 async function removeExt(id: string) {
@@ -579,11 +602,13 @@ async function removeExt(id: string) {
   });
   if (!ok) return;
   const activeTheme = settings.theme === id;
+  const activeIconPack = settings.iconPack === id;
   await invoke("ext_remove", { id });
-  if (activeTheme) applyThemeById(null);
   await refreshInstalled();
   selectedDetails = null;
-  render();
+  if (activeTheme) applyThemeById(null);
+  if (activeIconPack) applyIconPackById(null);
+  else if (!activeTheme) render();
 }
 
 async function rollbackExt(id: string) {
@@ -597,6 +622,7 @@ async function rollbackExt(id: string) {
   await invoke("ext_rollback", { id });
   await refreshInstalled();
   if (settings.theme === id) applyThemeById(id);
+  else if (settings.iconPack === id) applyIconPackById(id);
   else render();
 }
 
@@ -735,6 +761,9 @@ function extensionActions(entry: IndexEntry): HTMLElement[] {
     }
     if (entry.kind === "theme" && current.enabled) {
       actions.push(btn(settings.theme === entry.id ? "Active" : "Apply", () => applyThemeById(entry.id)));
+    }
+    if (entry.kind === "icon-pack" && current.enabled) {
+      actions.push(btn(settings.iconPack === entry.id ? "Active" : "Apply", () => applyIconPackById(entry.id)));
     }
     if (current.rollbackAvailable) {
       actions.push(btn("Roll back to v" + current.rollbackVersion, () => rollbackExt(entry.id)));
@@ -903,6 +932,11 @@ function renderExtensionDetails(list: HTMLElement, entry: IndexEntry) {
         btn(settings.theme === entry.id ? "Active" : "Apply", () => applyThemeById(entry.id))
       );
     }
+    if (entry.kind === "icon-pack" && current.enabled) {
+      actions.appendChild(
+        btn(settings.iconPack === entry.id ? "Active" : "Apply", () => applyIconPackById(entry.id))
+      );
+    }
     if (current.rollbackAvailable) {
       actions.appendChild(
         btn("Roll back to v" + current.rollbackVersion, () => rollbackExt(entry.id))
@@ -970,6 +1004,9 @@ function renderInstalled(list: HTMLElement) {
     if (m.kind === "theme" && m.enabled) {
       actions.push(btn(settings.theme === m.id ? "Active" : "Apply", () => applyThemeById(m.id)));
     }
+    if (m.kind === "icon-pack" && m.enabled) {
+      actions.push(btn(settings.iconPack === m.id ? "Active" : "Apply", () => applyIconPackById(m.id)));
+    }
     actions.push(btn("Remove", () => removeExt(m.id)));
     list.appendChild(
       card(
@@ -990,6 +1027,13 @@ function renderInstalled(list: HTMLElement) {
     list.appendChild(
       card("Default theme", "theme", "built in", "Go back to the built-in dark theme.", [
         btn("Use default", () => applyThemeById(null)),
+      ])
+    );
+  }
+  if (settings.iconPack) {
+    list.appendChild(
+      card("Default icons", "icon-pack", "built in", "Go back to the built-in Explorer icons.", [
+        btn("Use default", () => applyIconPackById(null)),
       ])
     );
   }
@@ -1117,6 +1161,16 @@ export async function initExtensions(h: Hooks) {
         } catch {
           delete settings.theme;
         }
+      }
+      if (settings.iconPack) {
+        try {
+          applyIconPackById(settings.iconPack);
+        } catch {
+          hooks.setIconPack(null);
+          delete settings.iconPack;
+        }
+      } else {
+        hooks.setIconPack(null);
       }
     } catch (e) {
       console.error("extensions init failed", e);

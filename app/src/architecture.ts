@@ -163,6 +163,53 @@ let chronicleIndexTimer = 0;
 let treeScrollFrame = 0;
 let explorerOpen = getWindowValue("talos.explorer-open") === "true";
 let exportFullGraph = false;
+
+export interface ActiveIconPack {
+  id: string;
+  mappings: Record<string, string>;
+}
+
+let activeIconPack: ActiveIconPack | null = null;
+
+const ICON_PACK_GLYPHS: Record<string, string> = {
+  file: "FILE",
+  folder: "DIR",
+  python: "PY",
+  javascript: "JS",
+  typescript: "TS",
+  react: "RE",
+  java: "JV",
+  c: "C",
+  cpp: "C++",
+  csharp: "C#",
+  rust: "RS",
+  go: "GO",
+  ruby: "RB",
+  php: "PHP",
+  swift: "SW",
+  kotlin: "KT",
+  shell: "SH",
+  html: "HT",
+  css: "CS",
+  sass: "SA",
+  json: "{}",
+  xml: "XM",
+  yaml: "YM",
+  markdown: "MD",
+  sql: "DB",
+  docker: "DK",
+  config: "CF",
+  text: "TX",
+  log: "LG",
+  image: "IMG",
+  svg: "SV",
+  pdf: "PDF",
+};
+
+export function setExplorerIconPack(pack: ActiveIconPack | null): void {
+  activeIconPack = pack;
+  render();
+}
 let performanceReport: PerformanceMeasurement | null = null;
 let manifestSet: ManifestSet | null = null;
 let debtReport: DebtReport | null = null;
@@ -1000,8 +1047,20 @@ function renderFileTree() {
 }
 
 function entryIcon(entry: ProjectEntry): string {
-  if (entry.kind === "directory") return "DIR";
+  if (entry.kind === "directory") return activeIconPack ? (ICON_PACK_GLYPHS.folder ?? "DIR") : "DIR";
   if (entry.kind === "link") return "LNK";
+
+  if (activeIconPack) {
+    const name = entry.name.toLowerCase();
+    const extension = entry.extension.toLowerCase();
+    const token = activeIconPack.mappings[extension]
+      ?? activeIconPack.mappings[name]
+      ?? activeIconPack.mappings[entry.language]
+      ?? activeIconPack.mappings["default"]
+      ?? "file";
+    return ICON_PACK_GLYPHS[token] ?? token.slice(0, 3).toUpperCase();
+  }
+
   const icons: Record<string, string> = {
     ts: "TS", tsx: "TS", js: "JS", jsx: "JS", mjs: "JS", py: "PY",
     rs: "RS", go: "GO", json: "{}", md: "MD", html: "HT", css: "CS",

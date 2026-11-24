@@ -75,7 +75,7 @@ import { measure, LABEL, FUN } from "./meter";
 import type { Reading } from "./meter";
 import { openPdf, isPdfFocused, initPdfPane } from "./pdf";
 import { clearExtensionThemePreference, initExtensions, installedSnippets } from "./extensions";
-import { chooseWorkspace, initArchitectureExplorer, openQuickOpen, openObservatory, openRecentWorkspace, openWorkspace, rememberRecent } from "./architecture";
+import { chooseWorkspace, initArchitectureExplorer, openQuickOpen, openObservatory, openRecentWorkspace, openWorkspace, rememberRecent, setExplorerIconPack } from "./architecture";
 import { currentWorkspace, markWorkspaceIndexing, subscribeWorkspace } from "./workspace";
 import { initCommandPalette, openCommandPalette } from "./command-palette";
 import { collectOutline } from "./outline";
@@ -2857,6 +2857,7 @@ void initExtensions({
       applyBuiltinTheme(activeBuiltinTheme, false);
     }
   },
+  setIconPack: (pack) => setExplorerIconPack(pack),
   newFromTemplate: async (filename: string, content: string) => {
     currentPath = null;
     diskRevision = null;
