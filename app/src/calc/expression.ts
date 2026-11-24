@@ -8,6 +8,7 @@ export interface CalcOptions {
   bitWidth?: number;
   unsigned?: boolean;
   base?: IntegerBase;
+  angleUnit?: "deg" | "rad";
 }
 
 export interface CalcResult {
@@ -42,15 +43,49 @@ const SCIENTIFIC_FUNCTIONS: Record<string, (...args: number[]) => number> = {
   asin: Math.asin,
   acos: Math.acos,
   atan: Math.atan,
+  sinh: Math.sinh,
+  cosh: Math.cosh,
+  tanh: Math.tanh,
+  asinh: Math.asinh,
+  acosh: Math.acosh,
+  atanh: Math.atanh,
   sqrt: Math.sqrt,
+  cbrt: Math.cbrt,
   abs: Math.abs,
   ln: Math.log,
   log: Math.log10,
   log10: Math.log10,
+  log2: Math.log2,
   exp: Math.exp,
   floor: Math.floor,
   ceil: Math.ceil,
   round: Math.round,
+  trunc: Math.trunc,
+  sign: Math.sign,
+  hypot: Math.hypot,
+  fact: (n: number) => {
+    if (!Number.isInteger(n) || n < 0) throw new Error("Factorial requires a non-negative integer");
+    let r = 1;
+    for (let i = 2; i <= n; i++) r *= i;
+    return r;
+  },
+  factorial: (n: number) => {
+    if (!Number.isInteger(n) || n < 0) throw new Error("Factorial requires a non-negative integer");
+    let r = 1;
+    for (let i = 2; i <= n; i++) r *= i;
+    return r;
+  },
+  comb: (n: number, r: number) => {
+    if (!Number.isInteger(n) || !Number.isInteger(r) || n < 0 || r < 0 || r > n) throw new Error("Invalid combination parameters");
+    const fact = (x: number) => { let f = 1; for (let i = 2; i <= x; i++) f *= i; return f; };
+    return fact(n) / (fact(r) * fact(n - r));
+  },
+  perm: (n: number, r: number) => {
+    if (!Number.isInteger(n) || !Number.isInteger(r) || n < 0 || r < 0 || r > n) throw new Error("Invalid permutation parameters");
+    let r2 = 1;
+    for (let i = n - r + 1; i <= n; i++) r2 *= i;
+    return r2;
+  },
 };
 
 const SCIENTIFIC_CONSTANTS: Record<string, number> = {
@@ -335,7 +370,7 @@ function parseIntegerLiteral(text: string): bigint {
   return BigInt(text);
 }
 
-function evaluateNode(node: Node, mode: CalcMode, bitWidth: number): number | bigint {
+function evaluateNode(node: Node, mode: CalcMode, bitWidth: number, angleUnit: "deg" | "rad" = "rad"): number | bigint {
   switch (node.kind) {
     case "number":
       return node.value;
@@ -344,7 +379,7 @@ function evaluateNode(node: Node, mode: CalcMode, bitWidth: number): number | bi
     case "constant":
       return SCIENTIFIC_CONSTANTS[node.name];
     case "unary": {
-      const value = evaluateNode(node.operand, mode, bitWidth);
+      const value = evaluateNode(node.operand, mode, bitWidth, angleUnit);
       if (mode === "programmer") {
         const integer = toBigInt(value);
         if (node.op === "+") return normalizeInteger(integer, bitWidth, false);
@@ -358,15 +393,25 @@ function evaluateNode(node: Node, mode: CalcMode, bitWidth: number): number | bi
     }
     case "call": {
       const fn = SCIENTIFIC_FUNCTIONS[node.name];
-      const args = node.args.map((arg) => toNumber(evaluateNode(arg, mode, bitWidth)));
+      const trigFns = new Set(["sin", "cos", "tan"]);
+      const inverseTrigFns = new Set(["asin", "acos", "atan"]);
+      let args = node.args.map((arg) => toNumber(evaluateNode(arg, mode, bitWidth, angleUnit)));
+      // Convert degrees to radians for trig functions when in degree mode.
+      if (angleUnit === "deg" && args.length > 0 && trigFns.has(node.name)) {
+        args = args.map((a) => (a * Math.PI) / 180);
+      }
       const result = fn(...args);
-      if (!Number.isFinite(result)) fail(`Function '${node.name}' produced an invalid result`);
-      return result;
+      let finalResult = result;
+      if (angleUnit === "deg" && inverseTrigFns.has(node.name)) {
+        finalResult = result * 180 / Math.PI;
+      }
+      if (!Number.isFinite(finalResult)) fail(`Function '${node.name}' produced an invalid result`);
+      return finalResult;
     }
     case "binary": {
       if (mode === "programmer") {
-        const left = toBigInt(evaluateNode(node.left, mode, bitWidth));
-        const right = toBigInt(evaluateNode(node.right, mode, bitWidth));
+        const left = toBigInt(evaluateNode(node.left, mode, bitWidth, angleUnit));
+        const right = toBigInt(evaluateNode(node.right, mode, bitWidth, angleUnit));
         switch (node.op) {
           case "+": return normalizeInteger(left + right, bitWidth, false);
           case "-": return normalizeInteger(left - right, bitWidth, false);
@@ -388,8 +433,8 @@ function evaluateNode(node: Node, mode: CalcMode, bitWidth: number): number | bi
           default: fail(`Unsupported operator '${node.op}'`);
         }
       }
-      const left = toNumber(evaluateNode(node.left, mode, bitWidth));
-      const right = toNumber(evaluateNode(node.right, mode, bitWidth));
+      const left = toNumber(evaluateNode(node.left, mode, bitWidth, angleUnit));
+      const right = toNumber(evaluateNode(node.right, mode, bitWidth, angleUnit));
       switch (node.op) {
         case "+": return left + right;
         case "-": return left - right;
@@ -471,7 +516,7 @@ export function evaluate(input: string, mode: CalcMode, options: CalcOptions = {
 
   if (mode === "scientific") {
     const node = new Parser(tokenizeScientific(expression), mode).parse();
-    const value = toNumber(evaluateNode(node, mode, 32));
+    const value = toNumber(evaluateNode(node, mode, 32, options.angleUnit ?? "rad"));
     return { value, formatted: formatScientific(value) };
   }
 
@@ -479,7 +524,7 @@ export function evaluate(input: string, mode: CalcMode, options: CalcOptions = {
   const unsigned = options.unsigned ?? false;
   const base = options.base ?? 10;
   const node = new Parser(tokenizeProgrammer(expression), mode).parse();
-  const value = toBigInt(evaluateNode(node, mode, bitWidth));
+  const value = toBigInt(evaluateNode(node, mode, bitWidth, options.angleUnit ?? "rad"));
   return { value, formatted: formatInteger(value, bitWidth, base, unsigned) };
 }
 
