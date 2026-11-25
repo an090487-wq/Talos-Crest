@@ -20,6 +20,7 @@ type Token =
   | { kind: "number"; text: string; position: number }
   | { kind: "name"; text: string; position: number }
   | { kind: "operator"; text: string; position: number }
+  | { kind: "percent"; position: number }
   | { kind: "paren"; text: "(" | ")"; position: number }
   | { kind: "comma"; position: number };
 
@@ -137,7 +138,18 @@ function tokenizeScientific(input: string): Token[] {
     if ("+-*/^%,()".includes(char)) {
       if (char === ",") tokens.push({ kind: "comma", position: index });
       else if (char === "(" || char === ")") tokens.push({ kind: "paren", text: char, position: index });
-      else tokens.push({ kind: "operator", text: char, position: index });
+      else if (char === "%") {
+        // `5%` means five percent; `5 % 2` and `5%2` remain modulo.
+        const previous = tokens[tokens.length - 1];
+        const previousEndsValue = previous !== undefined
+          && (previous.kind === "number"
+            || previous.kind === "name"
+            || (previous.kind === "paren" && previous.text === ")"));
+        const next = /\S/.exec(input.slice(index + 1))?.[0] ?? "";
+        tokens.push(previousEndsValue && !/[\d.]/.test(next)
+          ? { kind: "percent", position: index }
+          : { kind: "operator", text: "%", position: index });
+      } else tokens.push({ kind: "operator", text: char, position: index });
       index += 1;
       continue;
     }
@@ -324,45 +336,50 @@ class Parser {
     const token = this.peek();
     if (!token) fail("Unexpected end of expression");
 
+    let node: Node;
     if (token.kind === "paren" && token.text === "(") {
       this.index += 1;
-      const node = this.expression(depth + 1);
+      node = this.expression(depth + 1);
       this.expectParen(")");
-      return node;
-    }
-
-    if (token.kind === "number") {
+    } else if (token.kind === "number") {
       this.index += 1;
       if (this.mode === "programmer") return { kind: "integer", value: parseIntegerLiteral(token.text) };
       const value = Number(token.text);
       if (!Number.isFinite(value)) fail(`Number '${token.text}' is out of range`);
-      return { kind: "number", value };
-    }
-
-    if (token.kind === "name") {
+      node = { kind: "number", value };
+    } else if (token.kind === "name") {
       this.index += 1;
       if (this.mode === "programmer") fail(`Names are not valid in Programmer mode at position ${token.position + 1}`);
       if (!this.consume("(")) {
-        if (token.text in SCIENTIFIC_CONSTANTS) return { kind: "constant", name: token.text };
-        fail(`Unknown name '${token.text}'`);
+        if (!(token.text in SCIENTIFIC_CONSTANTS)) fail(`Unknown name '${token.text}'`);
+        node = { kind: "constant", name: token.text };
+      } else {
+        const args: Node[] = [];
+        if (!this.consume(")")) {
+          do {
+            args.push(this.expression(depth + 1));
+          } while (this.consume(","));
+          this.expectParen(")");
+        }
+        if (!(token.text in SCIENTIFIC_FUNCTIONS)) fail(`Unknown function '${token.text}'`);
+        node = { kind: "call", name: token.text, args };
       }
-      const args: Node[] = [];
-      if (!this.consume(")")) {
-        do {
-          args.push(this.expression(depth + 1));
-        } while (this.consume(","));
-        this.expectParen(")");
-      }
-      if (!(token.text in SCIENTIFIC_FUNCTIONS)) fail(`Unknown function '${token.text}'`);
-      return { kind: "call", name: token.text, args };
+    } else {
+      fail(`Unexpected token '${tokenText(token)}' at position ${token.position + 1}`);
     }
 
-    fail(`Unexpected token '${tokenText(token)}' at position ${token.position + 1}`);
+    while (this.peek()?.kind === "percent") {
+      this.index += 1;
+      node = { kind: "binary", op: "/", left: node, right: { kind: "number", value: 100 } };
+    }
+    return node;
   }
 }
 
 function tokenText(token: Token): string {
-  return token.kind === "comma" ? "," : token.text;
+  if (token.kind === "comma") return ",";
+  if (token.kind === "percent") return "%";
+  return token.text;
 }
 
 function parseIntegerLiteral(text: string): bigint {
@@ -370,21 +387,27 @@ function parseIntegerLiteral(text: string): bigint {
   return BigInt(text);
 }
 
-function evaluateNode(node: Node, mode: CalcMode, bitWidth: number, angleUnit: "deg" | "rad" = "rad"): number | bigint {
+function evaluateNode(
+  node: Node,
+  mode: CalcMode,
+  bitWidth: number,
+  angleUnit: "deg" | "rad" = "rad",
+  unsigned = false,
+): number | bigint {
   switch (node.kind) {
     case "number":
       return node.value;
     case "integer":
-      return mode === "programmer" ? normalizeInteger(node.value, bitWidth, false) : Number(node.value);
+      return mode === "programmer" ? normalizeInteger(node.value, bitWidth, unsigned) : Number(node.value);
     case "constant":
       return SCIENTIFIC_CONSTANTS[node.name];
     case "unary": {
-      const value = evaluateNode(node.operand, mode, bitWidth, angleUnit);
+      const value = evaluateNode(node.operand, mode, bitWidth, angleUnit, unsigned);
       if (mode === "programmer") {
         const integer = toBigInt(value);
-        if (node.op === "+") return normalizeInteger(integer, bitWidth, false);
-        if (node.op === "-") return normalizeInteger(-integer, bitWidth, false);
-        return normalizeInteger(~integer, bitWidth, false);
+        if (node.op === "+") return normalizeInteger(integer, bitWidth, unsigned);
+        if (node.op === "-") return normalizeInteger(-integer, bitWidth, unsigned);
+        return normalizeInteger(~integer, bitWidth, unsigned);
       }
       const number = toNumber(value);
       if (node.op === "+") return number;
@@ -395,7 +418,7 @@ function evaluateNode(node: Node, mode: CalcMode, bitWidth: number, angleUnit: "
       const fn = SCIENTIFIC_FUNCTIONS[node.name];
       const trigFns = new Set(["sin", "cos", "tan"]);
       const inverseTrigFns = new Set(["asin", "acos", "atan"]);
-      let args = node.args.map((arg) => toNumber(evaluateNode(arg, mode, bitWidth, angleUnit)));
+      let args = node.args.map((arg) => toNumber(evaluateNode(arg, mode, bitWidth, angleUnit, unsigned)));
       // Convert degrees to radians for trig functions when in degree mode.
       if (angleUnit === "deg" && args.length > 0 && trigFns.has(node.name)) {
         args = args.map((a) => (a * Math.PI) / 180);
@@ -410,31 +433,34 @@ function evaluateNode(node: Node, mode: CalcMode, bitWidth: number, angleUnit: "
     }
     case "binary": {
       if (mode === "programmer") {
-        const left = toBigInt(evaluateNode(node.left, mode, bitWidth, angleUnit));
-        const right = toBigInt(evaluateNode(node.right, mode, bitWidth, angleUnit));
+        const left = toBigInt(evaluateNode(node.left, mode, bitWidth, angleUnit, unsigned));
+        const right = toBigInt(evaluateNode(node.right, mode, bitWidth, angleUnit, unsigned));
         switch (node.op) {
-          case "+": return normalizeInteger(left + right, bitWidth, false);
-          case "-": return normalizeInteger(left - right, bitWidth, false);
-          case "*": return normalizeInteger(left * right, bitWidth, false);
+          case "+": return normalizeInteger(left + right, bitWidth, unsigned);
+          case "-": return normalizeInteger(left - right, bitWidth, unsigned);
+          case "*": return normalizeInteger(left * right, bitWidth, unsigned);
           case "/":
             if (right === 0n) fail("Division by zero");
-            return normalizeInteger(left / right, bitWidth, false);
+            return normalizeInteger(left / right, bitWidth, unsigned);
           case "%":
             if (right === 0n) fail("Division by zero");
-            return normalizeInteger(left % right, bitWidth, false);
-          case "&": return normalizeInteger(left & right, bitWidth, false);
-          case "|": return normalizeInteger(left | right, bitWidth, false);
-          case "^": return normalizeInteger(left ^ right, bitWidth, false);
+            return normalizeInteger(left % right, bitWidth, unsigned);
+          case "&": return normalizeInteger(left & right, bitWidth, unsigned);
+          case "|": return normalizeInteger(left | right, bitWidth, unsigned);
+          case "^": return normalizeInteger(left ^ right, bitWidth, unsigned);
           case "<<":
           case ">>": {
             if (right < 0n || right > 1024n) fail(`Shift amount must be between 0 and 1024`);
-            return normalizeInteger(node.op === "<<" ? left << right : left >> right, bitWidth, false);
+            if (node.op === "<<") return normalizeInteger(left << right, bitWidth, unsigned);
+            if (unsigned) return normalizeInteger(left >> right, bitWidth, true);
+            const signedLeft = toSignedBigInt(left, bitWidth);
+            return normalizeInteger(signedLeft >> right, bitWidth, false);
           }
           default: fail(`Unsupported operator '${node.op}'`);
         }
       }
-      const left = toNumber(evaluateNode(node.left, mode, bitWidth, angleUnit));
-      const right = toNumber(evaluateNode(node.right, mode, bitWidth, angleUnit));
+      const left = toNumber(evaluateNode(node.left, mode, bitWidth, angleUnit, unsigned));
+      const right = toNumber(evaluateNode(node.right, mode, bitWidth, angleUnit, unsigned));
       switch (node.op) {
         case "+": return left + right;
         case "-": return left - right;
@@ -476,6 +502,15 @@ function normalizeInteger(value: bigint, bitWidth: number, unsigned: boolean): b
     if (normalized >= signBit) normalized -= modulus;
   }
   return normalized;
+}
+
+function toSignedBigInt(value: bigint, bitWidth: number): bigint {
+  const bits = BigInt(bitWidth);
+  const modulus = 1n << bits;
+  let normalized = value % modulus;
+  if (normalized < 0n) normalized += modulus;
+  const signBit = 1n << (bits - 1n);
+  return normalized >= signBit ? normalized - modulus : normalized;
 }
 
 function formatScientific(value: number): string {
@@ -524,7 +559,7 @@ export function evaluate(input: string, mode: CalcMode, options: CalcOptions = {
   const unsigned = options.unsigned ?? false;
   const base = options.base ?? 10;
   const node = new Parser(tokenizeProgrammer(expression), mode).parse();
-  const value = toBigInt(evaluateNode(node, mode, bitWidth, options.angleUnit ?? "rad"));
+  const value = toBigInt(evaluateNode(node, mode, bitWidth, options.angleUnit ?? "rad", unsigned));
   return { value, formatted: formatInteger(value, bitWidth, base, unsigned) };
 }
 

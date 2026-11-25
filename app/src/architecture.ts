@@ -341,11 +341,20 @@ function isInsightMode(value: string): value is InsightMode {
   return value === "performance" || value === "sandbox" || value === "debt";
 }
 
+function setExplorerOpen(open: boolean, notify = true) {
+  explorerOpen = open;
+  setWindowValue("talos.explorer-open", String(open));
+  $("architecture").classList.toggle("hidden", !open);
+  document.body.classList.toggle("explorer-open", open);
+  if (!open) {
+    if (refreshTimer) window.clearTimeout(refreshTimer);
+    refreshTimer = 0;
+    if (notify) document.dispatchEvent(new Event("talos:explorer-close"));
+  }
+}
+
 function showArchitectureWindow() {
-  explorerOpen = true;
-  setWindowValue("talos.explorer-open", "true");
-  $("architecture").classList.remove("hidden");
-  document.body.classList.add("explorer-open");
+  setExplorerOpen(true);
 }
 let panStart: { x: number; y: number; left: number; top: number } | null = null;
 let spaceHeld = false;
@@ -611,7 +620,6 @@ async function openSelected() {
   try {
     await onOpenFile(entry.path);
     rememberRecent(entry.path);
-    $("architecture").classList.add("hidden");
   } catch (error) {
     reportOpenError(entry.name, error);
   }
@@ -643,7 +651,6 @@ async function createEntry(kind: "file" | "directory") {
       try {
         await onOpenFile(createdPath);
         rememberRecent(createdPath);
-        $("architecture").classList.add("hidden");
       } catch (error) {
         setMessage(`Created ${path}, but could not open it: ${String(error)}`, true);
       }
@@ -736,7 +743,6 @@ async function duplicateSelected(entryOverride?: ProjectEntry) {
       try {
         await onOpenFile(createdPath);
         rememberRecent(createdPath);
-        $("architecture").classList.add("hidden");
       } catch (error) {
         setMessage(`Duplicated to ${result.path}, but could not open it: ${String(error)}`, true);
       }
@@ -1089,10 +1095,11 @@ function renderFileTree() {
       row.classList.add("selected");
       renderDetails();
       focusTreeRow(index);
-      if (entry.kind === "file" && onOpenFile) void onOpenFile(entry.path).then(() => {
-        rememberRecent(entry.path);
-        $("architecture").classList.add("hidden");
-      }).catch((error) => reportOpenError(entry.name, error));
+      if (entry.kind === "file" && onOpenFile) {
+        void onOpenFile(entry.path)
+          .then(() => rememberRecent(entry.path))
+          .catch((error) => reportOpenError(entry.name, error));
+      }
     });
     row.addEventListener("dblclick", () => {
       if (entry.kind === "file") void openSelected();
@@ -1895,7 +1902,10 @@ function render() {
 
 async function chooseProject() {
   const picked = await open({ multiple: false, directory: true });
-  if (typeof picked === "string") await scanProject(picked, false, { lazy: true });
+  if (typeof picked === "string") {
+    setMode("structure");
+    await scanProject(picked, false, { lazy: true });
+  }
 }
 
 export async function chooseWorkspace() {
@@ -1947,6 +1957,7 @@ async function findInWorkspace() {
       query,
       exclusions: currentExclusions(),
       showHidden,
+      showIgnored,
       limit: 200,
       paths: snapshotPaths,
     });
@@ -2194,7 +2205,7 @@ async function scanProject(root: string, forceWatch = false, options: ScanProjec
     $("arch-root").textContent = result.root;
     let watcherWarning = "";
     let watcherStatus: "idle" | "active" | "error" = "idle";
-    const policyKey = JSON.stringify([currentExclusions(), showHidden]);
+    const policyKey = JSON.stringify([currentExclusions(), showHidden, showIgnored]);
     const newDirectories = !result.lazy && [...directories].some((path) => !watchedDirectories.has(path));
     if (forceWatch || watchedRoot !== result.root || newDirectories || watcherPolicyKey !== policyKey) {
       try {
@@ -2202,6 +2213,7 @@ async function scanProject(root: string, forceWatch = false, options: ScanProjec
           root: result.root,
           exclusions: currentExclusions(),
           showHidden: showHidden,
+          showIgnored: showIgnored,
           // A truncated or lazy scan has an incomplete directory list; fall back
           // to a real directory walk on the backend in that case.
           directories: result.truncated || result.lazy ? undefined : [...directories],
@@ -2481,6 +2493,7 @@ async function applyWorkspaceChanges(payload: WorkspaceChangeEvent) {
         path: change.path,
         exclusions: currentExclusions(),
         showHidden,
+        showIgnored,
       });
     } catch {
       // A transient inspection error is not evidence that the entry vanished.
@@ -2562,16 +2575,9 @@ export function initArchitectureExplorer(
     else void refreshTree(scan.root);
   };
   $("btn-architecture").addEventListener("click", showArchitecture);
-  const closeExplorer = () => {
-    explorerOpen = false;
-    setWindowValue("talos.explorer-open", "false");
-    $("architecture").classList.add("hidden");
-    document.body.classList.remove("explorer-open");
-    document.dispatchEvent(new Event("talos:explorer-close"));
-    if (refreshTimer) window.clearTimeout(refreshTimer);
-    refreshTimer = 0;
-  };
+  const closeExplorer = () => setExplorerOpen(false);
   $("arch-close").addEventListener("click", closeExplorer);
+  $("arch-close-docked").addEventListener("click", closeExplorer);
   $("arch-open-project").addEventListener("click", () => void chooseProject());
   const recent = document.getElementById("arch-recent") as HTMLSelectElement | null;
   if (recent) {
@@ -2684,9 +2690,7 @@ export function initArchitectureExplorer(
   });
   $("quick-open-project").addEventListener("click", () => {
     ($("quick-open-dialog") as HTMLDialogElement).close();
-    explorerOpen = true;
-    setWindowValue("talos.explorer-open", "true");
-    $("architecture").classList.remove("hidden");
+    showArchitectureWindow();
     void chooseProject();
   });
   for (const button of document.querySelectorAll<HTMLElement>("[data-arch-mode]")) {
@@ -2826,11 +2830,12 @@ export function initArchitectureExplorer(
     }, delay);
   }).catch((error: unknown) => setMessage(`Could not subscribe to watcher errors: ${String(error)}`, true));
   void restoreWorkspace();
-  $("architecture").classList.toggle("hidden", !explorerOpen);
+  setExplorerOpen(explorerOpen, false);
   render();
 }
 
 export function openWorkspace(root: string) {
+  setMode("structure");
   showArchitectureWindow();
   void scanProject(root, false, { lazy: true });
 }

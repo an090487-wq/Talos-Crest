@@ -23,6 +23,7 @@ const {
   formatSize,
   formatStrings,
   HEX_PAGE_BYTES,
+  nextPageEnabled,
 } = module.exports;
 
 test("binary files get an honest, type-specific label", () => {
@@ -63,4 +64,9 @@ test("printable strings are bounded and keep absolute offsets", () => {
 
 test("hex pages are bounded", () => {
   assert.equal(HEX_PAGE_BYTES, 4096);
+  assert.equal(nextPageEnabled(0, 4096), false);
+  assert.equal(nextPageEnabled(0, 8192), true);
+  assert.equal(nextPageEnabled(4096, 8192), false);
+  assert.equal(nextPageEnabled(4096, 8193), true);
+  assert.equal(nextPageEnabled(8192, 8193), false);
 });

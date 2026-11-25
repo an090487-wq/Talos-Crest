@@ -582,7 +582,7 @@ let terminalModule: typeof import("./terminal") | null = null;
 async function ensureTerminal(focus = false): Promise<void> {
   try {
     if (!terminalModule) terminalModule = await import("./terminal");
-    terminalModule.activateTerminal({
+    await terminalModule.activateTerminal({
       getCwd: () => getWindowValue("talos.workspace-root"),
       reportError: (error: unknown) => say(`Terminal: ${String(error)}`),
     });
@@ -602,7 +602,7 @@ async function runOllamaInTerminal(): Promise<void> {
   showPanel(true);
   showTab("terminal");
   await ensureTerminal();
-  terminalModule?.runOllamaModel();
+  await terminalModule?.runOllamaModel();
 }
 
 function say(text: string) {
@@ -783,7 +783,13 @@ async function restoreEditorSession(): Promise<boolean> {
   activeTab = null;
   const selected = restored[session.activeIndex] ?? restored[0];
   activateEditorTab(selected);
-  void setLanguage(selected.path ?? selected.suggestedName ?? "");
+  try {
+    await setLanguage(selected.path ?? selected.suggestedName ?? "");
+  } catch (error) {
+    // Session restore must not fail because an optional language package is
+    // unavailable; the document is already restored as plain text.
+    say(`Restored ${fileNameFromPath(selected.path ?? selected.suggestedName ?? "document")} as plain text: ${String(error)}`);
+  }
   return true;
 }
 

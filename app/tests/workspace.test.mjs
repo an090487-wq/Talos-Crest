@@ -147,13 +147,48 @@ test("find-in-files reuses the generation-stamped snapshot", () => {
   assert.match(architecture, /generation !== scanGeneration \|\| scan !== snapshot/);
   assert.match(libRs, /fn snapshot_file_paths\(/);
   assert.match(libRs, /paths: Option<Vec<String>>/);
-  assert.match(libRs, /scan_project_tree\(root, exclusions, show_hidden, None\)/);
+  assert.match(libRs, /scan_project_tree\(root, exclusions, show_hidden, show_ignored, None\)/);
 });
 
 test("watcher registration reuses snapshot directories with a fallback", () => {
   assert.match(architecture, /directories: result\.truncated \|\| result\.lazy \? undefined : \[\.\.\.directories\]/);
   assert.match(libRs, /directories: Option<Vec<String>>/);
   assert.match(libRs, /_ => collect_watch_dirs\(&root, &policy\)/);
+});
+
+test("show-ignored reaches scan, watch, metadata, and search", () => {
+  assert.match(architecture, /JSON\.stringify\(\[currentExclusions\(\), showHidden, showIgnored\]\)/);
+  assert.match(architecture, /showIgnored: showIgnored,[\s\S]{0,160}directories:/);
+  assert.match(architecture, /showHidden,\s*showIgnored,\s*limit: 200/);
+  assert.match(architecture, /showHidden,\s*showIgnored,\s*\}\);/);
+  assert.match(libRs, /fn workspace_policy\(/);
+  assert.match(libRs, /show_ignored: bool,[\s\S]{0,120}directories: Option<Vec<String>>/);
+  assert.match(libRs, /show_ignored: bool,[\s\S]{0,80}registry: Option<&Registry>/);
+  assert.match(libRs, /show_ignored: bool,[\s\S]{0,120}paths: Option<&\[String\]>/);
+});
+
+test("Explorer visibility is centralized and file opens keep the dock in place", () => {
+  assert.match(architecture, /function setExplorerOpen\(open: boolean, notify = true\)/);
+  assert.match(architecture, /document\.body\.classList\.toggle\("explorer-open", open\)/);
+  assert.doesNotMatch(architecture, /\$\("architecture"\)\.classList\.add\("hidden"\)/);
+  assert.doesNotMatch(architecture, /\$\("architecture"\)\.classList\.remove\("hidden"\)/);
+  assert.match(architecture, /function showArchitectureWindow\(\) \{\s*setExplorerOpen\(true\);\s*\}/);
+  assert.match(architecture, /setExplorerOpen\(explorerOpen, false\)/);
+  assert.match(architecture, /\$\("arch-close-docked"\)\.addEventListener\("click", closeExplorer\)/);
+});
+
+test("Explorer docks inside the workspace body with a close control", () => {
+  const shell = readFileSync(resolve(appDir, "index.html"), "utf8");
+  assert.match(shell, /<nav id="activity-bar"[\s\S]{0,4000}<div id="architecture" class="hidden">/);
+  assert.match(shell, /#architecture \{ position: relative; z-index: 30; display: flex; flex: 0 0 min\(300px, 28vw\)/);
+  assert.match(shell, /#architecture\.fullscreen \{ position: fixed; inset: 0; z-index: 100;/);
+  assert.match(shell, /id="arch-close-docked"/);
+  assert.doesNotMatch(shell, /#architecture \{ position: fixed; top: 0; left: 48px/);
+});
+
+test("basic folder opening always returns to the file tree", () => {
+  assert.match(architecture, /setMode\("structure"\);\s*await scanProject/);
+  assert.match(architecture, /setMode\("structure"\);\s*showArchitectureWindow\(\);\s*void scanProject/);
 });
 
 test("Explorer duplicate is wired through menu, details, and a bounded backend command", () => {

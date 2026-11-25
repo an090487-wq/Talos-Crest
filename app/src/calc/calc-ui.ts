@@ -25,6 +25,7 @@ interface CalcState {
   bitWidth: number;
   base: IntegerBase;
   unsigned: boolean;
+  angleUnit: "deg" | "rad";
   memory: string | null;
   history: HistoryEntry[];
   fromUnit: string;
@@ -40,6 +41,7 @@ const defaultState: CalcState = {
   bitWidth: 32,
   base: 10,
   unsigned: false,
+  angleUnit: "deg",
   memory: null,
   history: [],
   fromUnit: "km",
@@ -73,6 +75,7 @@ function loadState(): CalcState {
       bitWidth,
       base,
       unsigned: parsed.unsigned === true,
+      angleUnit: parsed.angleUnit === "rad" ? "rad" : "deg",
       memory: typeof parsed.memory === "string" ? parsed.memory : null,
       history,
       fromUnit,
@@ -92,7 +95,12 @@ function saveState(): void {
 }
 
 function calcOptions() {
-  return { bitWidth: state.bitWidth, base: state.base, unsigned: state.unsigned };
+  return {
+    bitWidth: state.bitWidth,
+    base: state.base,
+    unsigned: state.unsigned,
+    angleUnit: state.angleUnit,
+  };
 }
 
 function displayValue(): string {
@@ -138,6 +146,7 @@ function renderMode(): void {
     button.setAttribute("aria-selected", String(active));
   }
   $("calc-dialog").querySelector(".calc-programmer")?.classList.toggle("calc-hidden", state.mode !== "programmer");
+  $("calc-dialog").querySelector(".calc-scientific-options")?.classList.toggle("calc-hidden", state.mode !== "scientific");
   for (const button of document.querySelectorAll<HTMLElement>("[data-calc-group]")) {
     const group = button.dataset.calcGroup;
     const isHex = /^[0-9A-F]$/.test(button.textContent?.trim() ?? "") && /^[A-F]$/.test(button.textContent?.trim() ?? "");
@@ -149,6 +158,7 @@ function renderMode(): void {
   ($("calc-bit-width") as HTMLSelectElement).value = String(state.bitWidth);
   ($("calc-base") as HTMLSelectElement).value = String(state.base);
   ($("calc-unsigned") as HTMLInputElement).checked = state.unsigned;
+  ($("calc-angle-unit") as HTMLSelectElement).value = state.angleUnit;
   renderResult();
 }
 
@@ -216,8 +226,26 @@ function insertText(text: string, caretOffset?: number): void {
   input.focus();
 }
 
+function insertHexDigit(digit: string): void {
+  const input = expressionInput();
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? start;
+  const before = input.value.slice(0, start);
+  // Continue an open hex literal instead of producing invalid `0xA0xB`.
+  const openHexLiteral = /(?:^|[+\-*/%&|^<>()~,\s])0[xX][0-9a-fA-F]*$/.test(before);
+  if (openHexLiteral) {
+    input.setRangeText(digit, start, end, "end");
+    input.setSelectionRange(start + digit.length, start + digit.length);
+  } else {
+    insertText(`0x${digit}`);
+  }
+  input.focus();
+}
+
 function recallHistory(direction: -1 | 1): void {
   if (!state.history.length) return;
+  // Arrow-down from the newest entry should not duplicate it.
+  if (direction === 1 && historyCursor === -1) return;
   historyCursor = Math.max(0, Math.min(state.history.length - 1, historyCursor + direction));
   expressionInput().value = state.history[historyCursor].expression;
   setStatus(`History ${historyCursor + 1} of ${state.history.length}`);
@@ -272,6 +300,7 @@ function applySettings(): void {
   state.bitWidth = Number(($("calc-bit-width") as HTMLSelectElement).value);
   state.base = Number(($("calc-base") as HTMLSelectElement).value) as IntegerBase;
   state.unsigned = ($("calc-unsigned") as HTMLInputElement).checked;
+  state.angleUnit = ($("calc-angle-unit") as HTMLSelectElement).value === "rad" ? "rad" : "deg";
   state.fromUnit = ($("calc-unit-from") as HTMLSelectElement).value;
   state.toUnit = ($("calc-unit-to") as HTMLSelectElement).value;
   renderMode();
@@ -359,8 +388,11 @@ function initialize(): void {
       return;
     }
     const fn = button.dataset.calcFunction;
+    const insert = button.dataset.calcInsert;
+    const hexDigit = /^0x([0-9A-F])$/.exec(insert ?? "");
     if (fn) insertText(`${fn}()`, fn.length + 1);
-    else if (button.dataset.calcInsert) insertText(button.dataset.calcInsert);
+    else if (hexDigit) insertHexDigit(hexDigit[1]);
+    else if (insert) insertText(insert);
   });
 
   $("calc-history").addEventListener("click", (event) => {
@@ -395,7 +427,7 @@ function initialize(): void {
   $("calc-madd").addEventListener("click", () => void memoryAdd(1));
   $("calc-msub").addEventListener("click", () => void memoryAdd(-1));
 
-  for (const id of ["calc-bit-width", "calc-base", "calc-unsigned", "calc-unit-from", "calc-unit-to"]) {
+  for (const id of ["calc-bit-width", "calc-base", "calc-unsigned", "calc-angle-unit", "calc-unit-from", "calc-unit-to"]) {
     $(id).addEventListener("change", applySettings);
   }
   $("calc-unit-run").addEventListener("click", runUnitConversion);

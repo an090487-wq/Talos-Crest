@@ -4,6 +4,12 @@
 export const HEX_PAGE_BYTES = 4096;
 export const HEX_BYTES_PER_LINE = 16;
 
+/** True while another full hex page can be reached. */
+export function nextPageEnabled(offset: number, size: number): boolean {
+  if (!Number.isFinite(offset) || !Number.isFinite(size) || size <= 0) return false;
+  return offset >= 0 && offset + HEX_PAGE_BYTES < size;
+}
+
 export interface BinaryString {
   offset: number;
   text: string;

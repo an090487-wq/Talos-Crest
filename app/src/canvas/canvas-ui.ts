@@ -969,7 +969,7 @@ function canvasPoint(event: PointerEvent): Point {
 
 function setTool(next: Tool): void {
   if (!CANVAS_TOOLS.includes(next)) return;
-  if (drawing || cropDrag || (dragStart && (dragTool === "line" || dragTool === "rect" || dragTool === "ellipse"))) return;
+  if (drawing || cropDrag || dragStart || compareDragging) return;
   commitText();
   tool = next;
   setWindowValue("talos.canvas.tool", next);
@@ -2166,9 +2166,15 @@ function initialize(): void {
     if (!canvasVisible()) return;
     const dialog = $("canvas-export-dialog") as HTMLDialogElement;
     const onCanvasSurfaceArea = onCanvasSurface(event.target);
-    // Native select popups emit Escape when they close, so only close Canvas
-    // when focus is on the image itself.
-    if (event.key === "Escape" && !dialog.open && onCanvasSurfaceArea) {
+    const target = event.target as HTMLElement | null;
+    const interactiveTarget = event.target === input("canvas-text-input")
+      || !!target?.isContentEditable
+      || ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target?.tagName ?? "")
+      || target?.closest("[role='button']") !== null;
+    // Native select popups emit Escape when they close, and focused controls
+    // must handle their own Enter/Escape. Only the canvas surface gets Canvas
+    // shortcuts.
+    if (event.key === "Escape" && !dialog.open && onCanvasSurfaceArea && !interactiveTarget) {
       event.preventDefault();
       event.stopPropagation();
       if ((tool === "crop" || tool === "select") && selection) {
@@ -2180,8 +2186,7 @@ function initialize(): void {
       }
       return;
     }
-    if (dialog.open || event.target === input("canvas-text-input")
-      || ["INPUT", "TEXTAREA", "SELECT"].includes((event.target as HTMLElement | null)?.tagName ?? "")) return;
+    if (dialog.open || interactiveTarget) return;
 
     if (event.key === "Enter" && onCanvasSurfaceArea && (tool === "crop" || tool === "select") && selection) {
       event.preventDefault();
@@ -2237,6 +2242,9 @@ function initialize(): void {
 export function openCanvas(path?: string): void {
   initialize();
   showCanvas();
+  // Keyboard tool shortcuts work immediately after opening Canvas, even when
+  // the command came from the editor or command palette.
+  $("canvas").focus();
   if (path) void openImage(path).catch((error: unknown) => status(String(error)));
   else if (!layers.length) status("Choose Open image… to start editing.");
 }

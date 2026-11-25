@@ -7,6 +7,8 @@ import ts from "typescript";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const source = await readFile(resolve(appDir, "src/calc/expression.ts"), "utf8");
+const uiSource = await readFile(resolve(appDir, "src/calc/calc-ui.ts"), "utf8");
+const htmlSource = await readFile(resolve(appDir, "index.html"), "utf8");
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
 }).outputText;
@@ -42,6 +44,19 @@ test("scientific functions, constants and notation work", () => {
   assert.equal(scientific("pi * 0").formatted, "0");
 });
 
+test("scientific angle unit controls trig input and inverse trig output", () => {
+  assert.equal(evaluate("sin(90)", "scientific", { angleUnit: "deg" }).formatted, "1");
+  assert.equal(evaluate("asin(1)", "scientific", { angleUnit: "deg" }).formatted, "90");
+  assert.equal(evaluate("sin(pi / 2)", "scientific", { angleUnit: "rad" }).formatted, "1");
+});
+
+test("postfix percent is distinct from modulo", () => {
+  assert.equal(scientific("5%").formatted, "0.05");
+  assert.equal(scientific("5% * 200").formatted, "10");
+  assert.equal(scientific("5 % 2").formatted, "1");
+  assert.equal(scientific("5%2").formatted, "1");
+});
+
 test("scientific errors are clear and do not throw raw exceptions", () => {
   assert.throws(() => scientific("1 / 0"), /Division by zero/);
   assert.throws(() => scientific("2 +"), /Unexpected end of expression/);
@@ -64,6 +79,13 @@ test("programmer bitwise operators work", () => {
   assert.equal(programmer("0b1010 ^ 0b0110", { bitWidth: 8, unsigned: true, base: 2 }).formatted, "0b1100");
   assert.equal(programmer("~0", { bitWidth: 8, unsigned: true, base: 2 }).formatted, "0b11111111");
   assert.equal(programmer("-8 >> 1", { bitWidth: 8, unsigned: false }).formatted, "-4");
+});
+
+test("unsigned programmer operations stay unsigned through the whole expression", () => {
+  assert.equal(programmer("0xff / 2", { bitWidth: 8, unsigned: true, base: 16 }).formatted, "0x7F");
+  assert.equal(programmer("0xff >> 1", { bitWidth: 8, unsigned: true, base: 16 }).formatted, "0x7F");
+  assert.equal(programmer("-8 >> 1", { bitWidth: 8, unsigned: true, base: 10 }).formatted, "124");
+  assert.equal(programmer("1 - 2", { bitWidth: 8, unsigned: true, base: 16 }).formatted, "0xFF");
 });
 
 test("programmer errors cover invalid literals, zero division and bit width", () => {
@@ -134,4 +156,14 @@ test("Calc UI avoids stale state and invalid programmer controls", async () => {
   assert.match(ui, /formatValue\(lastResult, state\.mode, calcOptions\(\), true\)/);
   assert.match(ui, /expressionInput\(\)\.classList\.remove\("calc-invalid"\)/);
   assert.match(markup, /data-calc-group="scientific" data-calc-insert="\^"/);
+});
+
+test("Calc UI exposes angle mode and base-aware hex entry", () => {
+  assert.match(htmlSource, /id="calc-angle-unit"/);
+  assert.match(htmlSource, /class="calc-section calc-scientific-options"/);
+  assert.match(uiSource, /angleUnit: state\.angleUnit/);
+  assert.match(uiSource, /calc-angle-unit/);
+  assert.match(uiSource, /function insertHexDigit\(/);
+  assert.match(uiSource, /openHexLiteral/);
+  assert.match(uiSource, /direction === 1 && historyCursor === -1/);
 });

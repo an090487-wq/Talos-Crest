@@ -115,9 +115,13 @@ function sendResize(immediate = false) {
       return;
     }
     if (!session) return;
-    if (terminal.cols === lastCols && terminal.rows === lastRows) return;
-    lastCols = terminal.cols;
-    lastRows = terminal.rows;
+    // The Rust PTY clamps to the same minimums. Keep xterm's reported size and
+    // the size we send in sync so wrapping does not drift in tiny panels.
+    const cols = Math.max(20, terminal.cols);
+    const rows = Math.max(4, terminal.rows);
+    if (cols === lastCols && rows === lastRows) return;
+    lastCols = cols;
+    lastRows = rows;
     void invoke("terminal_resize", {
       id: session.id,
       cols: lastCols,
@@ -157,9 +161,9 @@ async function startSession() {
   if (!terminal || !fitAddon) return;
 
   starting = (async () => {
-    const view = document.getElementById("terminal-view");
-    if (!view || view.clientWidth < 20 || view.clientHeight < 20) return;
-
+    // Do not wait for a measurable panel. Opening with conservative dimensions
+    // prevents a short terminal panel from getting stuck at "Starting shell…";
+    // sendResize() corrects the size once the view settles.
     const candidate = nonce();
     connectingNonce = candidate;
     pendingOutput = [];
@@ -175,6 +179,8 @@ async function startSession() {
       // The panel may still be settling; the conservative dimensions above are
       // enough to open the PTY and sendResize() will correct them immediately.
     }
+    cols = Math.max(20, cols);
+    rows = Math.max(4, rows);
 
     try {
       const opened = await invoke<TerminalSession>("terminal_open", {
@@ -235,14 +241,13 @@ function installListeners() {
   window.addEventListener("beforeunload", closeSession);
 }
 
-export function activateTerminal(options: TerminalOptions): void {
+export async function activateTerminal(options: TerminalOptions): Promise<void> {
   getCwd = options.getCwd;
   reportError = options.reportError;
 
   const view = document.getElementById("terminal-view");
   if (!view || terminal) {
-    void startSession();
-    return;
+    return startSession();
   }
 
   terminal = new Terminal({
@@ -291,10 +296,10 @@ export function activateTerminal(options: TerminalOptions): void {
     const model = ollamaInput.value.trim();
     if (MODEL_PATTERN.test(model)) setWindowValue("talos.ollama-model", model);
   });
-  document.getElementById("btn-ollama-run")?.addEventListener("click", () => runOllamaModel());
+  document.getElementById("btn-ollama-run")?.addEventListener("click", () => void runOllamaModel());
 
   setStatus("Starting shell…");
-  void startSession();
+  await startSession();
 }
 
 export function focusTerminal(): void {
@@ -307,7 +312,7 @@ export function focusTerminal(): void {
   terminal.focus();
 }
 
-export function runOllamaModel(): void {
+export async function runOllamaModel(): Promise<void> {
   const input = document.getElementById("ollama-model") as HTMLInputElement | null;
   const model = input?.value.trim() ?? "";
   if (!MODEL_PATTERN.test(model)) {
@@ -315,6 +320,9 @@ export function runOllamaModel(): void {
     input?.focus();
     return;
   }
+  // A command palette action can arrive while the PTY is opening. Wait for
+  // that startup instead of discarding the command.
+  if (!session && starting) await starting;
   if (!session) {
     setStatus("Start the terminal before running Ollama", "error");
     return;

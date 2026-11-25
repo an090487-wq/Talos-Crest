@@ -261,8 +261,9 @@
       .card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 4px; }
       .note { grid-column: 1 / -1; color: var(--muted); padding: 6px 2px; }
 
-      #architecture { position: fixed; top: 0; left: 48px; bottom: 0; z-index: 60; display: flex; width: min(300px, 28vw); max-width: 380px; padding: 0; background: var(--panel); border-right: 1px solid var(--line); box-shadow: var(--shadow-md); }
-      #architecture.fullscreen { inset: 0; left: 0; width: auto; max-width: none; padding: 3vh 3vw; background: var(--overlay); border-right: 0; }
+      #architecture { position: relative; z-index: 30; display: flex; flex: 0 0 min(300px, 28vw); width: min(300px, 28vw); max-width: 380px; min-height: 0; padding: 0; background: var(--panel); border-right: 1px solid var(--line); box-shadow: var(--shadow-md); }
+      #architecture.fullscreen { position: fixed; inset: 0; z-index: 100; flex: none; width: auto; max-width: none; padding: 3vh 3vw; background: var(--overlay); border-right: 0; }
+      #architecture.fullscreen #arch-close-docked { display: none; }
       #arch-window { display: flex; flex-direction: column; min-width: 0; min-height: 0; width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow-md); }
       #arch-header, #arch-toolbar { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
       #arch-header strong { color: var(--text); white-space: nowrap; }
@@ -799,6 +800,117 @@
           <button class="tc-nav-item" data-view="calc" title="Talos Calc" aria-label="Talos Calc"><span class="tc-nav-icon" aria-hidden="true">⊞</span><span class="tc-nav-label">Calc</span></button>
         </nav>
 
+        <div id="architecture" class="hidden">
+          <div id="arch-window">
+            <div id="arch-header">
+              <strong>Talos Observatory</strong>
+              <span id="arch-root">No project selected</span>
+              <button id="arch-close" class="mini" aria-label="Close Talos Observatory">×</button>
+            </div>
+            <div id="arch-toolbar">
+              <button id="arch-close-docked" class="mini" title="Close Explorer" aria-label="Close Explorer">×</button>
+              <div id="arch-modes" role="tablist" aria-label="Architecture Explorer mode">
+                <button class="arch-mode active" data-arch-mode="structure" role="tab">File Structure</button>
+                <button class="arch-mode" data-arch-mode="dependencies" role="tab">Dependencies</button>
+                <button class="arch-mode" data-arch-mode="architecture" role="tab">Architecture</button>
+                <button class="arch-mode" data-arch-mode="performance" role="tab">Performance Budget</button>
+                <button class="arch-mode" data-arch-mode="sandbox" role="tab">Dependency Sandbox</button>
+                <button class="arch-mode" data-arch-mode="debt" role="tab">Technical Debt</button>
+                <button class="arch-mode" data-arch-mode="github" role="tab">GitHub</button>
+              </div>
+              <button id="arch-open-project" class="accent" title="Open a project folder">Open Folder</button>
+              <select id="arch-recent" aria-label="Recent projects" title="Reopen a recent project">
+                <option value="">Recent projects</option>
+              </select>
+              <button id="arch-refresh" title="Rescan the current project">Refresh</button>
+              <button id="arch-find-text" title="Search text across all workspace files">Find in Files</button>
+              <input id="arch-search" type="search" placeholder="Search files and folders…" aria-label="Search project graph" />
+              <input id="arch-excludes" type="text" aria-label="Excluded directory names" title="Comma-separated directory names to exclude" />
+              <label class="arch-hidden-toggle"><input id="arch-show-hidden" type="checkbox" /> Show hidden files</label>
+              <label class="arch-hidden-toggle"><input id="arch-show-ignored" type="checkbox" /> Show ignored files</label>
+              <button id="arch-focus" disabled title="Focus on the selected file and its direct neighbors">Focus</button>
+              <button id="arch-zoom-out" title="Zoom out">−</button>
+              <button id="arch-zoom-in" title="Zoom in">+</button>
+              <button id="arch-fit" title="Reset zoom and scroll">Fit</button>
+              <button id="arch-export" disabled>Export SVG</button>
+              <button id="arch-export-png" disabled>PNG</button>
+            </div>
+            <div id="arch-message" role="status">Choose a project folder to explore.</div>
+            <div id="arch-privacy">Project structure and import analysis stay on this device. No source is sent to AI or external services.</div>
+            <div id="arch-content">
+              <div id="arch-graph-pane">
+                <div id="arch-graph-viewport" aria-label="Project file structure graph">
+                  <div id="arch-graph-space"></div>
+                  <svg id="arch-graph" role="tree" aria-label="Project structure"></svg>
+                  <div id="arch-tree" class="hidden" role="tree" aria-label="Project file tree"></div>
+                </div>
+                <div id="arch-summary">Choose a project folder to explore.</div>
+              </div>
+              <aside id="arch-details-pane">
+                <h3>Selection details</h3>
+                <div id="arch-details"><p>Select a node to inspect it.</p></div>
+              </aside>
+            </div>
+            <div id="arch-insights" class="hidden">
+              <div id="insight-toolbar">
+                <div id="insight-budgets">
+                  <label>Wall (ms) <input id="insight-budget-wall" type="number" min="1" max="600000" step="1" aria-label="Wall time budget in milliseconds" /></label>
+                  <label>CPU (ms) <input id="insight-budget-cpu" type="number" min="1" max="600000" step="1" aria-label="CPU time budget in milliseconds" /></label>
+                  <label>Source (KB) <input id="insight-budget-bytes" type="number" min="1" max="1048576" step="1" aria-label="Source size budget in kilobytes" /></label>
+                </div>
+                <span id="insight-summary">Choose a project folder to explore.</span>
+              </div>
+              <div id="insight-table-wrap">
+                <table id="insight-table">
+                  <thead><tr><th>Component</th><th>Files</th><th>Source</th><th>Wall</th><th>CPU</th><th>Status</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <div id="insight-note"></div>
+            </div>
+            <div id="github-panel" class="hidden">
+              <div id="github-toolbar">
+                <input id="github-token" type="password" placeholder="Personal access token" aria-label="GitHub personal access token" autocomplete="off" spellcheck="false" />
+                <button id="github-token-save" class="accent">Save token</button>
+                <button id="github-token-clear">Clear token</button>
+                <span id="github-token-status">Not connected</span>
+              </div>
+              <div id="github-toolbar-secondary">
+                <input id="github-owner" type="text" placeholder="owner" aria-label="GitHub repository owner" autocomplete="off" spellcheck="false" />
+                <input id="github-repo" type="text" placeholder="repository" aria-label="GitHub repository name" autocomplete="off" spellcheck="false" />
+                <button id="github-load">Load</button>
+                <button id="github-my-repos">My repositories</button>
+                <button id="github-kind-issues" class="active">Issues</button>
+                <button id="github-kind-pulls">Pull requests</button>
+                <select id="github-state" aria-label="Issue state">
+                  <option value="open">Open</option>
+                  <option value="closed">Closed</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div id="github-status" role="status">GitHub is optional. Talos stays fully offline unless you use this tab.</div>
+              <div id="github-workspace">
+                <div id="github-list" role="list" aria-label="GitHub items"></div>
+                <div id="github-detail">
+                  <div id="github-detail-head"></div>
+                  <div id="github-detail-body"></div>
+                  <div id="github-comments"></div>
+                  <div id="github-compose">
+                    <input id="github-title" type="text" placeholder="New issue title" aria-label="New issue title" />
+                    <textarea id="github-body" placeholder="Description or comment" aria-label="Description or comment"></textarea>
+                    <div id="github-actions">
+                      <button id="github-create">Create issue</button>
+                      <button id="github-comment">Add comment</button>
+                      <button id="github-toggle">Close</button>
+                      <button id="github-merge" class="hidden">Merge</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p class="github-privacy">The token is encrypted with a key stored on this device. Talos contacts GitHub only when you press a button in this tab; no source code is uploaded.</p>
+            </div>
+          </div>
+        </div>
         <div id="editor-region">
           <nav id="breadcrumbs" aria-label="Breadcrumb">
             <button id="breadcrumb-root" class="tc-breadcrumb-root" title="Open Talos Observatory">Workspace</button>
@@ -929,116 +1041,6 @@
         <button id="btn-layout-mode" class="mini" title="Layout mode: Auto">Layout: Auto</button>
         <button id="btn-panel" class="mini">Panel</button>
       </footer>
-    </div>
-    <div id="architecture" class="hidden">
-      <div id="arch-window">
-        <div id="arch-header">
-          <strong>Talos Observatory</strong>
-          <span id="arch-root">No project selected</span>
-          <button id="arch-close" class="mini" aria-label="Close Talos Observatory">×</button>
-        </div>
-        <div id="arch-toolbar">
-          <div id="arch-modes" role="tablist" aria-label="Architecture Explorer mode">
-            <button class="arch-mode active" data-arch-mode="structure" role="tab">File Structure</button>
-            <button class="arch-mode" data-arch-mode="dependencies" role="tab">Dependencies</button>
-            <button class="arch-mode" data-arch-mode="architecture" role="tab">Architecture</button>
-            <button class="arch-mode" data-arch-mode="performance" role="tab">Performance Budget</button>
-            <button class="arch-mode" data-arch-mode="sandbox" role="tab">Dependency Sandbox</button>
-            <button class="arch-mode" data-arch-mode="debt" role="tab">Technical Debt</button>
-            <button class="arch-mode" data-arch-mode="github" role="tab">GitHub</button>
-          </div>
-          <button id="arch-open-project" class="accent" title="Open a project folder">Open Folder</button>
-          <select id="arch-recent" aria-label="Recent projects" title="Reopen a recent project">
-            <option value="">Recent projects</option>
-          </select>
-          <button id="arch-refresh" title="Rescan the current project">Refresh</button>
-          <button id="arch-find-text" title="Search text across all workspace files">Find in Files</button>
-          <input id="arch-search" type="search" placeholder="Search files and folders…" aria-label="Search project graph" />
-          <input id="arch-excludes" type="text" aria-label="Excluded directory names" title="Comma-separated directory names to exclude" />
-          <label class="arch-hidden-toggle"><input id="arch-show-hidden" type="checkbox" /> Show hidden files</label>
-          <label class="arch-hidden-toggle"><input id="arch-show-ignored" type="checkbox" /> Show ignored files</label>
-          <button id="arch-focus" disabled title="Focus on the selected file and its direct neighbors">Focus</button>
-          <button id="arch-zoom-out" title="Zoom out">−</button>
-          <button id="arch-zoom-in" title="Zoom in">+</button>
-          <button id="arch-fit" title="Reset zoom and scroll">Fit</button>
-          <button id="arch-export" disabled>Export SVG</button>
-          <button id="arch-export-png" disabled>PNG</button>
-        </div>
-        <div id="arch-message" role="status">Choose a project folder to explore.</div>
-        <div id="arch-privacy">Project structure and import analysis stay on this device. No source is sent to AI or external services.</div>
-        <div id="arch-content">
-          <div id="arch-graph-pane">
-            <div id="arch-graph-viewport" aria-label="Project file structure graph">
-              <div id="arch-graph-space"></div>
-              <svg id="arch-graph" role="tree" aria-label="Project structure"></svg>
-              <div id="arch-tree" class="hidden" role="tree" aria-label="Project file tree"></div>
-            </div>
-            <div id="arch-summary">Choose a project folder to explore.</div>
-          </div>
-          <aside id="arch-details-pane">
-            <h3>Selection details</h3>
-            <div id="arch-details"><p>Select a node to inspect it.</p></div>
-          </aside>
-        </div>
-        <div id="arch-insights" class="hidden">
-          <div id="insight-toolbar">
-            <div id="insight-budgets">
-              <label>Wall (ms) <input id="insight-budget-wall" type="number" min="1" max="600000" step="1" aria-label="Wall time budget in milliseconds" /></label>
-              <label>CPU (ms) <input id="insight-budget-cpu" type="number" min="1" max="600000" step="1" aria-label="CPU time budget in milliseconds" /></label>
-              <label>Source (KB) <input id="insight-budget-bytes" type="number" min="1" max="1048576" step="1" aria-label="Source size budget in kilobytes" /></label>
-            </div>
-            <span id="insight-summary">Choose a project folder to explore.</span>
-          </div>
-          <div id="insight-table-wrap">
-            <table id="insight-table">
-              <thead><tr><th>Component</th><th>Files</th><th>Source</th><th>Wall</th><th>CPU</th><th>Status</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-          <div id="insight-note"></div>
-        </div>
-        <div id="github-panel" class="hidden">
-          <div id="github-toolbar">
-            <input id="github-token" type="password" placeholder="Personal access token" aria-label="GitHub personal access token" autocomplete="off" spellcheck="false" />
-            <button id="github-token-save" class="accent">Save token</button>
-            <button id="github-token-clear">Clear token</button>
-            <span id="github-token-status">Not connected</span>
-          </div>
-          <div id="github-toolbar-secondary">
-            <input id="github-owner" type="text" placeholder="owner" aria-label="GitHub repository owner" autocomplete="off" spellcheck="false" />
-            <input id="github-repo" type="text" placeholder="repository" aria-label="GitHub repository name" autocomplete="off" spellcheck="false" />
-            <button id="github-load">Load</button>
-            <button id="github-my-repos">My repositories</button>
-            <button id="github-kind-issues" class="active">Issues</button>
-            <button id="github-kind-pulls">Pull requests</button>
-            <select id="github-state" aria-label="Issue state">
-              <option value="open">Open</option>
-              <option value="closed">Closed</option>
-              <option value="all">All</option>
-            </select>
-          </div>
-          <div id="github-status" role="status">GitHub is optional. Talos stays fully offline unless you use this tab.</div>
-          <div id="github-workspace">
-            <div id="github-list" role="list" aria-label="GitHub items"></div>
-            <div id="github-detail">
-              <div id="github-detail-head"></div>
-              <div id="github-detail-body"></div>
-              <div id="github-comments"></div>
-              <div id="github-compose">
-                <input id="github-title" type="text" placeholder="New issue title" aria-label="New issue title" />
-                <textarea id="github-body" placeholder="Description or comment" aria-label="Description or comment"></textarea>
-                <div id="github-actions">
-                  <button id="github-create">Create issue</button>
-                  <button id="github-comment">Add comment</button>
-                  <button id="github-toggle">Close</button>
-                  <button id="github-merge" class="hidden">Merge</button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <p class="github-privacy">The token is encrypted with a key stored on this device. Talos contacts GitHub only when you press a button in this tab; no source code is uploaded.</p>
-        </div>
-      </div>
     </div>
     <dialog id="quick-open-dialog" class="workspace-dialog" aria-label="Quick Open">
       <header>
@@ -1233,6 +1235,14 @@
             </div>
             <div id="calc-memory-value">0</div>
           </section>
+          <section class="calc-section calc-scientific-options">
+            <h3>Scientific options</h3>
+            <label class="sr-only" for="calc-angle-unit">Angle unit</label>
+            <select id="calc-angle-unit" aria-label="Angle unit">
+              <option value="deg" selected>Degrees</option>
+              <option value="rad">Radians</option>
+            </select>
+          </section>
           <section class="calc-section calc-programmer">
             <h3>Programmer options</h3>
             <div class="calc-inline">
@@ -1271,7 +1281,7 @@
         </aside>
       </div>
     </dialog>
-    <div id="canvas" class="hidden" aria-label="Talos Canvas">
+    <div id="canvas" class="hidden" tabindex="-1" aria-label="Talos Canvas editing workspace">
       <div id="canvas-header">
         <strong>TALOS CANVAS</strong>
         <span id="canvas-file">No image open</span>

@@ -887,6 +887,32 @@ fn modified_ms(metadata: &fs::Metadata) -> Option<u64> {
         .map(|duration| duration.as_millis().min(u64::MAX as u128) as u64)
 }
 
+/// Build the workspace policy used by every Explorer-facing subsystem.
+/// `show_ignored` must be threaded through scanning, watching, metadata and
+/// search together; otherwise ignored files appear in the tree but remain
+/// invisible to refresh, change notifications and Find-in-Files.
+fn workspace_policy(
+    root: &Path,
+    exclusions: &[String],
+    show_hidden: bool,
+    show_ignored: bool,
+) -> Result<workspace::WorkspacePolicy, String> {
+    if show_ignored {
+        workspace::WorkspacePolicy::load_with_options(
+            root,
+            workspace::WorkspacePolicyOptions {
+                exclusions: &[],
+                show_hidden,
+                respect_gitignore: false,
+                respect_ignore: false,
+                respect_talos_ignore: false,
+            },
+        )
+    } else {
+        workspace::WorkspacePolicy::load(root, exclusions, show_hidden)
+    }
+}
+
 #[derive(Clone, Debug, serde::Serialize)]
 struct ProjectEntry {
     path: String,
@@ -971,20 +997,7 @@ fn scan_project_tree(
         child_count: 0,
         file_count: 0,
     }];
-    let policy = if show_ignored {
-        workspace::WorkspacePolicy::load_with_options(
-            &root,
-            workspace::WorkspacePolicyOptions {
-                exclusions: &[],
-                show_hidden,
-                respect_gitignore: false,
-                respect_ignore: false,
-                respect_talos_ignore: false,
-            },
-        )?
-    } else {
-        workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?
-    };
+    let policy = workspace_policy(&root, exclusions, show_hidden, show_ignored)?;
     let mut stack = vec![(root.clone(), 0usize)];
     let mut warnings = Vec::new();
     let mut child_counts: HashMap<String, usize> = HashMap::new();
@@ -1177,20 +1190,7 @@ fn list_project_directory_at(
         return Err(format!("workspace entry is not a directory: {}", directory.display()));
     }
 
-    let policy = if show_ignored {
-        workspace::WorkspacePolicy::load_with_options(
-            &root,
-            workspace::WorkspacePolicyOptions {
-                exclusions: &[],
-                show_hidden,
-                respect_gitignore: false,
-                respect_ignore: false,
-                respect_talos_ignore: false,
-            },
-        )?
-    } else {
-        workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?
-    };
+    let policy = workspace_policy(&root, exclusions, show_hidden, show_ignored)?;
     let relative = directory.strip_prefix(&root).unwrap_or(Path::new(""));
     if !relative.as_os_str().is_empty() && policy.is_ignored(relative, true) {
         return Err(format!("directory is excluded by workspace policy: {}", relative.display()));
@@ -1728,6 +1728,7 @@ fn workspace_entry_metadata_at(
     path: &str,
     exclusions: &[String],
     show_hidden: bool,
+    show_ignored: bool,
     registry: Option<&Registry>,
 ) -> Result<Option<ProjectEntry>, String> {
     let root = canonical_project_root(root)?;
@@ -1758,7 +1759,7 @@ fn workspace_entry_metadata_at(
         .strip_prefix(&root)
         .unwrap_or(&canonical_parent)
         .join(file_name);
-    let policy = workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?;
+    let policy = workspace_policy(&root, exclusions, show_hidden, show_ignored)?;
     if policy.is_ignored(&relative, metadata.is_dir())
         || workspace::WorkspacePolicy::is_sensitive_name(&file_name.to_string_lossy())
     {
@@ -1878,9 +1879,10 @@ fn snapshot_file_paths(
     paths: &[String],
     exclusions: &[String],
     show_hidden: bool,
+    show_ignored: bool,
 ) -> Result<Vec<String>, String> {
     let root = canonical_project_root(root)?;
-    let policy = workspace::WorkspacePolicy::load(&root, exclusions, show_hidden)?;
+    let policy = workspace_policy(&root, exclusions, show_hidden, show_ignored)?;
     let mut result = Vec::with_capacity(paths.len());
     for path in paths {
         let candidate = PathBuf::from(path);
@@ -1912,6 +1914,7 @@ fn search_workspace_text_at(
     query: &str,
     exclusions: &[String],
     show_hidden: bool,
+    show_ignored: bool,
     limit: usize,
     paths: Option<&[String]>,
 ) -> Result<Vec<WorkspaceTextMatch>, String> {
@@ -1919,8 +1922,8 @@ fn search_workspace_text_at(
         return Ok(Vec::new());
     }
     let candidates: Vec<String> = match paths {
-        Some(paths) => snapshot_file_paths(root, paths, exclusions, show_hidden)?,
-        None => scan_project_tree(root, exclusions, show_hidden, false, None)?
+        Some(paths) => snapshot_file_paths(root, paths, exclusions, show_hidden, show_ignored)?,
+        None => scan_project_tree(root, exclusions, show_hidden, show_ignored, None)?
             .entries
             .into_iter()
             .filter(|entry| entry.kind == "file")
@@ -1936,6 +1939,7 @@ async fn search_workspace_text(
     query: String,
     exclusions: Vec<String>,
     show_hidden: bool,
+    show_ignored: bool,
     limit: Option<usize>,
     paths: Option<Vec<String>>,
 ) -> Result<Vec<WorkspaceTextMatch>, String> {
@@ -1946,6 +1950,7 @@ async fn search_workspace_text(
             &query,
             &exclusions,
             show_hidden,
+            show_ignored,
             limit,
             paths.as_deref(),
         )
@@ -1961,11 +1966,19 @@ async fn workspace_entry_metadata(
     path: String,
     exclusions: Vec<String>,
     show_hidden: bool,
+    show_ignored: bool,
 ) -> Result<Option<ProjectEntry>, String> {
     let resource_dir = app.path().resource_dir().ok();
     tauri::async_runtime::spawn_blocking(move || {
         let registry = language_registry(resource_dir.as_deref());
-        workspace_entry_metadata_at(&root, &path, &exclusions, show_hidden, registry.as_ref())
+        workspace_entry_metadata_at(
+            &root,
+            &path,
+            &exclusions,
+            show_hidden,
+            show_ignored,
+            registry.as_ref(),
+        )
     })
     .await
     .map_err(|error| format!("workspace metadata task failed: {error}"))?
@@ -2191,11 +2204,12 @@ fn watch_project(
     root: String,
     exclusions: Vec<String>,
     show_hidden: bool,
+    show_ignored: bool,
     directories: Option<Vec<String>>,
 ) -> Result<(), String> {
     #[cfg(target_os = "android")]
     {
-        let _ = (window, root, exclusions, show_hidden, directories);
+        let _ = (window, root, exclusions, show_hidden, show_ignored, directories);
         return Ok(());
     }
 
@@ -2211,10 +2225,11 @@ fn watch_project(
                 root.display()
             ));
         }
-        let policy = Arc::new(workspace::WorkspacePolicy::load(
+        let policy = Arc::new(workspace_policy(
             &root,
             &exclusions,
             show_hidden,
+            show_ignored,
         )?);
         let project_root = root.to_string_lossy().into_owned();
         let window_label = window.label().to_string();
@@ -3165,9 +3180,20 @@ fn run_language(lang: &Language, path: &Path) -> Result<RunResult, String> {
     let cmd = lang
         .run_command(path)
         .ok_or_else(|| format!("{} has no run command configured", lang.name))?;
-    let out = Command::new("sh")
-        .arg("-c")
-        .arg(&cmd)
+    let mut command = Command::new("sh");
+    command.arg("-c").arg(&cmd);
+    // AppImage runtimes export these for their own bundled libraries. When a
+    // user runs source code, a child shell must see the normal system Python
+    // environment instead of the temporary AppImage mount.
+    #[cfg(unix)]
+    {
+        for key in ["PYTHONHOME", "PYTHONPATH", "LD_LIBRARY_PATH", "APPDIR", "APPIMAGE"] {
+            if std::env::var(key).is_ok_and(|value| value.contains(".mount_")) {
+                command.env_remove(key);
+            }
+        }
+    }
+    let out = command
         .output()
         .map_err(|e| format!("failed to start '{cmd}': {e}"))?;
     Ok(RunResult {
@@ -4108,6 +4134,7 @@ mod tests {
             "needle_token",
             &[],
             false,
+            false,
             20,
             None,
         )
@@ -4143,6 +4170,7 @@ mod tests {
             "token_value",
             &[],
             false,
+            false,
             20,
             Some(&supplied),
         )
@@ -4174,8 +4202,9 @@ mod tests {
             .collect();
 
         let started = Instant::now();
-        let walked = search_workspace_text_at(&root_text, "needle_token", &[], false, 20, None)
-            .unwrap();
+        let walked =
+            search_workspace_text_at(&root_text, "needle_token", &[], false, false, 20, None)
+                .unwrap();
         let walked_ms = started.elapsed().as_millis();
 
         let started = Instant::now();
@@ -4183,6 +4212,7 @@ mod tests {
             &root_text,
             "needle_token",
             &[],
+            false,
             false,
             20,
             Some(&paths),

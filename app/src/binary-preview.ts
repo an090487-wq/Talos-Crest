@@ -7,6 +7,7 @@ import {
   formatSize,
   formatStrings,
   HEX_PAGE_BYTES,
+  nextPageEnabled,
 } from "./binary-view";
 import { fileNameFromPath, readBinaryPreview } from "./platform";
 
@@ -17,11 +18,10 @@ let offset = 0;
 let mode: "hex" | "strings" = "hex";
 let wired = false;
 
-function setControls(pages: number, page: number): void {
+function setControls(pages: number, page: number, size = 0): void {
   const paging = mode === "hex";
   ($("binary-prev") as HTMLButtonElement).disabled = !paging || offset <= 0;
-  ($("binary-next") as HTMLButtonElement).disabled =
-    !paging || offset + HEX_PAGE_BYTES >= (pages - 1) * HEX_PAGE_BYTES;
+  ($("binary-next") as HTMLButtonElement).disabled = !paging || !nextPageEnabled(offset, size);
   $("binary-page").textContent = mode === "strings" ? "all" : `${page} / ${pages}`;
   $("binary-mode-hex").setAttribute("aria-pressed", String(mode === "hex"));
   $("binary-mode-strings").setAttribute("aria-pressed", String(mode === "strings"));
@@ -40,7 +40,7 @@ async function render(): Promise<void> {
         `${summary.label} · ${summary.size} · offset ${offset.toLocaleString()} · ${summary.hint}`;
       view.textContent = formatHexDump(preview.bytes, offset).join("\n") || "(empty file)";
       const pages = Math.max(1, Math.ceil(preview.size / HEX_PAGE_BYTES));
-      setControls(pages, Math.floor(offset / HEX_PAGE_BYTES) + 1);
+      setControls(pages, Math.floor(offset / HEX_PAGE_BYTES) + 1, preview.size);
       return;
     }
 
@@ -51,12 +51,12 @@ async function render(): Promise<void> {
       `${summary.label} · ${summary.size} · printable strings from the first ${formatSize(preview.bytes.length)} · ${summary.hint}`;
     const strings = extractPrintableStrings(preview.bytes, 0, 4, 500);
     view.textContent = formatStrings(strings).join("\n") || "No printable strings found.";
-    setControls(1, 1);
+    setControls(1, 1, preview.size);
   } catch (error) {
     $("binary-name").textContent = name;
     $("binary-meta").textContent = `Could not read this file: ${String(error)}`;
     view.textContent = "";
-    setControls(1, 1);
+    setControls(1, 1, 0);
   }
 }
 
