@@ -709,6 +709,40 @@ fn validate_extension_manifest(
         {
             return Err("theme extension needs a 'theme' object".into());
         }
+        "icon-pack" => {
+            let pack = manifest
+                .get("iconPack")
+                .and_then(serde_json::Value::as_object)
+                .ok_or("icon-pack extension needs an 'iconPack' object")?;
+            let valid_token = |value: &str| {
+                !value.is_empty()
+                    && value.len() <= 64
+                    && value
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            };
+            if let Some(default) = pack.get("default") {
+                let default = default
+                    .as_str()
+                    .ok_or("icon pack default must be a string")?;
+                if !valid_token(default) {
+                    return Err("icon pack default is not a valid icon token".into());
+                }
+            }
+            let mappings = pack
+                .get("mappings")
+                .and_then(serde_json::Value::as_object)
+                .ok_or("icon pack needs a 'mappings' object")?;
+            if mappings.is_empty() || mappings.len() > 500 {
+                return Err("icon pack needs between 1 and 500 mappings".into());
+            }
+            for (key, value) in mappings {
+                let value = value.as_str().ok_or("icon pack mapping must be a string")?;
+                if !valid_token(key) || !valid_token(value) {
+                    return Err("icon pack contains an invalid mapping".into());
+                }
+            }
+        }
         "language" => {
             let language = manifest
                 .get("language")
@@ -2628,6 +2662,7 @@ fn ext_install(
     sha256: String,
     expected_id: String,
     expected_version: String,
+    expected_kind: Option<String>,
     approved_permissions: Vec<String>,
     dependencies: Vec<String>,
 ) -> Result<serde_json::Value, String> {
@@ -2645,6 +2680,15 @@ fn ext_install(
         serde_json::from_str(&text).map_err(|e| format!("invalid extension file: {e}"))?;
     let (kind, required_permissions) =
         validate_extension_manifest(&v, &expected_id, &expected_version)?;
+    if expected_kind
+        .as_deref()
+        .is_some_and(|expected| expected != kind)
+    {
+        return Err(format!(
+            "manifest kind '{kind}' does not match registry kind '{}'",
+            expected_kind.unwrap_or_default()
+        ));
+    }
     if approved_permissions
         .iter()
         .any(|permission| permission != "process.execution")
@@ -2874,20 +2918,34 @@ fn ext_set_enabled(id: String, enabled: bool, permissions: Vec<String>) -> Resul
     let manifest: serde_json::Value =
         serde_json::from_str(&text).map_err(|error| format!("invalid extension {id}: {error}"))?;
     let required = extension_permission_requirements(&manifest);
-    if permissions
+    let mut state = read_extension_state()?;
+    let previous_permissions = state
+        .get(&id)
+        .and_then(|status| status.get("permissions"))
+        .and_then(serde_json::Value::as_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    // Disabling must never discard an approval the user already granted.
+    let effective_permissions = if enabled { permissions } else { previous_permissions };
+    if effective_permissions
         .iter()
         .any(|permission| permission != "process.execution")
         || (enabled
             && required
                 .iter()
-                .any(|permission| !permissions.contains(permission)))
+                .any(|permission| !effective_permissions.contains(permission)))
     {
         return Err("required extension permissions were not explicitly approved".into());
     }
-    let mut state = read_extension_state()?;
     state.insert(
         id,
-        serde_json::json!({ "enabled": enabled, "permissions": permissions }),
+        serde_json::json!({ "enabled": enabled, "permissions": effective_permissions }),
     );
     let contents = serde_json::to_string_pretty(&state).map_err(|error| error.to_string())?;
     fs::create_dir_all(config_dir()).map_err(|error| error.to_string())?;
@@ -3779,6 +3837,26 @@ mod tests {
                 .0,
             "icon-pack"
         );
+
+        let missing_pack = serde_json::json!({
+            "id": "bad-pack",
+            "name": "Bad Pack",
+            "kind": "icon-pack",
+            "version": "1.0.0"
+        });
+        assert!(validate_extension_manifest(&missing_pack, "bad-pack", "1.0.0").is_err());
+
+        let bad_mapping = serde_json::json!({
+            "id": "bad-pack",
+            "name": "Bad Pack",
+            "kind": "icon-pack",
+            "version": "1.0.0",
+            "iconPack": {
+                "default": "file",
+                "mappings": { "py": "<script>" }
+            }
+        });
+        assert!(validate_extension_manifest(&bad_mapping, "bad-pack", "1.0.0").is_err());
 
         let malformed = serde_json::json!({
             "id": "bad",

@@ -166,6 +166,7 @@ let exportFullGraph = false;
 
 export interface ActiveIconPack {
   id: string;
+  default: string;
   mappings: Record<string, string>;
 }
 
@@ -258,11 +259,12 @@ function activeIconPackStyle(): IconPackStyle {
 function iconPackToken(entry: ProjectEntry): string {
   if (entry.kind === "directory") return "folder";
   if (entry.kind === "link") return "link";
-  const mappings = activeIconPack?.mappings ?? {};
+  const pack = activeIconPack;
+  const mappings = pack?.mappings ?? {};
   return mappings[entry.extension.toLowerCase()]
     ?? mappings[entry.name.toLowerCase()]
     ?? mappings[entry.language]
-    ?? mappings.default
+    ?? pack?.default
     ?? "file";
 }
 

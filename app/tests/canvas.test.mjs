@@ -358,6 +358,19 @@ test("locked resizing syncs the other dimension and reports no-op sizes", () => 
   assert.match(ui, /Canvas already has these dimensions\./);
 });
 
+test("brush strokes blend once so overlapping segments do not accumulate alpha", () => {
+  const ui = readFileSync(resolve(appDir, "src/canvas/canvas-ui.ts"), "utf8");
+  const pointerDown = ui.slice(ui.indexOf("function onPointerDown("), ui.indexOf("function onPointerMove("));
+  const pointerMove = ui.slice(ui.indexOf("function onPointerMove("), ui.indexOf("function onPointerUp("));
+  const pointerUp = ui.slice(ui.indexOf("function onPointerUp("), ui.indexOf("async function applyCrop("));
+  assert.match(ui, /function redrawBrushPreview\(\): void \{/);
+  assert.match(ui, /function commitBrushPreview\(erase: boolean\): void \{/);
+  assert.doesNotMatch(pointerDown, /activeLayer\(\)\?\.canvas\.getContext/);
+  assert.doesNotMatch(pointerMove, /ctx\.globalAlpha = brushOpacity \/ 100/);
+  assert.match(pointerMove, /addStrokePoint\(dragCurrent\)/);
+  assert.match(pointerUp, /commitBrushPreview\(finishedTool === \"eraser\"\)/);
+});
+
 test("typed canvas text survives tool changes and click-away", () => {
   const ui = readFileSync(resolve(appDir, "src/canvas/canvas-ui.ts"), "utf8");
   const setTool = ui.slice(ui.indexOf("function setTool("), ui.indexOf("function drawSelection("));

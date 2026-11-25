@@ -109,6 +109,12 @@ test("desktop runs expose a live stdin channel for interactive input", () => {
   assert.match(rust, /Stdio::piped\(\)/);
 });
 
+test("data files explain why they cannot be run", () => {
+  assert.match(main, /const dataExtensions = \[/);
+  assert.match(main, /is a data file, not runnable source/);
+  assert.match(main, /or choose a run language/);
+});
+
 test("read-only AppImage files are saved through Save As", () => {
   assert.match(main, /import \{ isReadOnlyAppImagePath \} from "\.\/workspace-paths"/);
   assert.match(main, /readOnlyAppImageFile && !forceDialog/);

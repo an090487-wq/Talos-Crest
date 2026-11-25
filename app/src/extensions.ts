@@ -5,11 +5,34 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";
 import type { ThemeDef } from "./theme";
 
+export interface ActiveIconPack {
+  id: string;
+  default: string;
+  mappings: Record<string, string>;
+}
+
 export interface Hooks {
   setTheme: (def: ThemeDef | null) => void;
-  setIconPack: (pack: { id: string; mappings: Record<string, string> } | null) => void;
+  setIconPack: (pack: ActiveIconPack | null) => void;
   newFromTemplate: (filename: string, content: string) => Promise<void>;
   insertText: (text: string) => void;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function stringMap(value: unknown): Record<string, string> {
+  const result: Record<string, string> = {};
+  if (!isRecord(value)) return result;
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === "string") result[key] = item;
+  }
+  return result;
 }
 
 interface Manifest {
@@ -462,7 +485,7 @@ function supportedByTalos(entry: IndexEntry): boolean {
 }
 
 // ---------- actions ----------
-function applyThemeById(id: string | null) {
+async function applyThemeById(id: string | null) {
   if (id === null) {
     hooks.setTheme(null);
     delete settings.theme;
@@ -474,11 +497,11 @@ function applyThemeById(id: string | null) {
     hooks.setTheme(def);
     settings.theme = id;
   }
-  void saveSettings().catch((error: unknown) => setMsg("Could not save extension settings: " + String(error)));
+  await saveSettings();
   render();
 }
 
-function applyIconPackById(id: string | null) {
+async function applyIconPackById(id: string | null) {
   if (id === null) {
     hooks.setIconPack(null);
     delete settings.iconPack;
@@ -487,10 +510,14 @@ function applyIconPackById(id: string | null) {
     if (!manifest?.enabled) throw new Error("Enable this extension before applying its icon pack.");
     if (manifest.kind !== "icon-pack") throw new Error("This extension is not an icon pack.");
     if (!manifest.iconPack) throw new Error("Icon pack data missing for " + id);
-    hooks.setIconPack({ id, mappings: manifest.iconPack.mappings ?? {} });
+    const mappings = stringMap(manifest.iconPack.mappings);
+    const fallback = typeof manifest.iconPack.default === "string" && manifest.iconPack.default.trim()
+      ? manifest.iconPack.default
+      : "file";
+    hooks.setIconPack({ id, default: fallback, mappings });
     settings.iconPack = id;
   }
-  void saveSettings().catch((error: unknown) => setMsg("Could not save icon pack preference: " + String(error)));
+  await saveSettings();
   render();
 }
 
@@ -507,29 +534,49 @@ async function installExt(e: IndexEntry) {
   if (isHttp(base) && !isHttp(src)) {
     throw new Error("A remote registry cannot install from local files.");
   }
-  if (!e.sha256) throw new Error("This entry has no checksum, so Talos will not install it.");
+  if (typeof e.sha256 !== "string" || !e.sha256) {
+    throw new Error("This entry has no checksum, so Talos will not install it.");
+  }
+  if (typeof e.kind !== "string") {
+    throw new Error("This registry entry has no extension kind.");
+  }
   const text = await fetchSource(src);
-  const parsed = JSON.parse(text) as Manifest;
+  const parsedValue: unknown = JSON.parse(text);
+  if (!isRecord(parsedValue)) {
+    throw new Error("Downloaded manifest is not a JSON object.");
+  }
+  const parsed = parsedValue as unknown as Manifest;
   if (
+    typeof parsed.id !== "string" ||
+    typeof parsed.name !== "string" ||
+    typeof parsed.kind !== "string" ||
+    typeof parsed.version !== "string" ||
     parsed.id !== e.id ||
     parsed.version !== e.version ||
     !validVersion(parsed.version)
   ) {
     throw new Error("Downloaded manifest identity or version does not match the registry entry.");
   }
+  if (parsed.kind !== e.kind) {
+    throw new Error("Downloaded manifest kind does not match the registry entry.");
+  }
   if (!supportedByTalos(e)) {
     throw new Error("This extension declares compatibility outside the current Talos manifest support.");
   }
-  const missingDependencies = (e.dependencies ?? []).filter(
+  const dependencies = stringArray(e.dependencies);
+  const missingDependencies = dependencies.filter(
     (dependency) => !installed.some((extension) => extension.id === dependency)
   );
   if (missingDependencies.length) {
     throw new Error("Install required dependencies first: " + missingDependencies.join(", "));
   }
+  // Rust derives requirements from the manifest only; the prompt must match
+  // exactly, so index-declared permissions cannot create phantom approvals.
   const requiredPermissions = new Set([
-    ...(e.permissions ?? []),
-    ...(parsed.permissions ?? []),
-    ...(parsed.kind === "language" && parsed.language?.run ? ["process.execution"] : []),
+    ...stringArray(parsed.permissions),
+    ...(parsed.kind === "language" && isRecord(parsed.language) && typeof parsed.language.run === "string" && parsed.language.run
+      ? ["process.execution"]
+      : []),
   ]);
   const supportedPermissions = new Set(["process.execution"]);
   const unsupported = [...requiredPermissions].filter((permission) => !supportedPermissions.has(permission));
@@ -540,7 +587,9 @@ async function installExt(e: IndexEntry) {
   if (requiredPermissions.has("process.execution")) {
     const ok = await ask(
       "This extension declares a language command that Talos can execute only after you choose Run. It will not execute during installation or activation.\n\n" +
-        (parsed.language?.run ?? "(command not provided)") +
+        (isRecord(parsed.language) && typeof parsed.language.run === "string" && parsed.language.run
+          ? parsed.language.run
+          : "(command not provided)") +
         "\n\nGrant the process.execution permission?",
       { title: "Approve extension permission", kind: "warning" }
     );
@@ -552,23 +601,26 @@ async function installExt(e: IndexEntry) {
     sha256: e.sha256,
     expectedId: e.id,
     expectedVersion: e.version,
+    expectedKind: e.kind,
     approvedPermissions,
-    dependencies: e.dependencies ?? [],
+    dependencies,
   });
   await refreshInstalled();
   selectedDetails = null;
-  if (e.kind === "icon-pack" && !settings.iconPack) applyIconPackById(e.id);
-  else if (settings.theme === e.id) applyThemeById(e.id);
-  else if (settings.iconPack === e.id) applyIconPackById(e.id);
+  if (e.kind === "icon-pack" && !settings.iconPack) await applyIconPackById(e.id);
+  else if (settings.theme === e.id) await applyThemeById(e.id);
+  else if (settings.iconPack === e.id) await applyIconPackById(e.id);
   else render();
 }
 
 async function setExtensionEnabled(extension: Manifest, enabled: boolean) {
   const required = new Set([
-    ...(extension.permissions ?? []),
-    ...(extension.kind === "language" && extension.language?.run ? ["process.execution"] : []),
+    ...stringArray(extension.permissions),
+    ...(extension.kind === "language" && isRecord(extension.language) && typeof extension.language.run === "string" && extension.language.run
+      ? ["process.execution"]
+      : []),
   ]);
-  const approved = new Set(extension.grantedPermissions ?? []);
+  const approved = new Set(stringArray(extension.grantedPermissions));
   const missing = [...required].filter((permission) => !approved.has(permission));
   if (missing.some((permission) => permission !== "process.execution")) {
     throw new Error("This extension requests a permission Talos does not support.");
@@ -576,7 +628,9 @@ async function setExtensionEnabled(extension: Manifest, enabled: boolean) {
   if (enabled && missing.includes("process.execution")) {
     const ok = await ask(
       "Enabling this language extension allows its configured command to run only when you choose Run:\n\n" +
-        (extension.language?.run ?? "(command not provided)") +
+        (isRecord(extension.language) && typeof extension.language.run === "string" && extension.language.run
+          ? extension.language.run
+          : "(command not provided)") +
         "\n\nGrant the process.execution permission?",
       { title: "Approve extension permission", kind: "warning" }
     );
@@ -588,10 +642,10 @@ async function setExtensionEnabled(extension: Manifest, enabled: boolean) {
     enabled,
     permissions: [...approved],
   });
-  if (!enabled && settings.theme === extension.id) applyThemeById(null);
-  if (!enabled && settings.iconPack === extension.id) applyIconPackById(null);
+  if (!enabled && settings.theme === extension.id) await applyThemeById(null);
+  if (!enabled && settings.iconPack === extension.id) await applyIconPackById(null);
   await refreshInstalled();
-  if (enabled && extension.kind === "icon-pack" && !settings.iconPack) applyIconPackById(extension.id);
+  if (enabled && extension.kind === "icon-pack" && !settings.iconPack) await applyIconPackById(extension.id);
   else render();
 }
 
@@ -606,8 +660,8 @@ async function removeExt(id: string) {
   await invoke("ext_remove", { id });
   await refreshInstalled();
   selectedDetails = null;
-  if (activeTheme) applyThemeById(null);
-  if (activeIconPack) applyIconPackById(null);
+  if (activeTheme) await applyThemeById(null);
+  if (activeIconPack) await applyIconPackById(null);
   else if (!activeTheme) render();
 }
 
@@ -621,8 +675,8 @@ async function rollbackExt(id: string) {
   if (!ok) return;
   await invoke("ext_rollback", { id });
   await refreshInstalled();
-  if (settings.theme === id) applyThemeById(id);
-  else if (settings.iconPack === id) applyIconPackById(id);
+  if (settings.theme === id) await applyThemeById(id);
+  else if (settings.iconPack === id) await applyIconPackById(id);
   else render();
 }
 
@@ -1157,17 +1211,23 @@ export async function initExtensions(h: Hooks) {
       await refreshInstalled();
       if (settings.theme) {
         try {
-          applyThemeById(settings.theme);
+          await applyThemeById(settings.theme);
         } catch {
           delete settings.theme;
+          await saveSettings().catch((error: unknown) => {
+            console.error("could not clear stale theme preference", error);
+          });
         }
       }
       if (settings.iconPack) {
         try {
-          applyIconPackById(settings.iconPack);
+          await applyIconPackById(settings.iconPack);
         } catch {
           hooks.setIconPack(null);
           delete settings.iconPack;
+          await saveSettings().catch((error: unknown) => {
+            console.error("could not clear stale icon pack preference", error);
+          });
         }
       } else {
         hooks.setIconPack(null);

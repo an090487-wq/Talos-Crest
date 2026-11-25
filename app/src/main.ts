@@ -2146,6 +2146,17 @@ async function runFile() {
     appendOut("CSS cannot run by itself. Add it to an HTML file's <style> block and tap Preview.\n", "err");
     return;
   }
+  const dataExtensions = ["json", "jsonc", "xml", "yaml", "yml", "toml", "ini", "md", "txt", "log", "csv"];
+  if (dataExtensions.includes(extension ?? "") && (selectedLanguage === "auto" || !selectedLanguage)) {
+    showPanel(true);
+    showTab("output");
+    $("output").textContent = "";
+    appendOut(
+      `${(extension ?? "This").toUpperCase()} is a data file, not runnable source. Open a .py, .js, .c, .cpp, or .java file, or choose a run language.\n`,
+      "err"
+    );
+    return;
+  }
   const inferredLanguage =
     extension === "py" ? "python" :
     extension === "js" || extension === "mjs" ? "javascript" :

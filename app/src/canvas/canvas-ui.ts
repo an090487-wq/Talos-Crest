@@ -85,6 +85,8 @@ let dragCurrent: Point | null = null;
 let cropDrag: { mode: CropHandle; start: Point; original: Rect; pointerId: number } | null = null;
 let panStart: { scrollLeft: number; scrollTop: number; x: number; y: number } | null = null;
 let drawing = false;
+let strokePoints: Point[] = [];
+let strokeDirty: Rect | null = null;
 let pendingHistoryLabel: string | null = null;
 let calloutNumber = 1;
 let measurement: { from: Point; to: Point } | null = null;
@@ -1061,6 +1063,57 @@ function clearPreview(): void {
   preview().getContext("2d")?.clearRect(0, 0, width, height);
 }
 
+function redrawBrushPreview(): void {
+  clearPreview();
+  const ctx = preview().getContext("2d");
+  if (!ctx || !strokePoints.length) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = strokeStyleColor();
+  ctx.lineWidth = brushSize;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  const first = strokePoints[0];
+  ctx.moveTo(first.x, first.y);
+  if (strokePoints.length === 1) ctx.lineTo(first.x + 0.01, first.y + 0.01);
+  for (const point of strokePoints.slice(1)) ctx.lineTo(point.x, point.y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function addStrokePoint(point: Point): void {
+  strokePoints.push(point);
+  const bounds = brushBounds(point, point, brushSize / 2 + 1, width, height);
+  strokeDirty = strokeDirty ? unionRect(strokeDirty, bounds) : bounds;
+  redrawBrushPreview();
+}
+
+function commitBrushPreview(erase: boolean): void {
+  if (!strokePoints.length || !strokeDirty) {
+    clearPreview();
+    return;
+  }
+  const ctx = activeLayer()?.canvas.getContext("2d");
+  const rect = strokeDirty;
+  if (ctx) {
+    ctx.save();
+    ctx.globalCompositeOperation = erase ? "destination-out" : "source-over";
+    ctx.globalAlpha = Math.max(0.01, Math.min(1, brushOpacity / 100));
+    ctx.drawImage(
+      preview(),
+      rect.x, rect.y, rect.width, rect.height,
+      rect.x, rect.y, rect.width, rect.height
+    );
+    ctx.restore();
+    scheduleComposite(rect);
+  }
+  clearPreview();
+  strokePoints = [];
+  strokeDirty = null;
+}
+
 function strokeStyleColor(): string {
   return normalizeColor(color);
 }
@@ -1437,22 +1490,9 @@ function onPointerDown(event: PointerEvent): void {
   if (tool === "brush" || tool === "eraser") {
     pendingHistoryLabel = tool === "brush" ? "Brush stroke" : "Eraser stroke";
     drawing = true;
-    const ctx = activeLayer()?.canvas.getContext("2d");
-    if (ctx) {
-      ctx.globalCompositeOperation = tool === "eraser" ? "destination-out" : "source-over";
-      ctx.globalAlpha = brushOpacity / 100;
-      ctx.strokeStyle = strokeStyleColor();
-      ctx.lineWidth = brushSize;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.beginPath();
-      ctx.moveTo(point.x, point.y);
-      ctx.lineTo(point.x + 0.01, point.y + 0.01);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = "source-over";
-    }
-    scheduleComposite(brushBounds(point, point, brushSize / 2 + 1, width, height) ?? undefined);
+    strokePoints = [];
+    strokeDirty = null;
+    addStrokePoint(point);
   } else if (tool === "measure") {
     measurement = { from: point, to: point };
     drawMeasurement();
@@ -1479,23 +1519,9 @@ function onPointerMove(event: PointerEvent): void {
     measurement.to = dragCurrent;
     drawMeasurement();
   } else if (drawing) {
-    const ctx = activeLayer()?.canvas.getContext("2d");
-    if (ctx) {
-      ctx.globalCompositeOperation = dragTool === "eraser" ? "destination-out" : "source-over";
-      ctx.globalAlpha = brushOpacity / 100;
-      ctx.strokeStyle = strokeStyleColor();
-      ctx.lineWidth = brushSize;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.beginPath();
-      ctx.moveTo(dragStart.x, dragStart.y);
-      ctx.lineTo(dragCurrent.x, dragCurrent.y);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = "source-over";
-      scheduleComposite(brushBounds(dragStart, dragCurrent, brushSize / 2 + 1, width, height) ?? undefined);
-      dragStart = dragCurrent;
-    }
+    // Draw the whole stroke at full alpha on the preview canvas, then blend it
+    // into the layer once on pointer-up. Per-segment alpha made overlaps darker.
+    addStrokePoint(dragCurrent);
   }
 }
 
@@ -1532,6 +1558,7 @@ function onPointerUp(event: PointerEvent): void {
     drawMeasurement();
   }
   if (drawing && pendingHistoryLabel) {
+    commitBrushPreview(finishedTool === "eraser");
     invalidateDocument();
     pushHistory(pendingHistoryLabel);
     pendingHistoryLabel = null;
