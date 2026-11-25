@@ -27,9 +27,14 @@ available through Extensions, and their legacy accent tokens now map to the new
 design tokens so extension palettes stay coherent.
 
 The activity rail opens Explorer, Search, Run and Debug, Extensions, Talos
-Chronicle, Talos Observatory, Talos Canvas, and Talos Calc. Source Control is
-shown as unavailable because this build has no Source Control provider. The
-rail can collapse to icons only, and that preference is window-scoped. Drag the
+Chronicle, Talos Observatory, Talos Canvas, and Talos Calc. **Source Control** uses
+the same button to open an integrated Git pane: it discovers the repository,
+shows conflicts, staged changes, and unstaged changes, previews diffs, stages or
+unstages files, commits, switches local branches, ignores paths, and lists recent
+history. Fetch, Pull, and Push use the selected remote only when you press them;
+Git prompts are disabled, so HTTPS remotes need a configured credential helper
+and SSH remotes need a working SSH key. The rail can collapse to icons only, and
+that preference is window-scoped. Drag the
 divider beside the PDF/HTML pane or above the bottom panel to resize it, or
 focus a divider and use the arrow keys (Shift+arrow for larger steps).
 
@@ -380,8 +385,9 @@ Explorer does not send source code to AI or external services.
 
 ### Optional GitHub integration
 
-The **GitHub** tab in Observatory is a separate, opt-in section; Source Control
-remains unavailable because this build is not a Source Control provider. Add a
+The **GitHub** tab in Observatory is a separate, opt-in section for browsing
+repositories through GitHub's API; it does not replace the local Source Control
+pane. Add a
 GitHub personal access token in that tab to browse repositories on the token,
 list issues and pull requests (open, closed, or all), read a conversation and
 its comments, create an issue, comment, close/reopen an item, and merge a pull

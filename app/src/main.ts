@@ -79,6 +79,7 @@ import { chooseWorkspace, initArchitectureExplorer, openQuickOpen, openObservato
 import { currentWorkspace, markWorkspaceIndexing, subscribeWorkspace } from "./workspace";
 import { initCommandPalette, openCommandPalette } from "./command-palette";
 import { collectOutline } from "./outline";
+import { initSourceControl, openSourceControl } from "./source-control";
 import type { OutlineSymbol } from "./outline";
 import { parseLineNumber } from "./editor-navigation";
 import { buildTheme, applyUi, resetUi } from "./theme";
@@ -460,6 +461,7 @@ const SHORTCUTS: Shortcut[] = [
   { id: "view.panel", label: "Toggle bottom panel", keys: "Mod+J", group: "View", run: () => togglePanel() },
   { id: "view.outline", label: "Toggle outline", keys: "Mod+B", group: "View", run: () => toggleOutline() },
   { id: "view.architecture", label: "Architecture explorer", keys: "Mod+Shift+E", group: "View", run: () => $("btn-architecture").click() },
+  { id: "view.source-control", label: "Source Control", keys: "Mod+Shift+G", group: "View", run: () => void guard(openSourceControl) },
   { id: "view.zoom-in", label: "Increase editor font", keys: "Mod+=", group: "View", run: () => adjustEditorFontSize(1) },
   { id: "view.zoom-in-plus", label: "Increase editor font (plus key)", keys: "Mod+Shift+=", group: "View", run: () => adjustEditorFontSize(1) },
   { id: "view.zoom-out", label: "Decrease editor font", keys: "Mod+-", group: "View", run: () => adjustEditorFontSize(-1) },
@@ -2766,6 +2768,7 @@ $("ui-scale").addEventListener("change", () => {
 });
 installGlobalShortcuts();
 initShortcutsUi();
+initSourceControl();
 $("btn-shortcuts").addEventListener("click", openShortcutsDialog);
 void getCurrentWindow()
   .onCloseRequested(async (event) => {
@@ -2778,6 +2781,7 @@ document.addEventListener("talos:side-pane-change", (event) => {
   syncSidePane();
   scheduleEditorMeasure();
 });
+document.addEventListener("talos:source-control-closed", () => setActiveNav("explorer"));
 document.addEventListener("talos:pdf-focus-change", () => {
   scheduleLayoutSync("pdf-focus");
   scheduleEditorMeasure();
@@ -2880,6 +2884,10 @@ for (const button of document.querySelectorAll<HTMLElement>("#activity-bar [data
     switch (view) {
       case "explorer":
         $("btn-architecture").click();
+        setActiveNav(view);
+        break;
+      case "source-control":
+        void guard(openSourceControl);
         setActiveNav(view);
         break;
       case "search":

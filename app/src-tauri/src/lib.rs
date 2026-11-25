@@ -2398,110 +2398,660 @@ fn stop_project_watch(window: tauri::WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 
-/// Absolute last resort for window closing. The renderer calls this from a
-/// watchdog only if destroying the webview fails or times out, so no close
-/// request can leave the application running forever.
-#[derive(serde::Serialize)]
+// ---------- integrated version control ----------
+// All Git work goes through the git CLI so Talos stays offline-first and does
+// not ship another VCS implementation. Network commands only run when the user
+// explicitly presses Fetch, Pull, or Push.
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct GitFileStatus {
     path: String,
     status: String,
     staged: bool,
+    conflict: bool,
+    original_path: Option<String>,
 }
 
-#[tauri::command]
-async fn git_status(root: String) -> Result<Vec<GitFileStatus>, String> {
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GitRepoInfo {
+    root: String,
+    branch: String,
+    upstream: Option<String>,
+    remote: Option<String>,
+    ahead: u32,
+    behind: u32,
+    detached: bool,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GitBranch {
+    name: String,
+    current: bool,
+    upstream: Option<String>,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GitRemote {
+    name: String,
+    url: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GitCommit {
+    hash: String,
+    short_hash: String,
+    subject: String,
+    author: String,
+    date: String,
+}
+
+const MAX_GIT_PATHS: usize = 500;
+const MAX_GIT_PATH_BYTES: usize = 4096;
+const MAX_GIT_PREVIEW_BYTES: usize = 256 * 1024;
+
+fn validate_git_root(root: &str) -> Result<PathBuf, String> {
+    if root.trim().is_empty() || root.len() > MAX_GIT_PATH_BYTES {
+        return Err("Invalid workspace folder for Git".into());
+    }
+    let path = PathBuf::from(root);
+    if !path.is_dir() {
+        return Err("The workspace folder no longer exists".into());
+    }
+    Ok(path)
+}
+
+fn validate_git_paths(paths: Vec<String>) -> Result<Vec<String>, String> {
+    if paths.len() > MAX_GIT_PATHS {
+        return Err(format!("Too many files selected (maximum {MAX_GIT_PATHS})"));
+    }
+    for path in &paths {
+        if path.is_empty()
+            || path.len() > MAX_GIT_PATH_BYTES
+            || path.contains('\0')
+            || path.contains('\n')
+        {
+            return Err("Invalid file path for Git".into());
+        }
+    }
+    Ok(paths)
+}
+
+fn validate_git_ref(name: &str, label: &str) -> Result<String, String> {
+    if name.is_empty()
+        || name.len() > 200
+        || name.starts_with('-')
+        || name.contains('\0')
+        || name.contains('\n')
+        || name.contains("..")
+    {
+        return Err(format!("Invalid Git {label}"));
+    }
+    Ok(name.to_string())
+}
+
+fn relative_git_path(path: &str) -> Result<PathBuf, String> {
+    if path.is_empty() || path.len() > MAX_GIT_PATH_BYTES || path.contains('\0') {
+        return Err("Invalid repository-relative path".into());
+    }
+    let relative = Path::new(path);
+    if relative.is_absolute() {
+        return Err("Only repository-relative paths are supported".into());
+    }
+    for component in relative.components() {
+        if !matches!(component, Component::Normal(_) | Component::CurDir) {
+            return Err("Only repository-relative paths are supported".into());
+        }
+    }
+    Ok(relative.to_path_buf())
+}
+
+fn contained_git_file_in(base_dir: &Path, path: &str) -> Result<PathBuf, String> {
+    let base = fs::canonicalize(base_dir)
+        .map_err(|error| format!("could not resolve repository folder: {error}"))?;
+    let joined = base.join(relative_git_path(path)?);
+    match fs::canonicalize(&joined) {
+        Ok(canonical) if canonical.starts_with(&base) => Ok(canonical),
+        Ok(_) => Err("Path escapes the repository folder".into()),
+        Err(_) if joined.starts_with(&base) => Ok(joined),
+        Err(_) => Err("Path escapes the repository folder".into()),
+    }
+}
+
+fn git_toplevel(root: &str) -> Result<PathBuf, String> {
+    let root = validate_git_root(root)?;
     let output = Command::new("git")
         .arg("-C")
         .arg(&root)
-        .arg("status")
-        .arg("--porcelain")
-        .arg("-uall")
+        .arg("rev-parse")
+        .arg("--show-toplevel")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_OPTIONAL_LOCKS", "0")
         .output()
         .map_err(|error| format!("could not run git: {error}"))?;
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("git status failed: {stderr}"));
+        return Err("No Git repository found at this workspace".into());
     }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut result = Vec::new();
-    for line in stdout.lines() {
-        if line.len() < 4 {
-            continue;
+    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if text.is_empty() {
+        return Err("Git returned an empty repository path".into());
+    }
+    Ok(PathBuf::from(text))
+}
+
+// Every path-oriented command runs from the repository root. Git's porcelain
+// status reports repository-relative paths, so using a nested workspace root
+// here would make stage/unstage/diff resolve those paths from the wrong folder.
+fn git_command(root: &str) -> Result<Command, String> {
+    let toplevel = git_toplevel(root)?;
+    let mut cmd = Command::new("git");
+    cmd.arg("-C")
+        .arg(toplevel)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_OPTIONAL_LOCKS", "0");
+    Ok(cmd)
+}
+
+fn git_failure(action: &str, output: &std::process::Output) -> String {
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let detail = if stderr.is_empty() { stdout } else { stderr };
+    format!("{action} failed: {detail}")
+}
+
+fn run_git(mut cmd: Command, action: &str) -> Result<String, String> {
+    let output = cmd.output().map_err(|error| format!("could not run git: {error}"))?;
+    if !output.status.success() {
+        return Err(git_failure(action, &output));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+fn run_git_combined(mut cmd: Command, action: &str) -> Result<String, String> {
+    let output = cmd.output().map_err(|error| format!("could not run git: {error}"))?;
+    if !output.status.success() {
+        return Err(git_failure(action, &output));
+    }
+    let mut result = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stderr.is_empty() {
+        if !result.is_empty() {
+            result.push('\n');
         }
-        let staged_char = line.chars().next().unwrap_or(' ');
-        let unstaged_char = line.chars().nth(1).unwrap_or(' ');
-        let path = line[3..].to_string();
-        let path = if path.contains(" -> ") {
-            path.split(" -> ").last().unwrap_or(&path).to_string()
-        } else {
-            path
-        };
-
-        let (status, staged) = if staged_char != ' ' && staged_char != '?' {
-            let s = match staged_char {
-                'M' => "modified",
-                'A' => "added",
-                'D' => "deleted",
-                'R' => "renamed",
-                'C' => "copied",
-                _ => "modified",
-            };
-            (s.to_string(), true)
-        } else {
-            let s = match unstaged_char {
-                'M' => "modified",
-                'D' => "deleted",
-                '?' => "untracked",
-                _ => "modified",
-            };
-            (s.to_string(), false)
-        };
-
-        let (status, staged) = if staged_char != ' ' && unstaged_char != ' ' && unstaged_char != '?' {
-            ("modified".to_string(), false)
-        } else {
-            (status, staged)
-        };
-
-        result.push(GitFileStatus { path, status, staged });
+        result.push_str(&stderr);
     }
     Ok(result)
 }
 
+fn git_status_label(code: char) -> &'static str {
+    match code {
+        'A' => "added",
+        'D' => "deleted",
+        'R' => "renamed",
+        'C' => "copied",
+        'T' => "type changed",
+        '?' => "untracked",
+        '!' => "ignored",
+        'M' => "modified",
+        _ => "modified",
+    }
+}
+
+fn parse_git_status(bytes: &[u8]) -> Vec<GitFileStatus> {
+    let mut result = Vec::new();
+    let mut records = bytes.split(|byte| *byte == 0).peekable();
+    while let Some(record) = records.next() {
+        if record.len() < 3 {
+            continue;
+        }
+        let staged_code = record[0] as char;
+        let worktree_code = record[1] as char;
+        if staged_code == '!' && worktree_code == '!' {
+            continue;
+        }
+        let path = String::from_utf8_lossy(&record[3..]).into_owned();
+        if path.is_empty() {
+            continue;
+        }
+        let original_path = if matches!(staged_code, 'R' | 'C') || matches!(worktree_code, 'R' | 'C') {
+            records
+                .next()
+                .map(|value| String::from_utf8_lossy(value).into_owned())
+                .filter(|value| !value.is_empty())
+        } else {
+            None
+        };
+        let conflict = staged_code == 'U'
+            || worktree_code == 'U'
+            || (staged_code == 'A' && worktree_code == 'A')
+            || (staged_code == 'D' && worktree_code == 'D');
+        if conflict {
+            result.push(GitFileStatus {
+                path,
+                status: "conflict".into(),
+                staged: false,
+                conflict: true,
+                original_path,
+            });
+            continue;
+        }
+        if staged_code != ' ' && staged_code != '?' {
+            result.push(GitFileStatus {
+                path: path.clone(),
+                status: git_status_label(staged_code).into(),
+                staged: true,
+                conflict: false,
+                original_path: original_path.clone(),
+            });
+        }
+        if worktree_code != ' ' {
+            result.push(GitFileStatus {
+                path,
+                status: git_status_label(worktree_code).into(),
+                staged: false,
+                conflict: false,
+                original_path,
+            });
+        }
+    }
+    result
+}
+
+fn parse_git_log(text: &str) -> Vec<GitCommit> {
+    text.split('\x1e')
+        .filter_map(|record| {
+            let record = record.trim_matches('\n').trim();
+            if record.is_empty() {
+                return None;
+            }
+            let mut fields = record.split('\x1f');
+            let hash = fields.next().unwrap_or_default().to_string();
+            if hash.is_empty() {
+                return None;
+            }
+            Some(GitCommit {
+                short_hash: fields.next().unwrap_or_default().to_string(),
+                subject: fields.next().unwrap_or("(no subject)").to_string(),
+                author: fields.next().unwrap_or("unknown").to_string(),
+                date: fields.next().unwrap_or_default().to_string(),
+                hash,
+            })
+        })
+        .collect()
+}
+
+#[tauri::command]
+async fn git_status(root: String) -> Result<Vec<GitFileStatus>, String> {
+    let mut cmd = git_command(&root)?;
+    cmd.arg("status").arg("--porcelain=v1").arg("-z").arg("-uall");
+    let output = cmd.output().map_err(|error| format!("could not run git: {error}"))?;
+    if !output.status.success() {
+        return Err(git_failure("git status", &output));
+    }
+    Ok(parse_git_status(&output.stdout))
+}
+
+#[tauri::command]
+async fn git_repo_info(root: String) -> Result<Option<GitRepoInfo>, String> {
+    let root_path = validate_git_root(&root)?;
+    let mut probe = Command::new("git");
+    probe
+        .arg("-C")
+        .arg(&root_path)
+        .arg("rev-parse")
+        .arg("--is-inside-work-tree")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_OPTIONAL_LOCKS", "0");
+    match probe.output() {
+        Ok(output) if output.status.success() => {}
+        Ok(_) => return Ok(None),
+        Err(error) => return Err(format!("could not run git: {error}")),
+    }
+
+    let toplevel = git_toplevel(&root)?;
+
+    let mut branch_cmd = git_command(&root)?;
+    branch_cmd.arg("symbolic-ref").arg("--short").arg("HEAD");
+    let (branch, detached) = match branch_cmd.output() {
+        Ok(output) if output.status.success() => {
+            (String::from_utf8_lossy(&output.stdout).trim().to_string(), false)
+        }
+        _ => {
+            let mut hash_cmd = git_command(&root)?;
+            hash_cmd.arg("rev-parse").arg("--short").arg("HEAD");
+            let hash = run_git(hash_cmd, "git rev-parse")?.trim().to_string();
+            (format!("detached@{hash}"), true)
+        }
+    };
+
+    let mut upstream_cmd = git_command(&root)?;
+    upstream_cmd
+        .arg("rev-parse")
+        .arg("--abbrev-ref")
+        .arg("--symbolic-full-name")
+        .arg("@{u}");
+    let upstream = upstream_cmd
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+        .filter(|value| !value.is_empty());
+
+    let mut remote = None;
+    if !detached {
+        let mut remote_cmd = git_command(&root)?;
+        remote_cmd
+            .arg("config")
+            .arg("--get")
+            .arg(format!("branch.{branch}.remote"));
+        remote = remote_cmd
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+            .filter(|value| !value.is_empty());
+    }
+    if remote.is_none() {
+        let mut remotes_cmd = git_command(&root)?;
+        remotes_cmd.arg("remote");
+        remote = run_git(remotes_cmd, "git remote")
+            .ok()
+            .and_then(|text| text.lines().next().map(str::to_string))
+            .filter(|value| !value.is_empty());
+    }
+
+    let (mut ahead, mut behind) = (0u32, 0u32);
+    if upstream.is_some() {
+        let mut count_cmd = git_command(&root)?;
+        count_cmd.arg("rev-list").arg("--left-right").arg("--count").arg("HEAD...@{u}");
+        if let Ok(counts) = run_git(count_cmd, "git rev-list") {
+            let mut values = counts.split_whitespace();
+            ahead = values.next().and_then(|value| value.parse().ok()).unwrap_or(0);
+            behind = values.next().and_then(|value| value.parse().ok()).unwrap_or(0);
+        }
+    }
+
+    Ok(Some(GitRepoInfo {
+        root: toplevel.to_string_lossy().into_owned(),
+        branch,
+        upstream,
+        remote,
+        ahead,
+        behind,
+        detached,
+    }))
+}
+
+#[tauri::command]
+async fn git_branches(root: String) -> Result<Vec<GitBranch>, String> {
+    let mut cmd = git_command(&root)?;
+    cmd.arg("for-each-ref")
+        .arg("--format=%(refname:short)%09%(HEAD)%09%(upstream:short)")
+        .arg("refs/heads");
+    let text = run_git(cmd, "git branch")?;
+    Ok(text
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.splitn(3, '\t');
+            let name = fields.next()?.to_string();
+            if name.is_empty() {
+                return None;
+            }
+            let current = fields.next() == Some("*");
+            let upstream = fields
+                .next()
+                .map(str::to_string)
+                .filter(|value| !value.is_empty());
+            Some(GitBranch {
+                name,
+                current,
+                upstream,
+            })
+        })
+        .collect())
+}
+
+#[tauri::command]
+async fn git_checkout(root: String, branch: String) -> Result<String, String> {
+    let branch = validate_git_ref(&branch, "branch")?;
+    let mut cmd = git_command(&root)?;
+    cmd.arg("switch").arg("--").arg(branch);
+    run_git_combined(cmd, "git switch")
+}
+
+#[tauri::command]
+async fn git_remotes(root: String) -> Result<Vec<GitRemote>, String> {
+    let mut names_cmd = git_command(&root)?;
+    names_cmd.arg("remote");
+    let names = run_git(names_cmd, "git remote")?;
+    let mut result = Vec::new();
+    for name in names.lines().filter(|value| !value.is_empty()).take(50) {
+        let mut url_cmd = git_command(&root)?;
+        url_cmd.arg("config").arg("--get").arg(format!("remote.{name}.url"));
+        let url = run_git(url_cmd, "git config")
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        result.push(GitRemote {
+            name: name.to_string(),
+            url,
+        });
+    }
+    Ok(result)
+}
+
+async fn git_sync_command(
+    root: &str,
+    remote: Option<String>,
+    branch: Option<String>,
+    verb: &str,
+) -> Result<String, String> {
+    let mut cmd = git_command(root)?;
+    cmd.arg(verb).arg("--no-edit");
+    if let Some(remote) = remote {
+        cmd.arg("--").arg(validate_git_ref(&remote, "remote")?);
+        if let Some(branch) = branch {
+            cmd.arg(validate_git_ref(&branch, "branch")?);
+        }
+    }
+    run_git_combined(cmd, &format!("git {verb}"))
+}
+
+#[tauri::command]
+async fn git_fetch(root: String, remote: Option<String>) -> Result<String, String> {
+    let mut cmd = git_command(&root)?;
+    cmd.arg("fetch").arg("--prune");
+    if let Some(remote) = remote {
+        cmd.arg("--").arg(validate_git_ref(&remote, "remote")?);
+    }
+    run_git_combined(cmd, "git fetch")
+}
+
+#[tauri::command]
+async fn git_pull(root: String, remote: Option<String>, branch: Option<String>) -> Result<String, String> {
+    git_sync_command(&root, remote, branch, "pull").await
+}
+
+#[tauri::command]
+async fn git_push(root: String, remote: Option<String>, branch: Option<String>) -> Result<String, String> {
+    let mut cmd = git_command(&root)?;
+    cmd.arg("push");
+    if let Some(remote) = remote {
+        cmd.arg("--").arg(validate_git_ref(&remote, "remote")?);
+        if let Some(branch) = branch {
+            cmd.arg(validate_git_ref(&branch, "branch")?);
+        }
+    }
+    run_git_combined(cmd, "git push")
+}
+
+#[tauri::command]
+async fn git_log(root: String, limit: Option<usize>) -> Result<Vec<GitCommit>, String> {
+    let limit = limit.unwrap_or(12).clamp(1, 100);
+    let mut cmd = git_command(&root)?;
+    cmd.arg("log")
+        .arg("-n")
+        .arg(limit.to_string())
+        .arg("--date=short")
+        .arg("--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ad%x1e");
+    Ok(parse_git_log(&run_git(cmd, "git log")?))
+}
+
+#[tauri::command]
+async fn git_commit_diff(root: String, hash: String) -> Result<String, String> {
+    if hash.is_empty()
+        || hash.len() > 64
+        || !hash.chars().all(|value| value.is_ascii_hexdigit())
+    {
+        return Err("Invalid commit hash".into());
+    }
+    let mut cmd = git_command(&root)?;
+    cmd.arg("show")
+        .arg("--no-ext-diff")
+        .arg("--format=fuller")
+        .arg("--no-color")
+        .arg(hash);
+    run_git(cmd, "git show")
+}
+
 #[tauri::command]
 async fn git_stage(root: String, paths: Vec<String>) -> Result<(), String> {
+    let paths = validate_git_paths(paths)?;
     if paths.is_empty() {
         return Ok(());
     }
-    let mut cmd = Command::new("git");
-    cmd.arg("-C").arg(&root).arg("add");
-    for path in &paths {
-        cmd.arg(path);
-    }
-    let output = cmd.output().map_err(|error| format!("could not run git: {error}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("git add failed: {stderr}"));
-    }
+    let mut cmd = git_command(&root)?;
+    cmd.arg("add").arg("--").args(paths);
+    run_git(cmd, "git add")?;
     Ok(())
 }
 
 #[tauri::command]
 async fn git_unstage(root: String, paths: Vec<String>) -> Result<(), String> {
+    let paths = validate_git_paths(paths)?;
     if paths.is_empty() {
         return Ok(());
     }
-    let mut cmd = Command::new("git");
-    cmd.arg("-C").arg(&root).arg("restore").arg("--staged");
-    for path in &paths {
-        cmd.arg(path);
+    let mut restore = git_command(&root)?;
+    restore.arg("restore").arg("--staged").arg("--").args(&paths);
+    if restore.output().is_ok_and(|output| output.status.success()) {
+        return Ok(());
     }
-    let output = cmd.output().map_err(|error| format!("could not run git: {error}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("git restore --staged failed: {stderr}"));
-    }
+    // A newly added file in a repository with no commits cannot be restored
+    // from HEAD. Removing it from the index keeps the working file untouched.
+    let mut cached = git_command(&root)?;
+    cached.arg("rm").arg("--cached").arg("--").args(paths);
+    run_git(cached, "git restore --staged")?;
     Ok(())
+}
+
+#[tauri::command]
+async fn git_discard(root: String, paths: Vec<String>) -> Result<(), String> {
+    let paths = validate_git_paths(paths)?;
+    if paths.is_empty() {
+        return Ok(());
+    }
+    let mut cmd = git_command(&root)?;
+    cmd.arg("restore").arg("--").args(paths);
+    run_git(cmd, "git restore")?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn git_ignore(root: String, paths: Vec<String>) -> Result<usize, String> {
+    let paths = validate_git_paths(paths)?;
+    if paths.is_empty() {
+        return Ok(0);
+    }
+    let mut normalized = Vec::new();
+    for path in paths {
+        let relative = relative_git_path(&path)?;
+        let entry = relative.to_string_lossy().trim().to_string();
+        if !entry.is_empty() && !normalized.contains(&entry) {
+            normalized.push(entry);
+        }
+    }
+    let toplevel = git_toplevel(&root)?;
+    let file_path = contained_git_file_in(&toplevel, ".gitignore")?;
+    let _guard = FILE_WRITE_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut existing = fs::read_to_string(&file_path).unwrap_or_default();
+    let mut added = 0usize;
+    for entry in normalized {
+        if existing.lines().any(|line| line.trim() == entry) {
+            continue;
+        }
+        if !existing.is_empty() && !existing.ends_with('\n') {
+            existing.push('\n');
+        }
+        existing.push_str(&entry);
+        existing.push('\n');
+        added += 1;
+    }
+    if added > 0 {
+        fs::write(&file_path, existing)
+            .map_err(|error| format!("could not update .gitignore: {error}"))?;
+    }
+    Ok(added)
+}
+
+#[tauri::command]
+async fn git_init(root: String) -> Result<String, String> {
+    let root = validate_git_root(&root)?;
+    let output = Command::new("git")
+        .arg("init")
+        .arg(root)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .output()
+        .map_err(|error| format!("could not run git: {error}"))?;
+    if !output.status.success() {
+        return Err(git_failure("git init", &output));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+#[tauri::command]
+async fn git_diff(root: String, path: String, staged: Option<bool>) -> Result<String, String> {
+    let path = validate_git_paths(vec![path])?
+        .pop()
+        .ok_or("Invalid file path for Git")?;
+    let mut cmd = git_command(&root)?;
+    cmd.arg("diff").arg("--no-ext-diff").arg("--no-color");
+    if staged.unwrap_or(false) {
+        cmd.arg("--cached");
+    }
+    cmd.arg("--").arg(path);
+    run_git(cmd, "git diff")
+}
+
+#[tauri::command]
+async fn git_file_preview(root: String, path: String) -> Result<String, String> {
+    let toplevel = git_toplevel(&root)?;
+    let file = contained_git_file_in(&toplevel, &path)?;
+    let bytes = fs::read(&file).map_err(|error| format!("could not read file: {error}"))?;
+    if bytes.contains(&0) {
+        return Ok(format!("Binary file: {path}\nOpen it in the file viewer for a hex preview."));
+    }
+    let take = bytes.len().min(MAX_GIT_PREVIEW_BYTES);
+    let text = String::from_utf8_lossy(&bytes[..take]);
+    let lines = text.lines().collect::<Vec<_>>();
+    let body = lines
+        .iter()
+        .map(|line| format!("+{line}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let truncated = if bytes.len() > take {
+        "\n… preview truncated …"
+    } else {
+        ""
+    };
+    Ok(format!(
+        "--- /dev/null\n+++ b/{path}\n@@ -0,0 +1,{} @@\n{body}{truncated}",
+        lines.len()
+    ))
 }
 
 #[tauri::command]
@@ -2509,37 +3059,9 @@ async fn git_commit(root: String, message: String) -> Result<String, String> {
     if message.trim().is_empty() {
         return Err("Commit message cannot be empty".into());
     }
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(&root)
-        .arg("commit")
-        .arg("-m")
-        .arg(&message)
-        .output()
-        .map_err(|error| format!("could not run git: {error}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("git commit failed: {stderr}"));
-    }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(stdout.to_string())
-}
-
-#[tauri::command]
-async fn git_diff(root: String, path: String) -> Result<String, String> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(&root)
-        .arg("diff")
-        .arg("--")
-        .arg(&path)
-        .output()
-        .map_err(|error| format!("could not run git: {error}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("git diff failed: {stderr}"));
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let mut cmd = git_command(&root)?;
+    cmd.arg("commit").arg("-m").arg(message);
+    run_git_combined(cmd, "git commit")
 }
 
 #[tauri::command]
@@ -4547,6 +5069,75 @@ mod tests {
         assert!(elapsed < Duration::from_secs(15));
         fs::remove_dir_all(root).unwrap();
     }
+
+    #[test]
+    fn git_porcelain_status_keeps_staged_and_unstaged_sides() {
+        let bytes = b"AM both.txt\0R  new.txt\0old.txt\0?? fresh.txt\0UU merge.txt\0!! ignored.log\0";
+        let entries = parse_git_status(bytes);
+        assert_eq!(entries.len(), 5);
+
+        let staged = entries.iter().find(|entry| entry.path == "both.txt" && entry.staged).unwrap();
+        assert_eq!(staged.status, "added");
+        let unstaged = entries.iter().find(|entry| entry.path == "both.txt" && !entry.staged).unwrap();
+        assert_eq!(unstaged.status, "modified");
+
+        let renamed = entries.iter().find(|entry| entry.path == "new.txt").unwrap();
+        assert_eq!(renamed.status, "renamed");
+        assert_eq!(renamed.original_path.as_deref(), Some("old.txt"));
+
+        let untracked = entries.iter().find(|entry| entry.path == "fresh.txt").unwrap();
+        assert_eq!(untracked.status, "untracked");
+        let conflict = entries.iter().find(|entry| entry.path == "merge.txt").unwrap();
+        assert!(conflict.conflict);
+        assert!(!entries.iter().any(|entry| entry.path == "ignored.log"));
+    }
+
+    #[test]
+    fn git_log_parser_reads_commit_fields() {
+        let text = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x1faaaaaaa\x1fFix Git pane\x1fArman\x1f2026-11-25\x1e";
+        let commits = parse_git_log(text);
+        assert_eq!(commits.len(), 1);
+        assert_eq!(commits[0].hash, "a".repeat(40));
+        assert_eq!(commits[0].short_hash, "aaaaaaa");
+        assert_eq!(commits[0].subject, "Fix Git pane");
+        assert_eq!(commits[0].author, "Arman");
+        assert_eq!(commits[0].date, "2026-11-25");
+    }
+
+    #[test]
+    fn git_paths_and_refs_reject_escapes() {
+        assert!(relative_git_path("../outside").is_err());
+        assert!(relative_git_path("/etc/passwd").is_err());
+        assert!(relative_git_path("src/main.ts").is_ok());
+        assert!(validate_git_ref("--upload-pack=x", "remote").is_err());
+        assert!(validate_git_ref("origin", "remote").is_ok());
+    }
+
+    #[test]
+    fn git_toplevel_resolves_a_nested_workspace() {
+        let root = std::env::temp_dir().join(format!(
+            "talos-git-root-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let nested = root.join("packages").join("app");
+        fs::create_dir_all(&nested).unwrap();
+        let init = Command::new("git")
+            .arg("init")
+            .arg("-q")
+            .arg(&root)
+            .output()
+            .expect("git must be available for Git integration tests");
+        assert!(init.status.success());
+        assert_eq!(
+            git_toplevel(nested.to_str().unwrap()).unwrap(),
+            fs::canonicalize(&root).unwrap()
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -4589,10 +5180,23 @@ pub fn run() {
             watch_project,
             stop_project_watch,
             git_status,
+            git_repo_info,
+            git_branches,
+            git_checkout,
+            git_remotes,
+            git_fetch,
+            git_pull,
+            git_push,
+            git_log,
+            git_commit_diff,
             git_stage,
             git_unstage,
+            git_discard,
+            git_ignore,
+            git_init,
             git_commit,
             git_diff,
+            git_file_preview,
             force_quit,
             github::github_token_status,
             github::github_set_token,

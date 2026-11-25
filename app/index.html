@@ -160,6 +160,32 @@
       .outline-row:hover { background: var(--panel); }
       .outline-kind { width: 12px; color: var(--accent); font-size: 10px; text-align: center; }
       .outline-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #source-control-pane { width: var(--side-pane-size); min-width: 260px; border-left: 1px solid var(--line); display: flex; flex-direction: column; background: var(--bg); }
+      #source-control-bar { display: flex; align-items: center; gap: 6px; padding: 7px 9px; background: var(--panel); border-bottom: 1px solid var(--line); }
+      #source-control-bar strong { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+      #sc-branch, #sc-remote { max-width: 138px; }
+      #sc-sync { color: var(--muted); font: 11px var(--mono-font); white-space: nowrap; }
+      #sc-repo { padding: 6px 9px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+      #sc-toolbar, #sc-commit-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+      #sc-toolbar button, #sc-commit-actions button { min-height: 26px; padding: 3px 8px; font-size: 11px; }
+      #sc-message { display: block; width: calc(100% - 16px); min-height: 58px; margin: 8px; padding: 7px; resize: vertical; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-sm); font: 12px/1.4 var(--ui-font); }
+      #sc-status { min-height: 18px; padding: 0 9px 6px; color: var(--muted); font-size: 11px; }
+      #sc-sections { flex: 1 1 auto; min-height: 0; overflow: auto; padding-bottom: 8px; }
+      .sc-section { border-top: 1px solid var(--line); }
+      .sc-section h3 { position: sticky; top: 0; z-index: 1; margin: 0; padding: 6px 9px; background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+      .sc-empty { padding: 8px 9px; color: var(--muted); font-size: 11px; }
+      .sc-row { display: flex; align-items: center; gap: 6px; min-height: 30px; padding: 3px 8px; border-bottom: 1px solid var(--line); }
+      .sc-row:hover, .sc-row.selected { background: var(--panel); }
+      .sc-row.conflict .sc-status { color: var(--danger); }
+      .sc-status { flex: 0 0 12px; color: var(--warning); font-size: 11px; text-align: center; }
+      .sc-path { flex: 1 1 auto; min-width: 0; padding: 0; overflow: hidden; border: 0; background: transparent; color: var(--text); font: 11px var(--editor-font); text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+      .sc-badge { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
+      .sc-actions { flex: 0 0 auto; display: flex; gap: 3px; }
+      .sc-actions button { min-width: 24px; min-height: 22px; padding: 0 5px; font-size: 10px; }
+      #sc-diff { flex: 0 0 42%; min-height: 120px; display: flex; flex-direction: column; border-top: 1px solid var(--line); background: var(--panel); }
+      #sc-diff-bar { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-bottom: 1px solid var(--line); font-size: 11px; }
+      #sc-diff-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #sc-diff-text { flex: 1 1 auto; min-height: 0; margin: 0; padding: 8px; overflow: auto; white-space: pre; color: var(--text); font: 11px/1.5 var(--mono-font); }
       #side-splitter, #panel-splitter { position: relative; z-index: 2; background: var(--line); flex: 0 0 auto; touch-action: none; }
       #side-splitter { width: 5px; cursor: col-resize; }
       #panel-splitter { height: 5px; cursor: row-resize; }
@@ -592,6 +618,7 @@
         .cm-editor { font-size: var(--editor-font-size, 15px); }
         #main.side-pane-open > .side-pane { min-width: 0; min-height: 160px; }
         #outline-pane { width: 100%; min-width: 0; border-left: 0; border-top: 1px solid var(--line); }
+        #source-control-pane { width: 100%; min-width: 0; border-left: 0; border-top: 1px solid var(--line); }
         #side-splitter { width: auto; height: 5px; cursor: row-resize; }
         #pdf-pane {
           width: 100%;
@@ -980,6 +1007,57 @@
                   referrerpolicy="no-referrer"
                 ></iframe>
                 <div id="preview-console" class="hidden" role="log" aria-label="Preview console"></div>
+              </div>
+            </aside>
+            <aside id="source-control-pane" class="side-pane hidden" aria-label="Source Control">
+              <div id="source-control-bar">
+                <strong>Source Control</strong>
+                <select id="sc-branch" class="mini" title="Switch branch" aria-label="Switch branch"></select>
+                <span id="sc-sync" title="Commits ahead / behind upstream">↑0 ↓0</span>
+                <button id="sc-refresh" class="mini" title="Refresh Git status" aria-label="Refresh Git status">Refresh</button>
+                <button id="sc-close" class="mini" aria-label="Close Source Control">×</button>
+              </div>
+              <div id="sc-repo" role="status">No repository detected</div>
+              <div id="sc-toolbar" role="toolbar" aria-label="Repository actions">
+                <button id="sc-stage-all" title="Stage all changes">Stage All</button>
+                <button id="sc-unstage-all" title="Unstage all changes">Unstage All</button>
+                <select id="sc-remote" class="mini" aria-label="Git remote"></select>
+                <button id="sc-fetch" title="Fetch from the selected remote">Fetch</button>
+                <button id="sc-pull" title="Pull from the selected remote">Pull</button>
+                <button id="sc-push" title="Push to the selected remote">Push</button>
+                <button id="sc-init" class="hidden" title="Initialize a Git repository here">Initialize</button>
+              </div>
+              <label class="sr-only" for="sc-message">Commit message</label>
+              <textarea id="sc-message" rows="3" placeholder="Commit message (Ctrl+Enter to commit)"></textarea>
+              <div id="sc-commit-actions">
+                <button id="sc-commit" class="accent" title="Commit staged changes">Commit</button>
+              </div>
+              <div id="sc-status" role="status"></div>
+              <div id="sc-sections">
+                <section class="sc-section">
+                  <h3>Merge Conflicts</h3>
+                  <div id="sc-conflicts"></div>
+                </section>
+                <section class="sc-section">
+                  <h3>Staged Changes</h3>
+                  <div id="sc-staged"></div>
+                </section>
+                <section class="sc-section">
+                  <h3>Changes</h3>
+                  <div id="sc-changes"></div>
+                </section>
+                <section class="sc-section">
+                  <h3>History</h3>
+                  <div id="sc-history"></div>
+                </section>
+              </div>
+              <div id="sc-diff" class="hidden">
+                <div id="sc-diff-bar">
+                  <span id="sc-diff-name"></span>
+                  <button id="sc-diff-open" class="mini" title="Open this file in the editor">Open</button>
+                  <button id="sc-diff-close" class="mini" aria-label="Close diff">×</button>
+                </div>
+                <pre id="sc-diff-text" aria-label="Diff preview"></pre>
               </div>
             </aside>
           </div>

@@ -3,15 +3,17 @@
 These builds are offline after download. The extension catalogue, snippets,
 themes, and language grammars are bundled in the artifact. No account,
 telemetry, cloud service, or internet connection is required to use Talos. The
-optional **Observatory → GitHub** tab is the only part that can use the
-internet, and only after you supply a personal access token and ask it to load
-data; everything else remains fully offline.
+optional **Observatory → GitHub** tab and Source Control's Fetch/Pull/Push
+buttons use the internet only when you explicitly ask them to; everything else
+remains fully offline.
 
 From a repository checkout, run `./scripts/verify-release.sh` to check every
 published hash below, including the newest timestamped copy of each artifact.
 Desktop runs also accept typed input in the Output panel, so programs that call
 `input()` work instead of failing with EOF. An interface-size selector keeps
 shell text and controls readable without changing the editor's monospace font.
+The Source Control button now opens an integrated Git pane with status, diffs,
+staging, commits, branches, history, and explicit remote sync.
 
 ## Linux
 
@@ -24,7 +26,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`3879bc85336a46dc128e1ef8a7a10aea4539a9f1a21f90f7fb59108af1b798ea`
+`8ec5ea19ac54e4aae4615b0f41bf913b8b290d370143334a2342c228ab016d1b`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -41,7 +43,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`b8b71320c2cd92192eb28e7eb13d810fc4bc7945b8feeff1c08ab236156666e2`
+`0e3971e5145c6dd79781848175768b8d9f5a69cb889f17f8ea1fb2bc8728eacd`
 
 ## Android
 
@@ -52,7 +54,7 @@ File: `android/TalosCrest-Android-universal.apk`
 - The terminal is desktop-only; the editor, file browser, and binary preview are local.
 
 SHA-256:
-`51aa3810d29e11ccb6eabdf5c3bc228b8f99e247404ac01f74df2cbd1ec50b44`
+`6885cbba82448a4a19967ea2b72f4f61551d357beaf1b93d390052633209b544`
 
 ## Optional GitHub access
 
