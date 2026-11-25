@@ -343,9 +343,9 @@ function isInsightMode(value: string): value is InsightMode {
   return value === "performance" || value === "sandbox" || value === "debt";
 }
 
-function setExplorerOpen(open: boolean, notify = true) {
+function setExplorerOpen(open: boolean, notify = true, persist = true) {
   explorerOpen = open;
-  setWindowValue("talos.explorer-open", String(open));
+  if (persist) setWindowValue("talos.explorer-open", String(open));
   $("architecture").classList.toggle("hidden", !open);
   document.body.classList.toggle("explorer-open", open);
   if (!open) {
@@ -2577,6 +2577,13 @@ export function initArchitectureExplorer(
     else void refreshTree(scan.root);
   };
   $("btn-architecture").addEventListener("click", showArchitecture);
+  // Source Control replaces the Explorer in the sidebar slot. main.ts asks us
+  // to hide/restore it without persisting the temporary state or firing the
+  // normal close event (which would fight the active rail button).
+  document.addEventListener("talos:explorer-visibility", (event) => {
+    const detail = (event as CustomEvent<{ open: boolean }>).detail;
+    setExplorerOpen(detail.open, false, false);
+  });
   const closeExplorer = () => setExplorerOpen(false);
   $("arch-close").addEventListener("click", closeExplorer);
   $("arch-close-docked").addEventListener("click", closeExplorer);

@@ -156,6 +156,7 @@ let layoutSignature = "";
 // this event so layout/run handlers can stay out of the way.
 let sourceControlBusy = false;
 let previousNavBeforeSourceControl: string | null = null;
+let explorerWasOpenBeforeSourceControl = false;
 document.addEventListener("talos:source-control-busy", (event) => {
   sourceControlBusy = (event as CustomEvent<boolean>).detail === true;
 });
@@ -2796,6 +2797,7 @@ document.addEventListener("talos:side-pane-change", (event) => {
   scheduleEditorMeasure();
 });
 document.addEventListener("talos:source-control-closed", () => {
+  if (explorerWasOpenBeforeSourceControl) setExplorerVisible(true);
   setActiveNav(previousNavBeforeSourceControl ?? "explorer");
   previousNavBeforeSourceControl = null;
   syncSidePane();
@@ -2869,6 +2871,12 @@ function setActiveNav(view: string) {
   }
 }
 
+function setExplorerVisible(open: boolean): void {
+  document.dispatchEvent(
+    new CustomEvent<{ open: boolean }>("talos:explorer-visibility", { detail: { open } })
+  );
+}
+
 updateWorkspaceLabel();
 document.addEventListener("talos:workspace-change", updateWorkspaceLabel);
 document.addEventListener("talos:open-path", (event) => {
@@ -2902,6 +2910,9 @@ for (const button of document.querySelectorAll<HTMLElement>("#activity-bar [data
     }
     switch (view) {
       case "explorer":
+        if (!$("source-control-pane").classList.contains("hidden")) {
+          ($("sc-close") as HTMLButtonElement).click();
+        }
         $("btn-architecture").click();
         setActiveNav(view);
         break;
@@ -2913,6 +2924,8 @@ for (const button of document.querySelectorAll<HTMLElement>("#activity-bar [data
         }
         previousNavBeforeSourceControl =
           document.querySelector<HTMLElement>("#activity-bar [data-view].active")?.dataset.view ?? "explorer";
+        explorerWasOpenBeforeSourceControl = !$("architecture").classList.contains("hidden");
+        if (explorerWasOpenBeforeSourceControl) setExplorerVisible(false);
         void guard(openSourceControl);
         setActiveNav(view);
         break;

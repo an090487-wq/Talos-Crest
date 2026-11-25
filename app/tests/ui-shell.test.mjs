@@ -64,6 +64,17 @@ test("adaptive layout uses width and height, with a user override and safe clamp
   assert.match(canvas, /addEventListener\("resize"/);
 });
 
+test("Source Control replaces the Explorer in the sidebar slot", () => {
+  assert.match(main, /let explorerWasOpenBeforeSourceControl = false;/);
+  assert.match(main, /function setExplorerVisible\(open: boolean\): void \{/);
+  assert.match(main, /new CustomEvent<\{ open: boolean \}>\("talos:explorer-visibility"/);
+  assert.match(main, /case "explorer":[\s\S]{0,300}\$\("sc-close"\) as HTMLButtonElement\)\.click\(\);/);
+  assert.match(main, /case "source-control": \{[\s\S]{0,700}if \(explorerWasOpenBeforeSourceControl\) setExplorerVisible\(false\);/);
+  assert.match(main, /talos:source-control-closed[\s\S]{0,180}if \(explorerWasOpenBeforeSourceControl\) setExplorerVisible\(true\);/);
+  assert.match(architecture, /talos:explorer-visibility/);
+  assert.match(architecture, /setExplorerOpen\(detail\.open, false, false\)/);
+});
+
 test("Source Control never stacks into the bottom panel area", () => {
   assert.match(html, /#main\.side-pane-open > #source-control-pane \{[\s\S]*?position: absolute;[\s\S]*?inset: 0 0 0 auto;[\s\S]*?height: 100%;/);
   assert.match(html, /#main\[data-active-side-pane="source-control-pane"\] > #side-splitter \{ display: none; \}/);

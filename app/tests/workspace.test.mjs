@@ -168,7 +168,7 @@ test("show-ignored reaches scan, watch, metadata, and search", () => {
 });
 
 test("Explorer visibility is centralized and file opens keep the dock in place", () => {
-  assert.match(architecture, /function setExplorerOpen\(open: boolean, notify = true\)/);
+  assert.match(architecture, /function setExplorerOpen\(open: boolean, notify = true, persist = true\)/);
   assert.match(architecture, /document\.body\.classList\.toggle\("explorer-open", open\)/);
   assert.doesNotMatch(architecture, /\$\("architecture"\)\.classList\.add\("hidden"\)/);
   assert.doesNotMatch(architecture, /\$\("architecture"\)\.classList\.remove\("hidden"\)/);
