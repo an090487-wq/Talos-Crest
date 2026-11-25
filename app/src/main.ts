@@ -151,6 +151,13 @@ let activeLayoutMode: LayoutMode = "medium";
 let layoutSyncFrame = 0;
 let editorMeasureFrame = 0;
 let layoutSignature = "";
+// A Source Control commit must never switch the bottom panel to Output or
+// trigger the editor's Run command. Source Control brackets its Git work with
+// this event so layout/run handlers can stay out of the way.
+let sourceControlBusy = false;
+document.addEventListener("talos:source-control-busy", (event) => {
+  sourceControlBusy = (event as CustomEvent<boolean>).detail === true;
+});
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -1127,6 +1134,7 @@ const bottomViews: Record<BottomTab, string> = {
 };
 
 function showTab(tab: BottomTab, focus = false) {
+  if (tab === "output" && sourceControlBusy) return;
   setWindowValue("talos.bottom-panel-tab", tab);
   for (const b of document.querySelectorAll<HTMLElement>("[data-tab]")) {
     b.classList.toggle("active", b.dataset.tab === tab);
@@ -1154,6 +1162,7 @@ function setPanelMaximized(maximized: boolean) {
 }
 
 function showPanel(show: boolean, persist = true) {
+  if (show && sourceControlBusy) return;
   if (!show && $("editor-region").classList.contains("panel-maximized")) setPanelMaximized(false);
   $("panel").classList.toggle("hidden", !show);
   $("panel-splitter").classList.toggle("hidden", !show);
@@ -2140,6 +2149,7 @@ function sendRunInput() {
 }
 
 async function runFile() {
+  if (sourceControlBusy) return;
   const selectedLanguage = ($("run-language") as HTMLSelectElement).value;
   const fileName = fileNameFromPath(currentPath ?? suggestedName ?? "");
   const extension = fileName.split(".").pop()?.toLowerCase();

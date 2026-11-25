@@ -44,6 +44,8 @@ test("commit clears stale diff UI and cannot double-submit", () => {
   assert.match(sourceControl, /input\.value = "";\s*closeDiff\(\);\s*await refresh\(\);/);
   assert.match(sourceControl, /event\.stopPropagation\(\);/);
   assert.match(sourceControl, /closeDiff\(\);\s*pane\(\)\.classList\.add\("hidden"\)/);
+  assert.match(sourceControl, /CustomEvent<boolean>\("talos:source-control-busy"/);
+  assert.match(sourceControl, /setBusy\(true\);[\s\S]{0,600}setBusy\(false\);/);
 });
 
 test("diff and commit areas cannot grow without bound", () => {

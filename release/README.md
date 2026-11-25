@@ -14,9 +14,9 @@ Desktop runs also accept typed input in the Output panel, so programs that call
 shell text and controls readable without changing the editor's monospace font.
 The Source Control button now opens an integrated Git pane with status, diffs,
 staging, commits, branches, history, and explicit remote sync. Ctrl+Enter in its
-message box commits without triggering the editor's Run command, stale diffs
-close after a commit, and the integrated terminal keeps its size and focus when
-panels change.
+message box commits without triggering the editor's Run command, a commit is
+hard-blocked from opening the bottom Output panel, stale diffs close after a
+commit, and the integrated terminal keeps its size and focus when panels change.
 
 ## Linux
 
@@ -29,7 +29,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`ae380daa3741505026385f5a2c29e6d5c42c063d803428fe77afb859bd0b3935`
+`e2ad3170297dc01257d07a569407368ad2662170e0487ee03fbceccc134c88b5`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -46,7 +46,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`948015de0eaa54cf140e8476a2e8646414cb6da37c022bc4ce386af055339d80`
+`8f33cfad8cb285af46355aae6a0b767e5d6328aaeb2b075c983e9616310c681f`
 
 ## Android
 

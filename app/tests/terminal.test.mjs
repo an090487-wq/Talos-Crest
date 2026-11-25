@@ -45,6 +45,14 @@ test("commit shortcut never reaches the editor's Mod+Enter run command", () => {
   assert.match(main, /id: "run\.file-editor"[\s\S]{0,180}scope: "editor"/);
 });
 
+test("a commit cannot open the bottom Output panel or start a run", () => {
+  assert.match(main, /let sourceControlBusy = false;/);
+  assert.match(main, /talos:source-control-busy/);
+  assert.match(main, /function showTab\(tab: BottomTab, focus = false\) \{\s*if \(tab === "output" && sourceControlBusy\) return;/);
+  assert.match(main, /function showPanel\(show: boolean, persist = true\) \{\s*if \(show && sourceControlBusy\) return;/);
+  assert.match(main, /async function runFile\(\) \{\s*if \(sourceControlBusy\) return;/);
+});
+
 test("terminal toolbar stays one row and terminal keeps usable height", () => {
   assert.match(css, /\.tc-terminal-toolbar \{[\s\S]*?flex-wrap: nowrap;[\s\S]*?overflow-x: auto;/);
   assert.match(css, /\.tc-terminal-view \{[\s\S]*?min-height: 48px;/);

@@ -66,6 +66,11 @@ function setStatus(text: string): void {
   el("sc-status").textContent = text;
 }
 
+function setBusy(value: boolean): void {
+  committing = value;
+  document.dispatchEvent(new CustomEvent<boolean>("talos:source-control-busy", { detail: value }));
+}
+
 function friendlyGitError(error: unknown): string {
   const raw = String(error instanceof Error ? error.message : error);
   if (/terminal prompt|authentication failed|could not read username|permission denied \(publickey\)|(^|\s)(401|403)(\s|$)/i.test(raw)) {
@@ -453,7 +458,7 @@ export function initSourceControl(): void {
       }
       const button = el<HTMLButtonElement>("sc-commit");
       const originalLabel = button.textContent || "Commit";
-      committing = true;
+      setBusy(true);
       button.disabled = true;
       button.textContent = "Committing…";
       try {
@@ -463,7 +468,7 @@ export function initSourceControl(): void {
         await refresh();
         setStatus(output.trim().split("\n")[0] || "Commit created.");
       } finally {
-        committing = false;
+        setBusy(false);
         button.disabled = false;
         button.textContent = originalLabel;
       }
