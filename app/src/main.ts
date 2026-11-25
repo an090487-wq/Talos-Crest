@@ -310,6 +310,16 @@ function resetEditorFontSize() {
   applyEditorFontSize(0);
 }
 
+const UI_SCALE_VALUES = [0.9, 1, 1.1, 1.25];
+
+function applyUiScale(scale: number) {
+  const next = UI_SCALE_VALUES.find((value) => Math.abs(value - scale) < 0.001) ?? 1;
+  document.documentElement.style.setProperty("--ui-scale", String(next));
+  localStorage.setItem("talos.ui-scale", String(next));
+  ($("ui-scale") as HTMLSelectElement).value = String(next);
+  scheduleEditorMeasure();
+}
+
 function setWordWrap(enabled: boolean) {
   wordWrap = enabled;
   const extension = enabled ? EditorView.lineWrapping : [];
@@ -2751,6 +2761,9 @@ $("editor-font").addEventListener("change", () => {
   applyEditorFont(font);
   localStorage.setItem("talos.editor-font", font);
 });
+$("ui-scale").addEventListener("change", () => {
+  applyUiScale(Number(($("ui-scale") as HTMLSelectElement).value));
+});
 installGlobalShortcuts();
 initShortcutsUi();
 $("btn-shortcuts").addEventListener("click", openShortcutsDialog);
@@ -2775,6 +2788,7 @@ initPreviewControls();
 applyBuiltinTheme(activeBuiltinTheme, false);
 applyEditorFont(localStorage.getItem("talos.editor-font") ?? "default");
 applyEditorFontSize(editorFontSize);
+applyUiScale(Number(localStorage.getItem("talos.ui-scale")) || 1);
 $("btn-fun").textContent = funMode ? "Fun mode: on" : "Fun mode: off";
 $("btn-fun").addEventListener("click", () => {
   funMode = !funMode;

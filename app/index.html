@@ -29,12 +29,13 @@
         --ui-font: Inter, "Segoe UI", system-ui, sans-serif;
         --mono-font: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
         --editor-font: var(--mono-font);
-        --font-size: 13px;
-        --font-xs: 10px; --font-sm: 11px; --font-md: 13px; --font-lg: 16px;
+        --ui-scale: 1;
+        --font-size: calc(13px * var(--ui-scale));
+        --font-xs: calc(10px * var(--ui-scale)); --font-sm: calc(11px * var(--ui-scale)); --font-md: calc(13px * var(--ui-scale)); --font-lg: calc(16px * var(--ui-scale));
         --radius-sm: 4px; --radius-md: 6px; --radius-lg: 9px; --radius-xl: 12px;
-        --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px;
-        --control-height: 30px; --control-height-sm: 26px; --icon-size: 18px;
-        --toolbar-height: 38px; --toolbar-gap: 6px; --panel-tab-height: 29px;
+        --space-1: calc(4px * var(--ui-scale)); --space-2: calc(8px * var(--ui-scale)); --space-3: calc(12px * var(--ui-scale)); --space-4: calc(16px * var(--ui-scale)); --space-5: calc(20px * var(--ui-scale)); --space-6: calc(24px * var(--ui-scale));
+        --control-height: calc(30px * var(--ui-scale)); --control-height-sm: calc(26px * var(--ui-scale)); --icon-size: calc(18px * var(--ui-scale));
+        --toolbar-height: calc(38px * var(--ui-scale)); --toolbar-gap: calc(6px * var(--ui-scale)); --panel-tab-height: calc(29px * var(--ui-scale));
         --surface-1: var(--panel); --surface-2: var(--panel-2); --surface-3: var(--surface-raised);
         --border-subtle: var(--line); --border-strong: var(--line-strong);
         --panel-size: 280px; --side-pane-size: 56%;
@@ -123,6 +124,7 @@
       #file { margin-left: auto; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 100px; max-width: 260px; padding: 5px 10px; border-left: 2px solid var(--accent); background: color-mix(in srgb, var(--surface-raised) 65%, transparent); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font: var(--font-sm)/1.3 var(--mono-font); }
       #theme-select { max-width: 138px; }
       #editor-font { max-width: 138px; }
+      #ui-scale { max-width: 88px; }
       header select { min-height: 30px; border-color: color-mix(in srgb, var(--line) 75%, transparent); font-size: var(--font-sm); }
       #msg { color: var(--danger); }
       #workspace-status { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -610,6 +612,7 @@
         #panel { height: min(var(--panel-size), 32vh); flex: 0 0 min(var(--panel-size), 32vh); }
         #theme-select { max-width: 130px; }
         #editor-font { max-width: 145px; }
+        #ui-scale { max-width: 92px; }
         footer {
           flex-wrap: wrap;
           gap: 6px;
@@ -777,6 +780,13 @@
               <option value="jetbrains">JetBrains Mono</option>
               <option value="consolas">Consolas</option>
               <option value="menlo">Menlo</option>
+            </select>
+            <label class="sr-only" for="ui-scale">Interface size</label>
+            <select id="ui-scale" title="Scale interface text and controls">
+              <option value="0.9">UI 90%</option>
+              <option value="1">UI 100%</option>
+              <option value="1.1">UI 110%</option>
+              <option value="1.25">UI 125%</option>
             </select>
           </div>
         </div>

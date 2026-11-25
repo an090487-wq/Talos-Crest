@@ -10,7 +10,8 @@ data; everything else remains fully offline.
 From a repository checkout, run `./scripts/verify-release.sh` to check every
 published hash below, including the newest timestamped copy of each artifact.
 Desktop runs also accept typed input in the Output panel, so programs that call
-`input()` work instead of failing with EOF.
+`input()` work instead of failing with EOF. An interface-size selector keeps
+shell text and controls readable without changing the editor's monospace font.
 
 ## Linux
 
@@ -23,7 +24,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`983f3621aedd9b01c1bb034eeafcb6bcb10fc5ad68d7e7d63238bb05be8457ec`
+`3879bc85336a46dc128e1ef8a7a10aea4539a9f1a21f90f7fb59108af1b798ea`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -40,7 +41,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`48c6f283eb65323cadc2857a2994f94ef0dfa9f35edc8e332cc37912d8f91e97`
+`b8b71320c2cd92192eb28e7eb13d810fc4bc7945b8feeff1c08ab236156666e2`
 
 ## Android
 
@@ -51,7 +52,7 @@ File: `android/TalosCrest-Android-universal.apk`
 - The terminal is desktop-only; the editor, file browser, and binary preview are local.
 
 SHA-256:
-`9f6f5de228b920ad5355519685cb672059aec0a740ed5e7d2ff5dc5477fc12fd`
+`51aa3810d29e11ccb6eabdf5c3bc228b8f99e247404ac01f74df2cbd1ec50b44`
 
 ## Optional GitHub access
 

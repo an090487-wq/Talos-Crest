@@ -109,6 +109,15 @@ test("desktop runs expose a live stdin channel for interactive input", () => {
   assert.match(rust, /Stdio::piped\(\)/);
 });
 
+test("interface size is a persisted preference independent of editor font", () => {
+  assert.match(html, /id="ui-scale"/);
+  assert.match(html, /--ui-scale: 1;/);
+  assert.match(html, /calc\(13px \* var\(--ui-scale\)\)/);
+  assert.match(main, /function applyUiScale\(scale: number\)/);
+  assert.match(main, /talos\.ui-scale/);
+  assert.match(main, /\$\("ui-scale"\)\.addEventListener\("change"/);
+});
+
 test("data files explain why they cannot be run", () => {
   assert.match(main, /const dataExtensions = \[/);
   assert.match(main, /is a data file, not runnable source/);
