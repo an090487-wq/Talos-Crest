@@ -2,9 +2,9 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use std::{
     collections::HashMap,
     fs,
-    io::{Read, Seek, SeekFrom},
+    io::{BufReader, Read, Seek, SeekFrom, Write},
     path::{Component, Path, PathBuf},
-    process::Command,
+    process::{ChildStdin, Command, Stdio},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex, OnceLock,
@@ -22,8 +22,13 @@ mod workspace;
 
 static PROJECT_WATCHERS: OnceLock<Mutex<HashMap<String, notify::RecommendedWatcher>>> =
     OnceLock::new();
+static ACTIVE_RUN_STDINS: OnceLock<Mutex<HashMap<String, ChildStdin>>> = OnceLock::new();
 static FILE_WRITE_LOCK: Mutex<()> = Mutex::new(());
 static NEXT_WINDOW_ID: AtomicU64 = AtomicU64::new(0);
+
+fn active_run_stdin_map() -> &'static Mutex<HashMap<String, ChildStdin>> {
+    ACTIVE_RUN_STDINS.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 #[derive(Default)]
 struct PendingWindowContexts(Mutex<HashMap<String, WindowContext>>);
@@ -342,15 +347,17 @@ fn create_window(
                     workspace_path: workspace_path.clone(),
                 },
             );
-        let result = tauri::WebviewWindowBuilder::new(
+        let builder = tauri::WebviewWindowBuilder::new(
             &app,
             &label,
             tauri::WebviewUrl::App("index.html".into()),
         )
         .title("Talos Crest")
-        .inner_size(1100.0, 720.0)
-        .center()
-        .build();
+        .inner_size(1100.0, 720.0);
+        // Centering is a desktop-only Tauri builder method.
+        #[cfg(not(target_os = "android"))]
+        let builder = builder.center();
+        let result = builder.build();
         if let Err(error) = result {
             contexts
                 .0
@@ -3176,12 +3183,30 @@ struct RunResult {
     language: String,
 }
 
-fn run_language(lang: &Language, path: &Path) -> Result<RunResult, String> {
+#[derive(Clone, serde::Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+enum RunEvent {
+    Start { id: String, language: String },
+    Output { id: String, stream: String, text: String },
+    End { id: String, code: i32 },
+    Error { id: String, message: String },
+}
+
+fn run_process_command(lang: &Language, path: &Path) -> Result<Command, String> {
     let cmd = lang
         .run_command(path)
         .ok_or_else(|| format!("{} has no run command configured", lang.name))?;
-    let mut command = Command::new("sh");
-    command.arg("-c").arg(&cmd);
+    let mut command;
+    #[cfg(windows)]
+    {
+        command = Command::new("cmd");
+        command.arg("/C").arg(&cmd);
+    }
+    #[cfg(not(windows))]
+    {
+        command = Command::new("sh");
+        command.arg("-c").arg(&cmd);
+    }
     // AppImage runtimes export these for their own bundled libraries. When a
     // user runs source code, a child shell must see the normal system Python
     // environment instead of the temporary AppImage mount.
@@ -3193,15 +3218,130 @@ fn run_language(lang: &Language, path: &Path) -> Result<RunResult, String> {
             }
         }
     }
+    Ok(command)
+}
+
+fn run_language(lang: &Language, path: &Path) -> Result<RunResult, String> {
+    let mut command = run_process_command(lang, path)?;
     let out = command
         .output()
-        .map_err(|e| format!("failed to start '{cmd}': {e}"))?;
+        .map_err(|e| format!("failed to start run command: {e}"))?;
     Ok(RunResult {
         stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
         code: out.status.code().unwrap_or(-1),
         language: lang.name.clone(),
     })
+}
+
+fn valid_run_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 80
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+fn pump_run_stream<R: Read + Send + 'static>(
+    app: &tauri::AppHandle,
+    id: String,
+    stream: &str,
+    mut reader: R,
+) {
+    let mut buffer = [0u8; 4096];
+    loop {
+        match reader.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(count) => {
+                let text = String::from_utf8_lossy(&buffer[..count]).into_owned();
+                let _ = app.emit(
+                    "talos://run-event",
+                    RunEvent::Output {
+                        id: id.clone(),
+                        stream: stream.to_string(),
+                        text,
+                    },
+                );
+            }
+            Err(error) => {
+                let _ = app.emit(
+                    "talos://run-event",
+                    RunEvent::Error {
+                        id: id.clone(),
+                        message: format!("run {stream} failed: {error}"),
+                    },
+                );
+                break;
+            }
+        }
+    }
+}
+
+/// Start a run with a writable stdin so `input()` and similar prompts work.
+fn spawn_interactive_run(
+    app: &tauri::AppHandle,
+    run_id: String,
+    lang: &Language,
+    path: &Path,
+    cleanup_dir: Option<PathBuf>,
+) -> Result<(), String> {
+    let mut command = run_process_command(lang, path)?;
+    command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = command
+        .spawn()
+        .map_err(|e| format!("failed to start run command: {e}"))?;
+    let stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| "could not open run input".to_string())?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "could not capture run output".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "could not capture run errors".to_string())?;
+
+    active_run_stdin_map()
+        .lock()
+        .map_err(|e| format!("run input state lock failed: {e}"))?
+        .insert(run_id.clone(), stdin);
+
+    let _ = app.emit(
+        "talos://run-event",
+        RunEvent::Start {
+            id: run_id.clone(),
+            language: lang.name.clone(),
+        },
+    );
+
+    let out_app = app.clone();
+    let out_id = run_id.clone();
+    std::thread::spawn(move || pump_run_stream(&out_app, out_id, "stdout", stdout));
+    let err_app = app.clone();
+    let err_id = run_id.clone();
+    std::thread::spawn(move || pump_run_stream(&err_app, err_id, "stderr", BufReader::new(stderr)));
+
+    let wait_app = app.clone();
+    let wait_id = run_id;
+    std::thread::spawn(move || {
+        let code = child
+            .wait()
+            .map(|status| status.code().unwrap_or(-1))
+            .unwrap_or(-1);
+        if let Ok(mut runs) = active_run_stdin_map().lock() {
+            runs.remove(&wait_id);
+        }
+        if let Some(dir) = cleanup_dir {
+            let _ = fs::remove_dir_all(&dir);
+        }
+        let _ = wait_app.emit("talos://run-event", RunEvent::End { id: wait_id, code });
+    });
+    Ok(())
 }
 
 fn temporary_run_dir() -> Result<PathBuf, String> {
@@ -3312,12 +3452,11 @@ async fn run_file(app: tauri::AppHandle, path: String) -> Result<RunResult, Stri
     run_file_impl(resources.as_deref(), path).await
 }
 
-async fn run_file_impl(resource_dir: Option<&Path>, path: String) -> Result<RunResult, String> {
-    let p = Path::new(&path);
+fn resolve_language_for_path(resource_dir: Option<&Path>, path: &Path) -> Result<Language, String> {
     let mut found = None;
     for d in languages_dirs(resource_dir).iter() {
         if let Ok(reg) = Registry::load_dir(d) {
-            if let Some(l) = reg.detect(p) {
+            if let Some(l) = reg.detect(path) {
                 found = Some(l.clone());
                 break;
             }
@@ -3326,43 +3465,31 @@ async fn run_file_impl(resource_dir: Option<&Path>, path: String) -> Result<RunR
     if found.is_none() {
         found = enabled_extension_languages()?.into_iter().find(|language| {
             language.extensions.iter().any(|extension| {
-                p.extension()
+                path.extension()
                     .and_then(|value| value.to_str())
                     .is_some_and(|actual| extension.eq_ignore_ascii_case(&format!(".{actual}")))
             })
         });
     }
-    let lang = found.ok_or_else(|| {
-        format!("no language configured for {path} (add one in languages/ or install a language extension)")
-    })?;
-    run_language(&lang, p)
+    found.ok_or_else(|| {
+        format!(
+            "no language configured for {} (add one in languages/ or install a language extension)",
+            path.display()
+        )
+    })
 }
 
-#[tauri::command]
-fn run_source(
-    app: tauri::AppHandle,
-    source: String,
-    language_id: Option<String>,
-    file_name: Option<String>,
-) -> Result<RunResult, String> {
-    let resources = app.path().resource_dir().ok();
-    run_source_impl(resources.as_deref(), source, language_id, file_name)
-}
-
-fn run_source_impl(
+fn resolve_language_for_source(
     resource_dir: Option<&Path>,
-    source: String,
-    language_id: Option<String>,
-    file_name: Option<String>,
-) -> Result<RunResult, String> {
+    language_id: Option<&str>,
+    file_name: Option<&str>,
+) -> Result<Language, String> {
     let mut found = None;
     for d in languages_dirs(resource_dir).iter() {
         if let Ok(reg) = Registry::load_dir(d) {
-            let lang = match language_id.as_deref() {
+            let lang = match language_id {
                 Some(id) => reg.by_id(id),
-                None => file_name
-                    .as_deref()
-                    .and_then(|name| reg.detect(Path::new(name))),
+                None => file_name.and_then(|name| reg.detect(Path::new(name))),
             };
             if let Some(lang) = lang {
                 found = Some(lang.clone());
@@ -3372,10 +3499,9 @@ fn run_source_impl(
     }
     if found.is_none() {
         found = enabled_extension_languages()?.into_iter().find(|language| {
-            match language_id.as_deref() {
+            match language_id {
                 Some(id) => language.id == id,
                 None => file_name
-                    .as_deref()
                     .and_then(|name| Path::new(name).extension())
                     .and_then(|extension| extension.to_str())
                     .is_some_and(|actual| {
@@ -3387,12 +3513,13 @@ fn run_source_impl(
             }
         });
     }
-    let lang = found.ok_or_else(|| {
-        language_id.map_or_else(
-            || "Choose a run language or save the file with a recognized extension.".to_string(),
-            |id| format!("No run configuration found for language '{id}'."),
-        )
-    })?;
+    found.ok_or_else(|| match language_id {
+        Some(id) => format!("No run configuration found for language '{id}'."),
+        None => "Choose a run language or save the file with a recognized extension.".to_string(),
+    })
+}
+
+fn write_temporary_source(lang: &Language, source: String) -> Result<(PathBuf, PathBuf), String> {
     let extension = lang
         .extensions
         .first()
@@ -3410,9 +3537,96 @@ fn run_source_impl(
         let _ = fs::remove_dir_all(&dir);
         return Err(format!("could not write temporary source file: {e}"));
     }
+    Ok((dir, path))
+}
+
+async fn run_file_impl(resource_dir: Option<&Path>, path: String) -> Result<RunResult, String> {
+    let p = Path::new(&path);
+    let lang = resolve_language_for_path(resource_dir, p)?;
+    run_language(&lang, p)
+}
+
+#[tauri::command]
+fn run_source(
+    app: tauri::AppHandle,
+    source: String,
+    language_id: Option<String>,
+    file_name: Option<String>,
+) -> Result<RunResult, String> {
+    let resources = app.path().resource_dir().ok();
+    run_source_impl(resources.as_deref(), &source, language_id.as_deref(), file_name.as_deref())
+}
+
+fn run_source_impl(
+    resource_dir: Option<&Path>,
+    source: &str,
+    language_id: Option<&str>,
+    file_name: Option<&str>,
+) -> Result<RunResult, String> {
+    let lang = resolve_language_for_source(resource_dir, language_id, file_name)?;
+    let (dir, path) = write_temporary_source(&lang, source.to_string())?;
     let result = run_language(&lang, &path);
     fs::remove_dir_all(&dir).map_err(|e| format!("could not remove temporary run files: {e}"))?;
     result
+}
+
+/// Run a saved file with a live stdin channel for interactive prompts.
+#[tauri::command]
+fn run_file_interactive(
+    app: tauri::AppHandle,
+    id: String,
+    path: String,
+) -> Result<(), String> {
+    if !valid_run_id(&id) {
+        return Err("invalid run identifier".into());
+    }
+    let resources = app.path().resource_dir().ok();
+    let p = Path::new(&path);
+    let lang = resolve_language_for_path(resources.as_deref(), p)?;
+    spawn_interactive_run(&app, id, &lang, p, None)
+}
+
+/// Run unsaved editor contents with a live stdin channel.
+#[tauri::command]
+fn run_source_interactive(
+    app: tauri::AppHandle,
+    id: String,
+    source: String,
+    language_id: Option<String>,
+    file_name: Option<String>,
+) -> Result<(), String> {
+    if !valid_run_id(&id) {
+        return Err("invalid run identifier".into());
+    }
+    let resources = app.path().resource_dir().ok();
+    let lang = resolve_language_for_source(
+        resources.as_deref(),
+        language_id.as_deref(),
+        file_name.as_deref(),
+    )?;
+    let (dir, path) = write_temporary_source(&lang, source)?;
+    if let Err(error) = spawn_interactive_run(&app, id, &lang, &path, Some(dir.clone())) {
+        let _ = fs::remove_dir_all(&dir);
+        return Err(error);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn run_write_stdin(id: String, text: String) -> Result<(), String> {
+    if text.len() > 64 * 1024 {
+        return Err("run input is too large".into());
+    }
+    let mut runs = active_run_stdin_map()
+        .lock()
+        .map_err(|e| format!("run input state lock failed: {e}"))?;
+    let stdin = runs
+        .get_mut(&id)
+        .ok_or_else(|| "this run is no longer accepting input".to_string())?;
+    stdin
+        .write_all(text.as_bytes())
+        .and_then(|_| stdin.flush())
+        .map_err(|e| format!("could not send run input: {e}"))
 }
 
 #[cfg(test)]
@@ -4329,6 +4543,9 @@ pub fn run() {
             ext_check_dependencies,
             run_file,
             run_source,
+            run_file_interactive,
+            run_source_interactive,
+            run_write_stdin,
             terminal::platform::terminal_open,
             terminal::platform::terminal_write,
             terminal::platform::terminal_resize,

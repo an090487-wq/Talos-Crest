@@ -18,7 +18,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`b8fd195a65ec85cc36f9186d92982f56bcf121d5cfc9a67fb38872198ba4ac06`
+`79f3c17ef6110934831dd5a4fb457381550d986dd97167bd69f0927469649681`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -35,17 +35,28 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`b7f596c8ee719b0a2d34cc68a443d278751d1adba2fc60092d0a83d43f2cbb7d`
+`64ce4831eec47c8237fc076e90cb2ded06f9f1f08d81b04b33ff6eccf6b47ff9`
+
+## Android
+
+File: `android/TalosCrest-Android-universal.apk`
+
+- Universal APK for 64-bit and 32-bit Android devices.
+- Unsigned build: sign it with your own key before installing it on a device.
+- The terminal is desktop-only; the editor, file browser, and binary preview are local.
+
+SHA-256:
+`1b82d71d5027a071f0de06b6ad263cbac954b20fbf7eba0c3ef640fab72d02fa`
 
 ## Optional GitHub access
 
-Both builds include an opt-in GitHub tab under Observatory. It stores a
+All builds include an opt-in GitHub tab under Observatory. It stores a
 personal access token encrypted with a local key, talks directly to the GitHub
 REST API when you use that tab, and does not create an account, send telemetry,
 or contact a Talos service. You can clear the token locally at any time. The
 rest of the editor needs no network connection.
 
-Both builds also include the Universal Project Workspace: a bounded local
+All builds also include the Universal Project Workspace: a bounded local
 folder scanner with nested Explorer navigation, automatic restoration of the
 last folder per window, recent-project fallback, a workspace/status indicator,
 structured file-change updates with bounded queueing and watcher recovery, one
@@ -74,10 +85,11 @@ default and can be reopened at full size from disk; no image data is uploaded.
 
 ## GitHub publishing
 
-Both builds are committed as separate files in this repository:
+All builds are committed as separate files in this repository:
 
 1. `appimage/TalosCrest-Linux-x86_64.AppImage`
 2. `windows/TalosCrest-Windows-x64-portable.zip`
+3. `android/TalosCrest-Android-universal.apk`
 
 Download them with “Download raw file”, or clone the repository. The
 timestamped copies in the same folders are the immutable build snapshots.

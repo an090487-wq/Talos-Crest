@@ -206,6 +206,9 @@
       #output .err { color: var(--danger); }
       #output .ok { color: var(--success); }
       #output .dim { color: var(--muted); }
+      .output-input-bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--border); background: var(--panel); }
+      .output-input-bar label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+      .output-input-bar input { flex: 1; min-width: 0; }
       .row { padding: 3px 6px; cursor: pointer; border-radius: var(--radius-sm); white-space: pre; }
       .row:hover { background: var(--panel); }
       .row::before { content: "\25CF"; margin-right: 8px; }
@@ -996,6 +999,11 @@
             </div>
             <div id="problems"></div>
             <pre id="output" class="hidden"></pre>
+            <div id="output-input-bar" class="output-input-bar hidden">
+              <label for="run-input">Input</label>
+              <input id="run-input" type="text" spellcheck="false" autocomplete="off" aria-label="Send text to the running program" placeholder="Type input and press Enter" />
+              <button id="btn-run-send" class="mini" title="Send input to the running program">Send</button>
+            </div>
             <div id="channel-terminal" class="tc-channel hidden">
               <div class="tc-terminal-toolbar">
                 <span class="tc-terminal-title">Terminal</span>

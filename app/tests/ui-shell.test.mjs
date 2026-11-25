@@ -11,6 +11,7 @@ const main = readFileSync(resolve(appDir, "src/main.ts"), "utf8");
 const architecture = readFileSync(resolve(appDir, "src/architecture.ts"), "utf8");
 const tauriConfig = readFileSync(resolve(appDir, "src-tauri/tauri.conf.json"), "utf8");
 const canvas = readFileSync(resolve(appDir, "src/canvas/canvas-ui.ts"), "utf8");
+const rust = readFileSync(resolve(appDir, "src-tauri/src/lib.rs"), "utf8");
 
 test("native controls keep their own chrome", () => {
   assert.match(html, /input\[type="checkbox"\], input\[type="radio"\], input\[type="range"\], input\[type="color"\]/);
@@ -96,6 +97,30 @@ test("file-open failures surface globally and optional language failures never b
   assert.match(architecture, /CustomEvent\("talos:open-error"/);
   assert.match(main, /talos:open-error/);
   assert.match(main, /as plain text/);
+});
+
+test("desktop runs expose a live stdin channel for interactive input", () => {
+  assert.match(html, /id="output-input-bar"/);
+  assert.match(html, /id="run-input"/);
+  assert.match(main, /run_file_interactive/);
+  assert.match(main, /run_source_interactive/);
+  assert.match(main, /run_write_stdin/);
+  assert.match(rust, /fn run_write_stdin/);
+  assert.match(rust, /Stdio::piped\(\)/);
+});
+
+test("read-only AppImage files are saved through Save As", () => {
+  assert.match(main, /import \{ isReadOnlyAppImagePath \} from "\.\/workspace-paths"/);
+  assert.match(main, /readOnlyAppImageFile && !forceDialog/);
+  assert.match(main, /Choose a writable location to save a copy/);
+});
+
+test("binary files open in a bounded hex and strings preview", () => {
+  assert.match(html, /id="binary-dialog"/);
+  assert.match(html, /id="binary-mode-hex"/);
+  assert.match(html, /id="binary-mode-strings"/);
+  assert.match(main, /import \{ openBinaryUi \} from "\.\/binary-preview"/);
+  assert.match(main, /id: "file\.open-binary"/);
 });
 
 test("installed icon packs visibly change Explorer file icons", () => {

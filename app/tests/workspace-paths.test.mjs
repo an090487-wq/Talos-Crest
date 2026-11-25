@@ -17,7 +17,12 @@ new Function("require", "module", "exports", compiled)(
   pathModule,
   pathModule.exports
 );
-const { resolveWorkspacePath, sameWorkspaceRoot, isInsideWorkspace } = pathModule.exports;
+const {
+  resolveWorkspacePath,
+  sameWorkspaceRoot,
+  isInsideWorkspace,
+  isReadOnlyAppImagePath,
+} = pathModule.exports;
 
 test("relative evidence paths resolve against the workspace root", () => {
   assert.equal(resolveWorkspacePath("/work/project", "src/api.py"), "/work/project/src/api.py");
@@ -44,4 +49,11 @@ test("workspace root comparison is stable across separators and Windows case", (
   assert.equal(sameWorkspaceRoot("C:\\Work\\Project", "c:/work/project"), true);
   assert.equal(sameWorkspaceRoot("/work/project", "/work/other"), false);
   assert.equal(isInsideWorkspace("/work/project-other/file", "/work/project"), false);
+});
+
+test("AppImage internal files are detected as read-only", () => {
+  assert.equal(isReadOnlyAppImagePath("/tmp/.mount_talos-AaIehN/usr/HelloWorld.java"), true);
+  assert.equal(isReadOnlyAppImagePath("/tmp/.mount_talos-AaIehN/usr/share/demo.py"), true);
+  assert.equal(isReadOnlyAppImagePath("C:/Program Files/Talos Crest/HelloWorld.java"), false);
+  assert.equal(isReadOnlyAppImagePath("/home/user/HelloWorld.java"), false);
 });

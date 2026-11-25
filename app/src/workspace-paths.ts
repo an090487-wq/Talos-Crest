@@ -3,6 +3,12 @@ export function normalizeWorkspacePath(value: string): string {
   return value.replace(/\\/g, "/").replace(/\0/g, "");
 }
 
+/** Files inside an AppImage's temporary mount are shipped read-only. */
+export function isReadOnlyAppImagePath(value: string): boolean {
+  const normalized = normalizeWorkspacePath(value).replace(/\/+$/, "");
+  return /^\/tmp\/\.mount_[^/]+\//.test(normalized);
+}
+
 export function trimWorkspaceRoot(value: string): string {
   return normalizeWorkspacePath(value).replace(/\/+$/, "");
 }

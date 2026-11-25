@@ -92,6 +92,7 @@ import {
   writeText,
 } from "./platform";
 import type { CheckedWriteResult } from "./platform";
+import { isReadOnlyAppImagePath } from "./workspace-paths";
 import { isImagePath } from "./canvas/image-core";
 import { getWindowValue, removeWindowValue, setWindowValue } from "./window-state";
 import {
@@ -1965,8 +1966,14 @@ async function askUnsavedChanges(message: string): Promise<"save" | "discard" | 
 
 async function saveFile(forceDialog = false) {
   let path = currentPath;
-  if (!path || forceDialog) {
-    const defaultPath = path && android ? fileNameFromPath(path) : path ?? suggestedName;
+  const readOnlyAppImageFile = !!path && isReadOnlyAppImagePath(path);
+  if (!path || forceDialog || readOnlyAppImageFile) {
+    if (readOnlyAppImageFile && !forceDialog) {
+      say("This file is bundled read-only inside the AppImage. Choose a writable location to save a copy.");
+    }
+    const defaultPath = path && (android || readOnlyAppImageFile)
+      ? fileNameFromPath(path)
+      : path ?? suggestedName;
     const chosen = await save({ defaultPath });
     if (!chosen) return;
     path = chosen;
@@ -2047,11 +2054,77 @@ interface RunResult {
   language: string;
 }
 
+type RunEvent =
+  | { type: "start"; id: string; language: string }
+  | { type: "output"; id: string; stream: string; text: string }
+  | { type: "end"; id: string; code: number }
+  | { type: "error"; id: string; message: string };
+
+type RunUnlisten = () => void;
+
+let activeRunId: string | null = null;
+let activeRunStartedAt = 0;
+let activeRunLanguage = "Program";
+let activeRunUnlisten: RunUnlisten | null = null;
+
 function appendOut(text: string, cls = "") {
   const s = document.createElement("span");
   s.className = cls;
   s.textContent = text;
   $("output").appendChild(s);
+  $("output").scrollTop = $("output").scrollHeight;
+}
+
+function setRunInputVisible(visible: boolean) {
+  $("output-input-bar").classList.toggle("hidden", !visible);
+  ($("run-input") as HTMLInputElement).disabled = !visible;
+}
+
+function clearActiveRunListener() {
+  if (!activeRunUnlisten) return;
+  const unlisten = activeRunUnlisten;
+  activeRunUnlisten = null;
+  unlisten();
+}
+
+function handleRunEvent(event: RunEvent) {
+  if (!activeRunId || event.id !== activeRunId) return;
+  if (event.type === "start") {
+    activeRunLanguage = event.language;
+    return;
+  }
+  if (event.type === "output") {
+    appendOut(event.text, event.stream === "stderr" ? "err" : "");
+    return;
+  }
+  if (event.type === "error") {
+    appendOut(`${event.message}\n`, "err");
+    return;
+  }
+  const ms = Math.round(performance.now() - activeRunStartedAt);
+  appendOut(
+    `\n— ${activeRunLanguage} finished with exit code ${event.code} in ${ms} ms\n`,
+    event.code === 0 ? "ok" : "err"
+  );
+  activeRunId = null;
+  setRunInputVisible(false);
+  clearActiveRunListener();
+}
+
+function sendRunInput() {
+  const input = $("run-input") as HTMLInputElement;
+  const text = input.value;
+  if (!text) return;
+  input.value = "";
+  const id = activeRunId;
+  if (!id) {
+    appendOut("No program is waiting for input.\n", "err");
+    return;
+  }
+  appendOut(`${text}\n`, "dim");
+  void invoke("run_write_stdin", { id, text: `${text}\n` }).catch((e: unknown) => {
+    appendOut(`Could not send input: ${String(e)}\n`, "err");
+  });
 }
 
 async function runFile() {
@@ -2113,29 +2186,34 @@ async function runFile() {
     }
     return;
   }
+  clearActiveRunListener();
+  activeRunId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  activeRunStartedAt = performance.now();
+  activeRunLanguage = language ?? "Program";
+  activeRunUnlisten = await listen<RunEvent>("talos://run-event", (event) => {
+    handleRunEvent(event.payload);
+  });
+  setRunInputVisible(true);
   try {
-    let result: RunResult;
     if (currentPath) {
       if (dirty) await saveFile();
       appendOut("Running " + currentPath + " ...\n", "dim");
-      result = await invoke<RunResult>("run_file", { path: currentPath });
+      await invoke("run_file_interactive", { id: activeRunId, path: currentPath });
     } else {
       appendOut("Running the current editor contents...\n", "dim");
-      result = await invoke<RunResult>("run_source", {
+      await invoke("run_source_interactive", {
+        id: activeRunId,
         source: view.state.doc.toString(),
         languageId: language,
         fileName: suggestedName ?? null,
       });
     }
-    if (result.stdout) appendOut(result.stdout);
-    if (result.stderr) appendOut(result.stderr, "err");
-    const ms = Math.round(performance.now() - t0);
-    appendOut(
-      "\n\u2014 " + result.language + " finished with exit code " + result.code + " in " + ms + " ms\n",
-      result.code === 0 ? "ok" : "err"
-    );
+    ($("run-input") as HTMLInputElement).focus();
   } catch (e) {
     appendOut("Run failed: " + String(e) + "\n", "err");
+    activeRunId = null;
+    setRunInputVisible(false);
+    clearActiveRunListener();
   }
 }
 
@@ -2632,6 +2710,13 @@ $("btn-redo").addEventListener("click", () => {
 $("btn-save").addEventListener("click", () => void guard(() => saveFile()));
 $("btn-saveas").addEventListener("click", () => void guard(() => saveFile(true)));
 $("btn-run").addEventListener("click", () => void guard(runFile));
+$("btn-run-send").addEventListener("click", sendRunInput);
+$("run-input").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    sendRunInput();
+  }
+});
 $("btn-preview").addEventListener("click", previewHtml);
 $("btn-preview-close").addEventListener("click", closeHtmlPreview);
 $("btn-panel").addEventListener("click", togglePanel);
