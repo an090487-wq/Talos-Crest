@@ -45,6 +45,7 @@ let terminal: Terminal | null = null;
 let fitAddon: FitAddon | null = null;
 let session: TerminalSession | null = null;
 let starting: Promise<void> | null = null;
+let restarting: Promise<void> | null = null;
 let connectingNonce: string | null = null;
 let pendingOutput: string[] = [];
 let getCwd: () => string | null = () => null;
@@ -102,13 +103,22 @@ function applyTheme() {
   if (!terminal) return;
   terminal.options.fontFamily = token("--mono-font", "monospace");
   terminal.options.theme = xtermTheme();
+  // Font metrics can change with the theme. Recompute the PTY size so text
+  // does not wrap at stale column counts.
+  sendResize();
 }
 
 function sendResize(immediate = false) {
   const run = () => {
     if (!terminal || !fitAddon) return;
     const view = document.getElementById("terminal-view");
-    if (!view || view.clientWidth < 20 || view.clientHeight < 20) return;
+    if (!view || view.clientWidth < 20 || view.clientHeight < 20) {
+      // A resize collapsed while the pane was hidden must still be applied
+      // when the view becomes measurable again.
+      lastCols = 0;
+      lastRows = 0;
+      return;
+    }
     try {
       fitAddon.fit();
     } catch {
@@ -201,7 +211,7 @@ async function startSession() {
       pendingOutput = [];
       setStatus(`${opened.shell} — ${opened.cwd}`, "success");
       sendResize(true);
-      terminal!.focus();
+      requestAnimationFrame(() => terminal?.focus());
     } catch (error) {
       connectingNonce = null;
       pendingOutput = [];
@@ -214,6 +224,20 @@ async function startSession() {
   });
 
   return starting;
+}
+
+async function restartSession(): Promise<void> {
+  if (restarting) return restarting;
+  restarting = (async () => {
+    // Wait for an in-flight open. Closing its nonce while it is still pending
+    // used to leave a closed session behind with no replacement started.
+    if (starting) await starting.catch(() => undefined);
+    closeSession();
+    await startSession();
+  })().finally(() => {
+    restarting = null;
+  });
+  return restarting;
 }
 
 function installListeners() {
@@ -286,8 +310,7 @@ export async function activateTerminal(options: TerminalOptions): Promise<void> 
     terminal?.focus();
   });
   document.getElementById("btn-terminal-restart")?.addEventListener("click", () => {
-    closeSession();
-    void startSession();
+    void restartSession();
   });
   const ollamaInput = document.getElementById("ollama-model") as HTMLInputElement | null;
   const savedModel = getWindowValue("talos.ollama-model");
@@ -309,7 +332,8 @@ export function focusTerminal(): void {
   }
   sendResize(true);
   if (!session) void startSession();
-  terminal.focus();
+  // A freshly unhidden xterm view is not always focusable in the same frame.
+  requestAnimationFrame(() => terminal?.focus());
 }
 
 export async function runOllamaModel(): Promise<void> {

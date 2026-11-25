@@ -40,7 +40,7 @@ focus a divider and use the arrow keys (Shift+arrow for larger steps).
 
 The shell selects **Large**, **Medium**, or **Compact** from both the available
 window width and height. Compact mode tightens the header and status bar,
-reduces panel chrome, wraps the terminal toolbar, and moves secondary toolbar
+reduces panel chrome, scrolls the terminal toolbar in one row, and moves secondary toolbar
 actions into a **More** menu. The status-bar **Layout** control cycles Auto,
 Large, Medium, and Compact; the choice is stored per window. Panel and side-pane
 sizes are clamped against the live window so a restored size cannot consume the
@@ -72,8 +72,11 @@ instead of closing the document.
 
 On desktop, the Terminal channel opens a real pseudo-terminal running the
 machine's default shell. It is created lazily, starts in the chosen workspace,
-tracks panel resizes, and is disposed when the window closes. Android builds
-receive inert terminal commands and do not expose this UI.
+tracks panel resizes and theme changes, and is disposed when the window closes.
+Restart waits for an in-flight shell before replacing it, late resizes are
+retried when the panel becomes visible again, and switching to the Terminal tab
+returns focus to the shell. Android builds receive inert terminal commands and
+do not expose this UI.
 
 Type shell commands directly in the terminal, or enter an Ollama model name in
 the toolbar and choose **Run in Ollama**. Talos validates the model name and

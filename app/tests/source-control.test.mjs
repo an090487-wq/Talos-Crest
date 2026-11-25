@@ -37,6 +37,20 @@ test("the pane exposes the full local Git workflow", () => {
   assert.match(sourceControl, /git_file_preview/);
 });
 
+test("commit clears stale diff UI and cannot double-submit", () => {
+  assert.match(sourceControl, /function closeDiff\(\): void/);
+  assert.match(sourceControl, /if \(committing\) return;/);
+  assert.match(sourceControl, /button\.textContent = "Committing…"/);
+  assert.match(sourceControl, /input\.value = "";\s*closeDiff\(\);\s*await refresh\(\);/);
+  assert.match(sourceControl, /event\.stopPropagation\(\);/);
+  assert.match(sourceControl, /closeDiff\(\);\s*pane\(\)\.classList\.add\("hidden"\)/);
+});
+
+test("diff and commit areas cannot grow without bound", () => {
+  assert.match(html, /#sc-message \{[^}]*max-height: 140px;/);
+  assert.match(html, /#sc-diff \{[^}]*height: min\(38%, 300px\);[^}]*max-height: 300px;/);
+});
+
 test("remote sync is explicit and never automatic", () => {
   assert.match(sourceControl, /el\("sc-fetch"\)\.addEventListener\("click"/);
   assert.match(sourceControl, /el\("sc-pull"\)\.addEventListener\("click"/);

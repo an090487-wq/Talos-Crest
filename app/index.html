@@ -168,7 +168,7 @@
       #sc-repo { padding: 6px 9px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
       #sc-toolbar, #sc-commit-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
       #sc-toolbar button, #sc-commit-actions button { min-height: 26px; padding: 3px 8px; font-size: 11px; }
-      #sc-message { display: block; width: calc(100% - 16px); min-height: 58px; margin: 8px; padding: 7px; resize: vertical; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-sm); font: 12px/1.4 var(--ui-font); }
+      #sc-message { display: block; width: calc(100% - 16px); min-height: 58px; max-height: 140px; margin: 8px; padding: 7px; resize: vertical; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-sm); font: 12px/1.4 var(--ui-font); }
       #sc-status { min-height: 18px; padding: 0 9px 6px; color: var(--muted); font-size: 11px; }
       #sc-sections { flex: 1 1 auto; min-height: 0; overflow: auto; padding-bottom: 8px; }
       .sc-section { border-top: 1px solid var(--line); }
@@ -182,7 +182,7 @@
       .sc-badge { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
       .sc-actions { flex: 0 0 auto; display: flex; gap: 3px; }
       .sc-actions button { min-width: 24px; min-height: 22px; padding: 0 5px; font-size: 10px; }
-      #sc-diff { flex: 0 0 42%; min-height: 120px; display: flex; flex-direction: column; border-top: 1px solid var(--line); background: var(--panel); }
+      #sc-diff { flex: 0 0 auto; height: min(38%, 300px); min-height: 120px; max-height: 300px; display: flex; flex-direction: column; border-top: 1px solid var(--line); background: var(--panel); }
       #sc-diff-bar { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-bottom: 1px solid var(--line); font-size: 11px; }
       #sc-diff-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       #sc-diff-text { flex: 1 1 auto; min-height: 0; margin: 0; padding: 8px; overflow: auto; white-space: pre; color: var(--text); font: 11px/1.5 var(--mono-font); }
@@ -705,8 +705,8 @@
       html[data-layout-mode="compact"] #gauge { width: 56px; }
       html[data-layout-mode="compact"] .tc-activity-bar:not(.expanded) { flex-basis: 44px; width: 44px; }
       html[data-layout-mode="compact"] .tc-nav-item { min-height: 34px; }
-      html[data-layout-mode="compact"] .tc-terminal-toolbar { flex-wrap: wrap; }
-      html[data-layout-mode="compact"] .tc-terminal-toolbar input { width: min(150px, 100%); }
+      html[data-layout-mode="compact"] .tc-terminal-toolbar { flex-wrap: nowrap; }
+      html[data-layout-mode="compact"] .tc-terminal-toolbar input { flex: 0 1 120px; width: min(150px, 30vw); }
       html[data-layout-mode="compact"] .tc-chronicle-stats,
       html[data-layout-mode="compact"] .tc-chronicle-toolbar { flex-wrap: wrap; }
       html[data-layout-mode="compact"] .tc-chronicle-results { min-height: 140px; max-height: none; }

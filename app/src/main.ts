@@ -1126,7 +1126,7 @@ const bottomViews: Record<BottomTab, string> = {
   debug: "channel-debug",
 };
 
-function showTab(tab: BottomTab) {
+function showTab(tab: BottomTab, focus = false) {
   setWindowValue("talos.bottom-panel-tab", tab);
   for (const b of document.querySelectorAll<HTMLElement>("[data-tab]")) {
     b.classList.toggle("active", b.dataset.tab === tab);
@@ -1136,7 +1136,7 @@ function showTab(tab: BottomTab) {
   }
   $("problems-toolbar").classList.toggle("hidden", tab !== "problems");
   if (tab === "problems" && !$("panel").classList.contains("hidden")) renderProblems();
-  if (tab === "terminal" && !$("panel").classList.contains("hidden")) void ensureTerminal();
+  if (tab === "terminal" && !$("panel").classList.contains("hidden")) void ensureTerminal(focus);
 }
 
 function setPanelMaximized(maximized: boolean) {
@@ -1158,7 +1158,7 @@ function showPanel(show: boolean, persist = true) {
   $("panel").classList.toggle("hidden", !show);
   $("panel-splitter").classList.toggle("hidden", !show);
   if (show && !$("problems").classList.contains("hidden")) renderProblems();
-  if (show && !$("channel-terminal").classList.contains("hidden")) void ensureTerminal();
+  if (show && !$("channel-terminal").classList.contains("hidden")) void ensureTerminal(true);
   if (persist) setWindowValue("talos.panel-visible", String(show));
   scheduleLayoutSync(show ? "panel-open" : "panel-close");
   scheduleEditorMeasure();
@@ -2803,7 +2803,7 @@ $("btn-fun").addEventListener("click", () => {
 for (const b of document.querySelectorAll<HTMLElement>("[data-tab]")) {
   b.addEventListener("click", () => {
     const tab = b.dataset.tab as BottomTab | undefined;
-    if (tab && tab in bottomViews) showTab(tab);
+    if (tab && tab in bottomViews) showTab(tab, true);
   });
 }
 initPdfPane();

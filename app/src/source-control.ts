@@ -40,6 +40,7 @@ interface GitCommit {
 
 let initialized = false;
 let refreshing = false;
+let committing = false;
 let refreshTimer = 0;
 let currentRoot: string | null = null;
 let repoInfo: GitRepoInfo | null = null;
@@ -343,6 +344,15 @@ async function ignorePaths(paths: string[]): Promise<void> {
   setStatus(added ? `Added ${added} rule${added === 1 ? "" : "s"} to .gitignore.` : "Those paths are already ignored.");
 }
 
+function closeDiff(): void {
+  el("sc-diff").classList.add("hidden");
+  el("sc-diff-text").textContent = "";
+  el("sc-diff-name").textContent = "";
+  diffOpenPath = null;
+  selectedFile = null;
+  selectedCommit = null;
+}
+
 function showDiff(title: string, text: string, openPath: string | null): void {
   el("sc-diff-name").textContent = title;
   el("sc-diff-text").textContent = text.trim() || "No textual changes.";
@@ -382,6 +392,7 @@ function syncOptions(): { remote?: string; branch?: string } {
 
 export async function openSourceControl(): Promise<void> {
   const target = pane();
+  closeDiff();
   target.classList.remove("hidden");
   document.dispatchEvent(new CustomEvent<string>("talos:side-pane-change", { detail: target.id }));
   await refresh();
@@ -395,11 +406,12 @@ export function initSourceControl(): void {
     void refresh().catch(reportError);
   });
   el("sc-close").addEventListener("click", () => {
+    closeDiff();
     pane().classList.add("hidden");
     document.dispatchEvent(new CustomEvent<string | null>("talos:side-pane-change", { detail: null }));
     document.dispatchEvent(new Event("talos:source-control-closed"));
   });
-  el("sc-diff-close").addEventListener("click", () => el("sc-diff").classList.add("hidden"));
+  el("sc-diff-close").addEventListener("click", closeDiff);
   el("sc-diff-open").addEventListener("click", () => {
     if (diffOpenPath) {
       document.dispatchEvent(new CustomEvent<string>("talos:open-path", { detail: diffOpenPath }));
@@ -430,6 +442,7 @@ export function initSourceControl(): void {
       .catch(reportError);
   });
   el("sc-commit").addEventListener("click", () => {
+    if (committing) return;
     void (async () => {
       const root = await requireRoot();
       const input = el<HTMLTextAreaElement>("sc-message");
@@ -438,15 +451,28 @@ export function initSourceControl(): void {
         setStatus("Enter a commit message first.");
         return;
       }
-      const output = await invoke<string>("git_commit", { root, message });
-      input.value = "";
-      await refresh();
-      setStatus(output.trim().split("\n")[0] || "Commit created.");
+      const button = el<HTMLButtonElement>("sc-commit");
+      const originalLabel = button.textContent || "Commit";
+      committing = true;
+      button.disabled = true;
+      button.textContent = "Committing…";
+      try {
+        const output = await invoke<string>("git_commit", { root, message });
+        input.value = "";
+        closeDiff();
+        await refresh();
+        setStatus(output.trim().split("\n")[0] || "Commit created.");
+      } finally {
+        committing = false;
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
     })().catch(reportError);
   });
   el<HTMLTextAreaElement>("sc-message").addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
       event.preventDefault();
+      event.stopPropagation();
       el<HTMLButtonElement>("sc-commit").click();
     }
   });
