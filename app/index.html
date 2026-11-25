@@ -160,7 +160,7 @@
       .outline-row:hover { background: var(--panel); }
       .outline-kind { width: 12px; color: var(--accent); font-size: 10px; text-align: center; }
       .outline-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      #source-control-pane { width: var(--side-pane-size); min-width: 260px; border-left: 1px solid var(--line); display: flex; flex-direction: column; background: var(--bg); }
+      #source-control-pane { width: var(--side-pane-size); min-width: 260px; min-height: 0; overflow: hidden; border-left: 1px solid var(--line); display: flex; flex-direction: column; background: var(--bg); }
       #source-control-bar { display: flex; align-items: center; gap: 6px; padding: 7px 9px; background: var(--panel); border-bottom: 1px solid var(--line); }
       #source-control-bar strong { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
       #sc-branch, #sc-remote { max-width: 138px; }
@@ -612,13 +612,27 @@
           text-align: left;
         }
         #main { flex-direction: column; }
+        /* Source Control stays an overlay sidebar; it must never become a
+           second bottom panel stacked above the Terminal/Output panel. */
+        #main.side-pane-open > #source-control-pane {
+          position: absolute;
+          inset: 0 0 0 auto;
+          z-index: 4;
+          width: min(92vw, 360px);
+          height: 100%;
+          min-width: 0;
+          min-height: 0;
+          border-left: 1px solid var(--line);
+          border-top: 0;
+          box-shadow: -8px 0 24px rgb(0 0 0 / 35%);
+        }
+        #main[data-active-side-pane="source-control-pane"] > #side-splitter { display: none; }
         #editor { min-height: 0; }
         #document-tabs { flex: 0 0 36px; }
         #canvas-header { flex: 0 0 auto; min-height: 48px; flex-wrap: wrap; padding: 8px; }
         .cm-editor { font-size: var(--editor-font-size, 15px); }
-        #main.side-pane-open > .side-pane { min-width: 0; min-height: 160px; }
+        #main.side-pane-open > .side-pane:not(#source-control-pane) { min-width: 0; min-height: 160px; }
         #outline-pane { width: 100%; min-width: 0; border-left: 0; border-top: 1px solid var(--line); }
-        #source-control-pane { width: 100%; min-width: 0; border-left: 0; border-top: 1px solid var(--line); }
         #side-splitter { width: auto; height: 5px; cursor: row-resize; }
         #pdf-pane {
           width: 100%;

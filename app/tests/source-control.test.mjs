@@ -14,7 +14,7 @@ test("the existing Source Control button opens a real side pane", () => {
   assert.match(html, /data-view="source-control"/);
   assert.match(html, /<aside id="source-control-pane" class="side-pane hidden"/);
   assert.match(main, /import \{ initSourceControl, openSourceControl \} from "\.\/source-control"/);
-  assert.match(main, /case "source-control":\s*void guard\(openSourceControl\)/);
+  assert.match(main, /case "source-control": \{[\s\S]*?void guard\(openSourceControl\)/);
   assert.match(main, /initSourceControl\(\);/);
   assert.match(main, /view\.source-control/);
 });
@@ -38,12 +38,12 @@ test("the pane exposes the full local Git workflow", () => {
 });
 
 test("commit clears stale diff UI and cannot double-submit", () => {
-  assert.match(sourceControl, /function closeDiff\(\): void/);
+  assert.match(sourceControl, /function closeDiff\(rerender = true\): void/);
   assert.match(sourceControl, /if \(committing\) return;/);
   assert.match(sourceControl, /button\.textContent = "Committing…"/);
-  assert.match(sourceControl, /input\.value = "";\s*closeDiff\(\);\s*await refresh\(\);/);
+  assert.match(sourceControl, /input\.value = "";\s*closeDiff\(false\);\s*await refresh\(\);/);
   assert.match(sourceControl, /event\.stopPropagation\(\);/);
-  assert.match(sourceControl, /closeDiff\(\);\s*pane\(\)\.classList\.add\("hidden"\)/);
+  assert.match(sourceControl, /closeDiff\(false\);\s*pane\(\)\.classList\.add\("hidden"\)/);
   assert.match(sourceControl, /CustomEvent<boolean>\("talos:source-control-busy"/);
   assert.match(sourceControl, /setBusy\(true\);[\s\S]{0,600}setBusy\(false\);/);
 });
@@ -51,6 +51,25 @@ test("commit clears stale diff UI and cannot double-submit", () => {
 test("diff and commit areas cannot grow without bound", () => {
   assert.match(html, /#sc-message \{[^}]*max-height: 140px;/);
   assert.match(html, /#sc-diff \{[^}]*height: min\(38%, 300px\);[^}]*max-height: 300px;/);
+});
+
+test("stale refreshes and overlapping Git actions cannot overwrite current state", () => {
+  assert.match(sourceControl, /let refreshGeneration = 0;/);
+  assert.match(sourceControl, /let pendingRefresh = false;/);
+  assert.match(sourceControl, /if \(refreshing\) \{\s*\/\/[\s\S]{0,240}refreshGeneration \+= 1;\s*pendingRefresh = true;/);
+  assert.match(sourceControl, /if \(generation !== refreshGeneration\) return;/);
+  assert.match(sourceControl, /function withGitAction<T>\(run: \(\) => Promise<T>\): Promise<T>/);
+  assert.match(sourceControl, /mutationQueue = task\.then\(\(\) => undefined, \(\) => undefined\);/);
+  assert.match(sourceControl, /const root = repoInfo\?\.root \?\? currentRoot;/);
+});
+
+test("dropdown choices and diff requests survive refreshes", () => {
+  assert.match(sourceControl, /let branchSelection: string \| null = null;/);
+  assert.match(sourceControl, /let remoteSelection: string \| null = null;/);
+  assert.match(sourceControl, /let diffRequest = 0;/);
+  assert.match(sourceControl, /if \(focusedId === "sc-branch" \|\| focusedId === "sc-remote"\) el\(focusedId\)\.focus\(\);/);
+  assert.match(sourceControl, /if \(request !== diffRequest\) return;/);
+  assert.match(sourceControl, /function closeDiff\(rerender = true\): void/);
 });
 
 test("remote sync is explicit and never automatic", () => {

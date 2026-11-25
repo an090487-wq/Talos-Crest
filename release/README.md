@@ -17,6 +17,9 @@ staging, commits, branches, history, and explicit remote sync. Ctrl+Enter in its
 message box commits without triggering the editor's Run command, a commit is
 hard-blocked from opening the bottom Output panel, stale diffs close after a
 commit, and the integrated terminal keeps its size and focus when panels change.
+The pane toggles shut when the rail button is pressed again, keeps branch and
+remote choices across refreshes, and stays a sidebar instead of stacking into
+the Terminal/Output area on narrow windows.
 
 ## Linux
 
@@ -29,7 +32,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`e2ad3170297dc01257d07a569407368ad2662170e0487ee03fbceccc134c88b5`
+`59d74763318ad5199a9bc39ff8d0ed20c85a2e3ccb5fa5bb09bf22b53e9c8375`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -46,7 +49,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`8f33cfad8cb285af46355aae6a0b767e5d6328aaeb2b075c983e9616310c681f`
+`e72b5fb843d4641b50096f4f24ebda9d4b383032bbdae25013c247272a537d88`
 
 ## Android
 

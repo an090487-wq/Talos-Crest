@@ -64,6 +64,15 @@ test("adaptive layout uses width and height, with a user override and safe clamp
   assert.match(canvas, /addEventListener\("resize"/);
 });
 
+test("Source Control never stacks into the bottom panel area", () => {
+  assert.match(html, /#main\.side-pane-open > #source-control-pane \{[\s\S]*?position: absolute;[\s\S]*?inset: 0 0 0 auto;[\s\S]*?height: 100%;/);
+  assert.match(html, /#main\[data-active-side-pane="source-control-pane"\] > #side-splitter \{ display: none; \}/);
+  assert.match(html, /#main\.side-pane-open > \.side-pane:not\(#source-control-pane\) \{[^}]*min-height: 160px;/);
+  assert.match(main, /previousNavBeforeSourceControl/);
+  assert.match(main, /case "source-control": \{[\s\S]{0,420}\$\("sc-close"\) as HTMLButtonElement\)\.click\(\);/);
+  assert.match(main, /talos:source-control-closed[\s\S]{0,260}setActiveNav\(previousNavBeforeSourceControl \?\? "explorer"\)/);
+});
+
 test("compact layout exposes secondary toolbar actions through an overflow menu", () => {
   assert.match(html, /id="btn-toolbar-overflow"/);
   assert.match(html, /id="toolbar-overflow-menu"/);

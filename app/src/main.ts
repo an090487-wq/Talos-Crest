@@ -155,6 +155,7 @@ let layoutSignature = "";
 // trigger the editor's Run command. Source Control brackets its Git work with
 // this event so layout/run handlers can stay out of the way.
 let sourceControlBusy = false;
+let previousNavBeforeSourceControl: string | null = null;
 document.addEventListener("talos:source-control-busy", (event) => {
   sourceControlBusy = (event as CustomEvent<boolean>).detail === true;
 });
@@ -2788,10 +2789,18 @@ void getCurrentWindow()
 document.addEventListener("talos:side-pane-change", (event) => {
   const id = (event as CustomEvent<string | null>).detail;
   if (id) $("main").dataset.activeSidePane = id;
+  else if ($("main").dataset.activeSidePane === "source-control-pane") {
+    delete $("main").dataset.activeSidePane;
+  }
   syncSidePane();
   scheduleEditorMeasure();
 });
-document.addEventListener("talos:source-control-closed", () => setActiveNav("explorer"));
+document.addEventListener("talos:source-control-closed", () => {
+  setActiveNav(previousNavBeforeSourceControl ?? "explorer");
+  previousNavBeforeSourceControl = null;
+  syncSidePane();
+  scheduleEditorMeasure();
+});
 document.addEventListener("talos:pdf-focus-change", () => {
   scheduleLayoutSync("pdf-focus");
   scheduleEditorMeasure();
@@ -2896,10 +2905,18 @@ for (const button of document.querySelectorAll<HTMLElement>("#activity-bar [data
         $("btn-architecture").click();
         setActiveNav(view);
         break;
-      case "source-control":
+      case "source-control": {
+        const sourcePane = $("source-control-pane");
+        if (!sourcePane.classList.contains("hidden")) {
+          ($("sc-close") as HTMLButtonElement).click();
+          break;
+        }
+        previousNavBeforeSourceControl =
+          document.querySelector<HTMLElement>("#activity-bar [data-view].active")?.dataset.view ?? "explorer";
         void guard(openSourceControl);
         setActiveNav(view);
         break;
+      }
       case "search":
         openQuickOpen();
         setActiveNav(view);

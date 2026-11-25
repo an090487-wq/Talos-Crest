@@ -40,8 +40,14 @@ interface GitCommit {
 
 let initialized = false;
 let refreshing = false;
+let pendingRefresh = false;
+let refreshGeneration = 0;
 let committing = false;
 let refreshTimer = 0;
+let mutationQueue: Promise<void> = Promise.resolve();
+let branchSelection: string | null = null;
+let remoteSelection: string | null = null;
+let diffRequest = 0;
 let currentRoot: string | null = null;
 let repoInfo: GitRepoInfo | null = null;
 let entries: GitFileStatus[] = [];
@@ -67,8 +73,20 @@ function setStatus(text: string): void {
 }
 
 function setBusy(value: boolean): void {
-  committing = value;
   document.dispatchEvent(new CustomEvent<boolean>("talos:source-control-busy", { detail: value }));
+}
+
+function withGitAction<T>(run: () => Promise<T>): Promise<T> {
+  const task = mutationQueue.then(async () => {
+    setBusy(true);
+    try {
+      return await run();
+    } finally {
+      setBusy(false);
+    }
+  });
+  mutationQueue = task.then(() => undefined, () => undefined);
+  return task;
 }
 
 function friendlyGitError(error: unknown): string {
@@ -110,7 +128,7 @@ function actionButton(label: string, title: string, run: () => void | Promise<vo
   button.title = title;
   button.addEventListener("click", (event) => {
     event.stopPropagation();
-    void Promise.resolve().then(run).catch(reportError);
+    void withGitAction(() => Promise.resolve().then(run)).catch(reportError);
   });
   return button;
 }
@@ -209,6 +227,8 @@ function render(): void {
   const branchSelect = el<HTMLSelectElement>("sc-branch");
   const remoteSelect = el<HTMLSelectElement>("sc-remote");
   const hasRepo = repoInfo !== null;
+  const active = document.activeElement;
+  const focusedId = active instanceof HTMLElement ? active.id : "";
 
   setRepoControlsEnabled(hasRepo);
   el("sc-repo").textContent = hasRepo
@@ -218,6 +238,7 @@ function render(): void {
       : "Open a folder to use Source Control";
   el("sc-sync").textContent = `↑${repoInfo?.ahead ?? 0} ↓${repoInfo?.behind ?? 0}`;
 
+  const branchValue = branchSelection ?? (hasRepo ? repoInfo!.branch : "");
   branchSelect.replaceChildren();
   for (const branch of branches) {
     const option = document.createElement("option");
@@ -228,13 +249,18 @@ function render(): void {
   if (hasRepo && !branches.some((branch) => branch.current)) {
     const option = document.createElement("option");
     option.value = repoInfo!.branch;
-    option.textContent = repoInfo!.branch;
+    option.textContent = `${repoInfo!.branch}${repoInfo!.detached ? " (detached)" : ""}`;
     branchSelect.append(option);
   }
-  if (hasRepo) branchSelect.value = repoInfo!.branch;
-  branchSelect.disabled = !hasRepo || branches.length === 0;
+  if (hasRepo && Array.from(branchSelect.options).some((option) => option.value === branchValue)) {
+    branchSelect.value = branchValue;
+  } else if (hasRepo) {
+    branchSelect.value = repoInfo!.branch;
+  }
+  branchSelection = branchSelect.value || null;
+  branchSelect.disabled = !hasRepo || branchSelect.options.length === 0;
 
-  const previousRemote = remoteSelect.value;
+  const remoteValue = remoteSelection ?? remoteSelect.value ?? "";
   remoteSelect.replaceChildren();
   for (const remote of remotes) {
     const option = document.createElement("option");
@@ -248,9 +274,12 @@ function render(): void {
     option.value = "";
     option.textContent = "No remote";
     remoteSelect.append(option);
-  } else if (remotes.some((remote) => remote.name === previousRemote)) {
-    remoteSelect.value = previousRemote;
+  } else if (remotes.some((remote) => remote.name === remoteValue)) {
+    remoteSelect.value = remoteValue;
+  } else {
+    remoteSelect.value = remotes[0].name;
   }
+  remoteSelection = remoteSelect.value || null;
   for (const id of ["sc-fetch", "sc-pull", "sc-push"]) {
     el<HTMLButtonElement>(id).disabled = !hasRepo || remotes.length === 0;
   }
@@ -259,12 +288,15 @@ function render(): void {
   renderFileGroup("sc-staged", entries.filter((entry) => entry.staged && !entry.conflict), true);
   renderFileGroup("sc-changes", entries.filter((entry) => !entry.staged && !entry.conflict), false);
   renderHistory();
+
+  if (focusedId === "sc-branch" || focusedId === "sc-remote") el(focusedId).focus();
 }
 
 async function refresh(): Promise<void> {
   const root = workspaceRoot();
-  currentRoot = root;
   if (!root) {
+    refreshGeneration += 1;
+    currentRoot = null;
     repoInfo = null;
     entries = [];
     branches = [];
@@ -275,12 +307,22 @@ async function refresh(): Promise<void> {
     return;
   }
 
-  if (refreshing) return;
+  if (refreshing) {
+    // Invalidate the in-flight read and queue a fresh one instead of letting
+    // stale Git data land on top of the newly selected workspace.
+    refreshGeneration += 1;
+    pendingRefresh = true;
+    return;
+  }
+  const generation = ++refreshGeneration;
+  currentRoot = root;
   refreshing = true;
   try {
     setStatus("Reading Git status…");
-    repoInfo = await invoke<GitRepoInfo | null>("git_repo_info", { root });
-    if (!repoInfo) {
+    const repo = await invoke<GitRepoInfo | null>("git_repo_info", { root });
+    if (generation !== refreshGeneration) return;
+    repoInfo = repo;
+    if (!repo) {
       entries = [];
       branches = [];
       remotes = [];
@@ -295,6 +337,7 @@ async function refresh(): Promise<void> {
       invoke<GitRemote[]>("git_remotes", { root }),
       invoke<GitCommit[]>("git_log", { root, limit: 12 }),
     ]);
+    if (generation !== refreshGeneration) return;
     entries = status;
     branches = branchList;
     remotes = remoteList;
@@ -306,6 +349,10 @@ async function refresh(): Promise<void> {
       : `${entries.length} change${entries.length === 1 ? "" : "s"}.`);
   } finally {
     refreshing = false;
+    if (pendingRefresh) {
+      pendingRefresh = false;
+      void refresh().catch(reportError);
+    }
   }
 }
 
@@ -318,8 +365,11 @@ function scheduleRefresh(): void {
 }
 
 async function requireRoot(): Promise<string> {
-  if (!currentRoot) throw new Error("Open a folder before using Source Control.");
-  return currentRoot;
+  // Actions must target the repository that produced the visible rows, even
+  // if the workspace root changed while a refresh was still in flight.
+  const root = repoInfo?.root ?? currentRoot;
+  if (!root) throw new Error("Open a folder before using Source Control.");
+  return root;
 }
 
 async function stagePaths(paths: string[]): Promise<void> {
@@ -349,13 +399,16 @@ async function ignorePaths(paths: string[]): Promise<void> {
   setStatus(added ? `Added ${added} rule${added === 1 ? "" : "s"} to .gitignore.` : "Those paths are already ignored.");
 }
 
-function closeDiff(): void {
+function closeDiff(rerender = true): void {
+  diffRequest += 1;
   el("sc-diff").classList.add("hidden");
   el("sc-diff-text").textContent = "";
   el("sc-diff-name").textContent = "";
+  el<HTMLButtonElement>("sc-diff-open").classList.add("hidden");
   diffOpenPath = null;
   selectedFile = null;
   selectedCommit = null;
+  if (rerender && initialized) render();
 }
 
 function showDiff(title: string, text: string, openPath: string | null): void {
@@ -368,21 +421,25 @@ function showDiff(title: string, text: string, openPath: string | null): void {
 
 async function showFileDiff(entry: GitFileStatus): Promise<void> {
   const root = await requireRoot();
+  const request = ++diffRequest;
   selectedFile = { path: entry.path, staged: entry.staged };
   selectedCommit = null;
   let patch = await invoke<string>("git_diff", { root, path: entry.path, staged: entry.staged });
   if (!patch.trim() && !entry.staged) {
     patch = await invoke<string>("git_file_preview", { root, path: entry.path });
   }
+  if (request !== diffRequest) return;
   showDiff(entry.path, patch, absoluteRepoPath(entry.path));
   render();
 }
 
 async function showCommitDiff(commit: GitCommit): Promise<void> {
   const root = await requireRoot();
+  const request = ++diffRequest;
   selectedFile = null;
   selectedCommit = commit.hash;
   const patch = await invoke<string>("git_commit_diff", { root, hash: commit.hash });
+  if (request !== diffRequest) return;
   showDiff(`${commit.shortHash} ${commit.subject}`, patch, null);
   render();
 }
@@ -397,7 +454,7 @@ function syncOptions(): { remote?: string; branch?: string } {
 
 export async function openSourceControl(): Promise<void> {
   const target = pane();
-  closeDiff();
+  closeDiff(false);
   target.classList.remove("hidden");
   document.dispatchEvent(new CustomEvent<string>("talos:side-pane-change", { detail: target.id }));
   await refresh();
@@ -411,12 +468,12 @@ export function initSourceControl(): void {
     void refresh().catch(reportError);
   });
   el("sc-close").addEventListener("click", () => {
-    closeDiff();
+    closeDiff(false);
     pane().classList.add("hidden");
     document.dispatchEvent(new CustomEvent<string | null>("talos:side-pane-change", { detail: null }));
     document.dispatchEvent(new Event("talos:source-control-closed"));
   });
-  el("sc-diff-close").addEventListener("click", closeDiff);
+  el("sc-diff-close").addEventListener("click", () => closeDiff());
   el("sc-diff-open").addEventListener("click", () => {
     if (diffOpenPath) {
       document.dispatchEvent(new CustomEvent<string>("talos:open-path", { detail: diffOpenPath }));
@@ -425,31 +482,36 @@ export function initSourceControl(): void {
   el("sc-branch").addEventListener("change", (event) => {
     const branch = (event.target as HTMLSelectElement).value;
     if (!branch || branch === repoInfo?.branch) return;
-    void (async () => {
+    branchSelection = branch;
+    void withGitAction(async () => {
       const root = await requireRoot();
       await invoke("git_checkout", { root, branch });
       await refresh();
-    })().catch(reportError);
+    }).catch(reportError);
+  });
+  el("sc-remote").addEventListener("change", (event) => {
+    remoteSelection = (event.target as HTMLSelectElement).value || null;
   });
   el("sc-init").addEventListener("click", () => {
-    void (async () => {
+    void withGitAction(async () => {
       const root = await requireRoot();
       await invoke("git_init", { root });
       await refresh();
-    })().catch(reportError);
+    }).catch(reportError);
   });
   el("sc-stage-all").addEventListener("click", () => {
-    void stagePaths(entries.filter((entry) => !entry.staged && !entry.conflict).map((entry) => entry.path))
-      .catch(reportError);
+    void withGitAction(async () => {
+      await stagePaths(entries.filter((entry) => !entry.staged && !entry.conflict).map((entry) => entry.path));
+    }).catch(reportError);
   });
   el("sc-unstage-all").addEventListener("click", () => {
-    void unstagePaths(entries.filter((entry) => entry.staged).map((entry) => entry.path))
-      .catch(reportError);
+    void withGitAction(async () => {
+      await unstagePaths(entries.filter((entry) => entry.staged).map((entry) => entry.path));
+    }).catch(reportError);
   });
   el("sc-commit").addEventListener("click", () => {
     if (committing) return;
     void (async () => {
-      const root = await requireRoot();
       const input = el<HTMLTextAreaElement>("sc-message");
       const message = input.value.trim();
       if (!message) {
@@ -458,17 +520,20 @@ export function initSourceControl(): void {
       }
       const button = el<HTMLButtonElement>("sc-commit");
       const originalLabel = button.textContent || "Commit";
-      setBusy(true);
+      committing = true;
       button.disabled = true;
       button.textContent = "Committing…";
       try {
-        const output = await invoke<string>("git_commit", { root, message });
-        input.value = "";
-        closeDiff();
-        await refresh();
-        setStatus(output.trim().split("\n")[0] || "Commit created.");
+        await withGitAction(async () => {
+          const root = await requireRoot();
+          const output = await invoke<string>("git_commit", { root, message });
+          input.value = "";
+          closeDiff(false);
+          await refresh();
+          setStatus(output.trim().split("\n")[0] || "Commit created.");
+        });
       } finally {
-        setBusy(false);
+        committing = false;
         button.disabled = false;
         button.textContent = originalLabel;
       }
@@ -482,36 +547,37 @@ export function initSourceControl(): void {
     }
   });
   el("sc-fetch").addEventListener("click", () => {
-    void (async () => {
+    void withGitAction(async () => {
       const root = await requireRoot();
       const remote = el<HTMLSelectElement>("sc-remote").value;
       const output = await invoke<string>("git_fetch", { root, remote: remote || null });
       await refresh();
       setStatus(output.trim() || "Fetch complete.");
-    })().catch(reportError);
+    }).catch(reportError);
   });
   el("sc-pull").addEventListener("click", () => {
-    void (async () => {
+    void withGitAction(async () => {
       const root = await requireRoot();
       const output = await invoke<string>("git_pull", { root, ...syncOptions() });
       await refresh();
       setStatus(output.trim() || "Pull complete.");
-    })().catch(reportError);
+    }).catch(reportError);
   });
   el("sc-push").addEventListener("click", () => {
-    void (async () => {
+    void withGitAction(async () => {
       const root = await requireRoot();
       const output = await invoke<string>("git_push", { root, ...syncOptions() });
       await refresh();
       setStatus(output.trim() || "Push complete.");
-    })().catch(reportError);
+    }).catch(reportError);
   });
 
   document.addEventListener("talos:workspace-change", scheduleRefresh);
   document.addEventListener("talos:workspace-opened", scheduleRefresh);
   document.addEventListener("talos:workspace-files-changed", (event) => {
     const detail = (event as CustomEvent<{ root?: string }>).detail;
-    if (detail?.root && currentRoot && detail.root !== currentRoot) return;
+    const activeRoot = repoInfo?.root ?? currentRoot;
+    if (detail?.root && activeRoot && detail.root !== activeRoot) return;
     scheduleRefresh();
   });
 }

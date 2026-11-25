@@ -2617,18 +2617,26 @@ fn parse_git_status(bytes: &[u8]) -> Vec<GitFileStatus> {
         if path.is_empty() {
             continue;
         }
-        let original_path = if matches!(staged_code, 'R' | 'C') || matches!(worktree_code, 'R' | 'C') {
-            records
-                .next()
-                .map(|value| String::from_utf8_lossy(value).into_owned())
-                .filter(|value| !value.is_empty())
-        } else {
-            None
-        };
+        // Rename/copy records carry one source path per renamed side. A
+        // rename/rename conflict carries two; consuming both keeps the record
+        // stream aligned so the next real change is not swallowed.
+        let source_count = usize::from(matches!(staged_code, 'R' | 'C'))
+            + usize::from(matches!(worktree_code, 'R' | 'C'));
+        let mut original_path = None;
+        for _ in 0..source_count {
+            if let Some(source) = records.next() {
+                let source = String::from_utf8_lossy(source).into_owned();
+                if !source.is_empty() && original_path.is_none() {
+                    original_path = Some(source);
+                }
+            }
+        }
         let conflict = staged_code == 'U'
             || worktree_code == 'U'
-            || (staged_code == 'A' && worktree_code == 'A')
-            || (staged_code == 'D' && worktree_code == 'D');
+            || matches!(
+                (staged_code, worktree_code),
+                ('A', 'A') | ('D', 'D') | ('R', 'R') | ('R', 'C') | ('C', 'R') | ('C', 'C')
+            );
         if conflict {
             result.push(GitFileStatus {
                 path,
@@ -2955,10 +2963,42 @@ async fn git_discard(root: String, paths: Vec<String>) -> Result<(), String> {
     if paths.is_empty() {
         return Ok(());
     }
-    let mut cmd = git_command(&root)?;
-    cmd.arg("restore").arg("--").args(paths);
-    run_git(cmd, "git restore")?;
+    // `git restore --` alone fails for untracked files and leaves staged
+    // additions in the index. Reset both index and worktree, then clean any
+    // file that is still untracked (including a newly staged addition).
+    let mut restore = git_command(&root)?;
+    restore
+        .arg("restore")
+        .arg("--staged")
+        .arg("--worktree")
+        .arg("--")
+        .args(&paths);
+    let restored = restore.output().is_ok_and(|output| output.status.success());
+    if !restored {
+        let mut cached = git_command(&root)?;
+        cached.arg("rm").arg("--cached").arg("--").args(&paths);
+        // Missing HEAD entries and untracked files are expected here; the
+        // clean pass below is what removes them from the worktree.
+        let _ = cached.output();
+    }
+    let mut clean = git_command(&root)?;
+    clean.arg("clean").arg("-f").arg("--").args(&paths);
+    run_git(clean, "git clean")?;
     Ok(())
+}
+
+fn gitignore_pattern(path: &str) -> String {
+    let mut pattern = String::from("/");
+    for character in path.chars() {
+        match character {
+            '\\' | '#' | '!' | '[' | ']' | '*' | '?' | ' ' => {
+                pattern.push('\\');
+                pattern.push(character);
+            }
+            _ => pattern.push(character),
+        }
+    }
+    pattern
 }
 
 #[tauri::command]
@@ -2981,13 +3021,14 @@ async fn git_ignore(root: String, paths: Vec<String>) -> Result<usize, String> {
     let mut existing = fs::read_to_string(&file_path).unwrap_or_default();
     let mut added = 0usize;
     for entry in normalized {
-        if existing.lines().any(|line| line.trim() == entry) {
+        let pattern = gitignore_pattern(&entry);
+        if existing.lines().any(|line| line.trim() == entry || line.trim() == pattern) {
             continue;
         }
         if !existing.is_empty() && !existing.ends_with('\n') {
             existing.push('\n');
         }
-        existing.push_str(&entry);
+        existing.push_str(&pattern);
         existing.push('\n');
         added += 1;
     }
@@ -5090,6 +5131,29 @@ mod tests {
         let conflict = entries.iter().find(|entry| entry.path == "merge.txt").unwrap();
         assert!(conflict.conflict);
         assert!(!entries.iter().any(|entry| entry.path == "ignored.log"));
+    }
+
+    #[test]
+    fn git_porcelain_status_marks_rename_and_add_conflicts() {
+        // RR carries two source paths; both must be consumed so the following
+        // real change is not parsed as a bogus status entry.
+        let bytes = b"RR renamed.txt\0base.txt\0theirs.txt\0DD gone.txt\0?? fresh.txt\0";
+        let entries = parse_git_status(bytes);
+        assert_eq!(entries.len(), 3);
+        assert!(entries.iter().any(|entry| entry.path == "renamed.txt" && entry.conflict));
+        assert_eq!(
+            entries.iter().find(|entry| entry.path == "renamed.txt").unwrap().original_path.as_deref(),
+            Some("base.txt")
+        );
+        assert!(entries.iter().any(|entry| entry.path == "gone.txt" && entry.conflict));
+        assert!(entries.iter().any(|entry| entry.path == "fresh.txt" && !entry.conflict));
+    }
+
+    #[test]
+    fn gitignore_pattern_escapes_special_characters() {
+        assert_eq!(gitignore_pattern("src/a b.txt"), "/src/a\\ b.txt");
+        assert_eq!(gitignore_pattern("!weird[1]*.log"), "/\\!weird\\[1\\]\\*.log");
+        assert_eq!(gitignore_pattern("normal/path.txt"), "/normal/path.txt");
     }
 
     #[test]
