@@ -25,6 +25,21 @@ static PROJECT_WATCHERS: OnceLock<Mutex<HashMap<String, notify::RecommendedWatch
 static ACTIVE_RUN_STDINS: OnceLock<Mutex<HashMap<String, ChildStdin>>> = OnceLock::new();
 static FILE_WRITE_LOCK: Mutex<()> = Mutex::new(());
 static NEXT_WINDOW_ID: AtomicU64 = AtomicU64::new(0);
+// Repository roots are stable for the life of a workspace. Every Git command
+// needs the toplevel (porcelain paths are repo-relative); resolving it with a
+// fresh `git rev-parse` for each command spawned ~20 processes per Source
+// Control refresh. Cache successful resolutions; failures are never cached so
+// a folder that later becomes a repository is detected correctly.
+static GIT_TOPLEVEL_CACHE: OnceLock<Mutex<HashMap<String, PathBuf>>> = OnceLock::new();
+
+fn cached_git_toplevel(root: &str) -> Option<PathBuf> {
+    GIT_TOPLEVEL_CACHE
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .get(root)
+        .cloned()
+}
 
 fn active_run_stdin_map() -> &'static Mutex<HashMap<String, ChildStdin>> {
     ACTIVE_RUN_STDINS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -2523,10 +2538,14 @@ fn contained_git_file_in(base_dir: &Path, path: &str) -> Result<PathBuf, String>
 }
 
 fn git_toplevel(root: &str) -> Result<PathBuf, String> {
-    let root = validate_git_root(root)?;
+    let cache_key = root.to_string();
+    if let Some(cached) = cached_git_toplevel(&cache_key) {
+        return Ok(cached);
+    }
+    let root_path = validate_git_root(root)?;
     let output = Command::new("git")
         .arg("-C")
-        .arg(&root)
+        .arg(&root_path)
         .arg("rev-parse")
         .arg("--show-toplevel")
         .env("GIT_TERMINAL_PROMPT", "0")
@@ -2540,7 +2559,13 @@ fn git_toplevel(root: &str) -> Result<PathBuf, String> {
     if text.is_empty() {
         return Err("Git returned an empty repository path".into());
     }
-    Ok(PathBuf::from(text))
+    let toplevel = PathBuf::from(text);
+    GIT_TOPLEVEL_CACHE
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .insert(cache_key, toplevel.clone());
+    Ok(toplevel)
 }
 
 // Every path-oriented command runs from the repository root. Git's porcelain
@@ -2831,25 +2856,37 @@ async fn git_checkout(root: String, branch: String) -> Result<String, String> {
     run_git_combined(cmd, "git switch")
 }
 
-#[tauri::command]
-async fn git_remotes(root: String) -> Result<Vec<GitRemote>, String> {
-    let mut names_cmd = git_command(&root)?;
-    names_cmd.arg("remote");
-    let names = run_git(names_cmd, "git remote")?;
-    let mut result = Vec::new();
-    for name in names.lines().filter(|value| !value.is_empty()).take(50) {
-        let mut url_cmd = git_command(&root)?;
-        url_cmd.arg("config").arg("--get").arg(format!("remote.{name}.url"));
-        let url = run_git(url_cmd, "git config")
-            .unwrap_or_default()
-            .trim()
-            .to_string();
+fn parse_git_remotes(text: &str) -> Vec<GitRemote> {
+    let mut result: Vec<GitRemote> = Vec::new();
+    for line in text.lines() {
+        let Some((name, target)) = line.split_once('\t') else {
+            continue;
+        };
+        let name = name.trim();
+        let Some(url) = target.trim().strip_suffix(" (fetch)") else {
+            continue;
+        };
+        if name.is_empty() || url.is_empty() || result.iter().any(|remote| remote.name == name) {
+            continue;
+        }
         result.push(GitRemote {
             name: name.to_string(),
-            url,
+            url: url.to_string(),
         });
+        if result.len() >= 50 {
+            break;
+        }
     }
-    Ok(result)
+    result
+}
+
+#[tauri::command]
+async fn git_remotes(root: String) -> Result<Vec<GitRemote>, String> {
+    // Git prints both fetch and push URLs for every remote. One command gives
+    // the full list; the old loop spawned another `git config` per remote.
+    let mut cmd = git_command(&root)?;
+    cmd.arg("remote").arg("-v");
+    Ok(parse_git_remotes(&run_git(cmd, "git remote -v")?))
 }
 
 async fn git_sync_command(
@@ -5169,6 +5206,23 @@ mod tests {
     }
 
     #[test]
+    fn git_remote_verbose_parser_keeps_one_fetch_url_per_remote() {
+        let text = concat!(
+            "origin\thttps://example.com/talos.git (fetch)\n",
+            "origin\thttps://example.com/talos.git (push)\n",
+            "fork\tgit@github.com:user/talos.git (fetch)\n",
+            "fork\tgit@github.com:user/talos.git (push)\n",
+            "malformed-line\n",
+        );
+        let remotes = parse_git_remotes(text);
+        assert_eq!(remotes.len(), 2);
+        assert_eq!(remotes[0].name, "origin");
+        assert_eq!(remotes[0].url, "https://example.com/talos.git");
+        assert_eq!(remotes[1].name, "fork");
+        assert_eq!(remotes[1].url, "git@github.com:user/talos.git");
+    }
+
+    #[test]
     fn git_paths_and_refs_reject_escapes() {
         assert!(relative_git_path("../outside").is_err());
         assert!(relative_git_path("/etc/passwd").is_err());
@@ -5200,6 +5254,37 @@ mod tests {
             git_toplevel(nested.to_str().unwrap()).unwrap(),
             fs::canonicalize(&root).unwrap()
         );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn git_toplevel_reuses_cached_resolution() {
+        let root = std::env::temp_dir().join(format!(
+            "talos-git-cache-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let init = Command::new("git")
+            .arg("init")
+            .arg("-q")
+            .arg(&root)
+            .output()
+            .expect("git must be available for Git integration tests");
+        assert!(init.status.success());
+
+        let root_text = root.to_string_lossy().into_owned();
+        let first = git_toplevel(&root_text).unwrap();
+        // The second lookup must be served from the cache: the repository
+        // metadata is gone, but the resolved root remains valid for commands.
+        fs::remove_dir_all(root.join(".git")).unwrap();
+        let second = git_toplevel(&root_text).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(second, fs::canonicalize(&root).unwrap());
+
         fs::remove_dir_all(root).unwrap();
     }
 }

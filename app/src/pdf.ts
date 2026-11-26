@@ -1,10 +1,20 @@
 // PDF reader pane (pdf.js). Pages render to a canvas; no text search yet.
-import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import { fileNameFromPath, readBytes } from "./platform";
 import { getWindowValue, setWindowValue } from "./window-state";
 
-pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+type PdfJsModule = typeof import("pdfjs-dist/legacy/build/pdf.mjs");
+let pdfjsModule: PdfJsModule | null = null;
+
+// pdf.js is a large dependency. Keep it out of the startup bundle and load it
+// only when a PDF is actually opened.
+async function loadPdfJs(): Promise<PdfJsModule> {
+  if (!pdfjsModule) {
+    pdfjsModule = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    pdfjsModule.GlobalWorkerOptions.workerSrc = workerUrl;
+  }
+  return pdfjsModule;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let doc: any = null;
@@ -80,6 +90,7 @@ function setPdfFocused(focused: boolean, persist = true) {
 }
 
 export async function openPdf(path: string) {
+  const pdfjs = await loadPdfJs();
   const buf = await readBytes(path);
   if (doc) await doc.destroy();
   doc = await pdfjs.getDocument({ data: buf }).promise;
