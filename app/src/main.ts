@@ -75,7 +75,7 @@ import { measure, LABEL, FUN } from "./meter";
 import type { Reading } from "./meter";
 import { openPdf, isPdfFocused, initPdfPane } from "./pdf";
 import { clearExtensionThemePreference, initExtensions, installedSnippets } from "./extensions";
-import { chooseWorkspace, initArchitectureExplorer, openQuickOpen, openObservatory, openRecentWorkspace, openWorkspace, rememberRecent, setExplorerIconPack } from "./architecture";
+import { chooseWorkspace, createExplorerEntry, initArchitectureExplorer, openQuickOpen, openObservatory, openRecentWorkspace, openWorkspace, rememberRecent, setExplorerIconPack } from "./architecture";
 import { currentWorkspace, markWorkspaceIndexing, subscribeWorkspace } from "./workspace";
 import { initCommandPalette, openCommandPalette } from "./command-palette";
 import { collectOutline } from "./outline";
@@ -120,6 +120,10 @@ let wordWrap = localStorage.getItem("talos.word-wrap") === "true";
 let editorFontSize = Number(localStorage.getItem("talos.editor-font-size")) || 0;
 let suggestedName: string | undefined;
 let currentPath: string | null = null;
+// Tracks the active document even when it is not an editor tab (PDF, image,
+// binary preview). The breadcrumb follows this instead of sticking to the last
+// text file while another kind of document is open.
+let breadcrumbPath: string | null = null;
 let diskRevision: string | null = null;
 let dirty = false;
 let savedDoc: Text | null = null;
@@ -652,7 +656,7 @@ void listen<{ phase: string }>("chronicle://progress", ({ payload }) => {
 }).catch(() => undefined);
 
 function updateBreadcrumbs() {
-  const source = currentPath ?? suggestedName ?? "Untitled";
+  const source = breadcrumbPath ?? currentPath ?? suggestedName ?? "Untitled";
   const parts = source.replace(/\\/g, "/").split("/").filter(Boolean);
   const visible = parts.length > 4 ? ["…", ...parts.slice(-4)] : parts;
   const label = visible.join(" / ") || "Untitled";
@@ -1444,21 +1448,14 @@ function updateLayoutButton() {
   button.setAttribute("aria-label", button.title);
 }
 
+// Only actions the current layout hides belong in More. The activity bar
+// already exposes Explorer/Search/Extensions/Canvas/Calc, so those never appear
+// in the toolbar menu again.
 const overflowActionIds = [
-  "btn-open",
-  "btn-quick-open",
-  "btn-architecture",
-  "btn-outline",
-  "btn-pdf",
-  "btn-preview",
-  "btn-calc",
-  "btn-canvas",
   "btn-undo",
   "btn-redo",
   "btn-save",
   "btn-saveas",
-  "btn-run",
-  "btn-ext",
   "btn-tpl",
 ];
 
@@ -1467,24 +1464,50 @@ function closeToolbarOverflow() {
   $("btn-toolbar-overflow").setAttribute("aria-expanded", "false");
 }
 
+function appendOverflowItem(label: string, title: string, run: () => void, disabled = false) {
+  const item = document.createElement("button");
+  item.type = "button";
+  item.className = "toolbar-overflow-item";
+  item.textContent = label;
+  item.disabled = disabled;
+  item.title = title;
+  item.setAttribute("role", "menuitem");
+  item.addEventListener("click", () => {
+    closeToolbarOverflow();
+    run();
+  });
+  $("toolbar-overflow-menu").appendChild(item);
+}
+
+function cycleUiScale() {
+  const select = $("ui-scale") as HTMLSelectElement;
+  const current = Number(select.value);
+  const index = UI_SCALE_VALUES.findIndex((value) => Math.abs(value - current) < 0.001);
+  const next = UI_SCALE_VALUES[(index + 1) % UI_SCALE_VALUES.length] ?? 1;
+  applyUiScale(next);
+}
+
 function refreshToolbarOverflow() {
   const menu = $("toolbar-overflow-menu");
   menu.replaceChildren();
+  appendOverflowItem("New File", "Create a file in the current Explorer folder", () => {
+    void createExplorerEntry("file");
+  });
+  appendOverflowItem("New Folder", "Create a folder in the current Explorer folder", () => {
+    void createExplorerEntry("directory");
+  });
+  const scaleSelect = $("ui-scale") as HTMLSelectElement;
+  appendOverflowItem(`UI ${Math.round(Number(scaleSelect.value) * 100)}%`, "Cycle interface size", cycleUiScale);
+
   for (const id of overflowActionIds) {
     const source = document.getElementById(id) as HTMLButtonElement | null;
-    if (!source) continue;
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className = "toolbar-overflow-item";
-    item.textContent = source.textContent?.trim() || id;
-    item.disabled = source.disabled;
-    item.title = source.title || item.textContent || id;
-    item.setAttribute("role", "menuitem");
-    item.addEventListener("click", () => {
-      closeToolbarOverflow();
-      source.click();
-    });
-    menu.appendChild(item);
+    if (!source || source.getClientRects().length > 0) continue;
+    appendOverflowItem(
+      source.textContent?.trim() || id,
+      source.title || source.textContent?.trim() || id,
+      () => source.click(),
+      source.disabled,
+    );
   }
 }
 
@@ -1738,6 +1761,7 @@ function activateEditorTab(tab: EditorTab | undefined) {
   }
   activeTab = tab;
   currentPath = tab.path;
+  breadcrumbPath = tab.path;
   suggestedName = tab.suggestedName ?? undefined;
   diskRevision = tab.revision;
   dirty = tab.dirty;
@@ -1765,6 +1789,7 @@ function activateEditorTab(tab: EditorTab | undefined) {
 }
 
 function showNewUntitledTab(name: string | null = null, contents = "") {
+  breadcrumbPath = null;
   const state = createEditorState(contents, view.state);
   const tab: EditorTab = {
     id: nextTabId++,
@@ -1903,6 +1928,8 @@ async function loadPath(path: string) {
 
 async function openAny(path: string) {
   rememberRecent(path);
+  breadcrumbPath = path;
+  updateBreadcrumbs();
   const name = fileNameFromPath(path).toLowerCase();
   if (name.endsWith(".pdf")) {
     closeHtmlPreview();
@@ -1930,6 +1957,8 @@ async function openPdfDialog() {
     filters: [{ name: "PDF", extensions: ["pdf"] }],
   });
   if (typeof picked !== "string") return;
+  breadcrumbPath = picked;
+  updateBreadcrumbs();
   closeHtmlPreview();
   toggleOutline(false);
   await openPdf(picked);
@@ -1943,6 +1972,8 @@ async function openBinaryDialog() {
   });
   if (typeof picked !== "string") return;
   rememberRecent(picked);
+  breadcrumbPath = picked;
+  updateBreadcrumbs();
   await openBinaryUi(picked);
 }
 
@@ -2836,9 +2867,11 @@ initArchitectureExplorer(openAny, (oldPath, newPath) => {
   if (normalizedCurrent !== normalizedOld && !normalizedCurrent.startsWith(`${normalizedOld}/`)) return;
   if (newPath) {
     currentPath = newPath + normalizedCurrent.slice(normalizedOld.length);
+    breadcrumbPath = currentPath;
     if (activeTab) activeTab.path = currentPath;
   } else {
     currentPath = null;
+    breadcrumbPath = null;
     savedDoc = null;
     dirty = true;
     if (activeTab) {
@@ -3034,6 +3067,7 @@ void initExtensions({
   setIconPack: (pack) => setExplorerIconPack(pack),
   newFromTemplate: async (filename: string, content: string) => {
     currentPath = null;
+    breadcrumbPath = null;
     diskRevision = null;
     suggestedName = filename;
     showNewUntitledTab(filename, content);

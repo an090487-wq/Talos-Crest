@@ -708,6 +708,16 @@
       html[data-layout-mode="compact"] #btn-toolbar-overflow { display: inline-flex; }
       html[data-layout-mode="compact"] .tc-header-actions .toolbar-group[aria-label="File actions"],
       html[data-layout-mode="compact"] .tc-header-actions .toolbar-group[aria-label="Extensions"] { display: none; }
+
+      /* The activity bar already owns these views. Keep the header focused on
+         file and run actions; keyboard shortcuts still reach the hidden ones. */
+      #btn-quick-open,
+      #btn-architecture,
+      #btn-ext,
+      #btn-canvas,
+      #btn-calc,
+      #ui-scale,
+      label[for="ui-scale"] { display: none !important; }
       html[data-layout-mode="compact"] #breadcrumbs { min-height: 24px; padding: 0 8px; }
       html[data-layout-mode="compact"] #document-tabs { min-height: 32px; }
       html[data-layout-mode="compact"] .document-tab { min-height: 31px; }

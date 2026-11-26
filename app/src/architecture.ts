@@ -632,7 +632,10 @@ function targetDirectory(entry: ProjectEntry): string {
 }
 
 async function createEntry(kind: "file" | "directory") {
-  if (!scan) return;
+  if (!scan) {
+    setMessage("Open a project folder before creating a file or folder.", true);
+    return;
+  }
   const entry = selectedEntry();
   const name = validEntryName(window.prompt(`New ${kind === "file" ? "file" : "folder"} name:`));
   if (!name) return;
@@ -660,6 +663,10 @@ async function createEntry(kind: "file" | "directory") {
   } catch (error) {
     setMessage(`Could not create ${path}: ${String(error)}`, true);
   }
+}
+
+export function createExplorerEntry(kind: "file" | "directory"): Promise<void> {
+  return createEntry(kind);
 }
 
 async function renameSelected() {

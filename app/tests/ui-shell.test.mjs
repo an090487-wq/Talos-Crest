@@ -92,6 +92,28 @@ test("compact layout exposes secondary toolbar actions through an overflow menu"
   assert.match(html, /html\[data-layout-mode="compact"\] #btn-toolbar-overflow \{ display: inline-flex; \}/);
 });
 
+test("More adds creation and UI size actions instead of repeating sidebar buttons", () => {
+  assert.match(architecture, /export function createExplorerEntry/);
+  assert.match(main, /createExplorerEntry\("file"\)/);
+  assert.match(main, /createExplorerEntry\("directory"\)/);
+  assert.match(main, /appendOverflowItem\(`UI \$\{Math\.round\(Number\(scaleSelect\.value\) \* 100\)\}%`/);
+  assert.doesNotMatch(main, /const overflowActionIds = \[[\s\S]{0,400}"btn-architecture"/);
+  assert.doesNotMatch(main, /const overflowActionIds = \[[\s\S]{0,400}"btn-quick-open"/);
+  assert.match(html, /#btn-architecture,[\s\S]{0,120}#btn-calc,[\s\S]{0,120}#ui-scale,[\s\S]{0,120}display: none !important/);
+});
+
+test("the top search bar sits with toolbar actions, not between title and file", () => {
+  assert.match(css, /"title file windows"\s*"command actions actions"/);
+  assert.match(css, /\.tc-command-trigger \{[\s\S]*?grid-area: command;[\s\S]*?width: auto;/);
+});
+
+test("the breadcrumb follows the active document, including non-editor views", () => {
+  assert.match(main, /let breadcrumbPath: string \| null = null/);
+  assert.match(main, /breadcrumbPath \?\? currentPath \?\? suggestedName/);
+  assert.match(main, /async function openAny\(path: string\) \{[\s\S]{0,160}breadcrumbPath = path;/);
+  assert.match(main, /breadcrumbPath = picked;[\s\S]{0,80}updateBreadcrumbs\(\);[\s\S]{0,160}await openPdf/);
+});
+
 test("Live Studio keeps preview execution sandboxed and adds isolated controls", () => {
   assert.match(html, /id="preview-viewport"/);
   assert.match(html, /id="preview-reload"/);
