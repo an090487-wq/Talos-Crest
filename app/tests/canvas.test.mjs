@@ -330,12 +330,27 @@ test("pixel results become real ImageData before canvas drawing", () => {
   }
 });
 
-test("canvas center guides use a subtle grid-matched color", () => {
+test("canvas overlays never paint blue lines on opened images", () => {
   const html = readFileSync(resolve(appDir, "index.html"), "utf8");
-  const rule = html.split("\n").find((line) => line.includes('data-guides="true"]::after'));
-  assert.ok(rule, "center guide overlay rule exists");
-  assert.doesNotMatch(rule, /255\s*,\s*120\s*,\s*180/);
-  assert.match(rule, /120\s*,\s*190\s*,\s*220/);
+  const ui = readFileSync(resolve(appDir, "src/canvas/canvas-ui.ts"), "utf8");
+  const gridRule = html.split("\n").find((line) => line.includes('data-grid="true"]::before'));
+  const guideRule = html.split("\n").find((line) => line.includes('data-guides="true"]::after'));
+  assert.ok(gridRule, "grid overlay rule exists");
+  assert.ok(guideRule, "center guide overlay rule exists");
+  assert.doesNotMatch(html, /rgba\(120,\s*190,\s*220/);
+  assert.match(gridRule, /color: var\(--muted\); opacity: \.22;/);
+  assert.match(guideRule, /color: var\(--muted\); opacity: \.45;/);
+  assert.match(gridRule, /currentColor 1px/);
+  assert.match(guideRule, /currentColor 50%/);
+  assert.match(ui, /talos\.canvas\.overlays-reset-v2/);
+  assert.match(ui, /removeWindowValue\("talos\.canvas\.grid"\)/);
+  assert.match(ui, /removeWindowValue\("talos\.canvas\.guides"\)/);
+  assert.match(ui, /removeWindowValue\("talos\.canvas\.snap"\)/);
+});
+
+test("removing a window preference also clears the legacy main-window key", () => {
+  const state = readFileSync(resolve(appDir, "src/window-state.ts"), "utf8");
+  assert.match(state, /if \(windowLabel === "main"\) localStorage\.removeItem\(key\);/);
 });
 
 test("canvas async, export, and keyboard invariants are enforced", () => {

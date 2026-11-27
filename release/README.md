@@ -36,6 +36,15 @@ window controls instead of the dark terminal-like native strip, and the Linux
 launcher matches the running window class so the Talos icon appears in the app
 menu and taskbar.
 
+Canvas no longer inherits blue grid, snapping, or center-guide settings from
+older sessions, so opened images start without overlay lines; any grid or guide
+overlay you enable now uses a neutral theme color instead of blue. The shell now
+uses one compact brand in the title bar, names the active file there, keeps the
+command search accurately labelled, separates Explorer project controls from
+fullscreen graph controls, shows content-search results inside the docked
+Explorer, supports dragging the Explorer width, and scales controls through the
+interface-size setting up to 150%.
+
 ## Linux
 
 File: `appimage/TalosCrest-Linux-x86_64.AppImage`
@@ -47,7 +56,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`23f8095c8de89997948e07756b88ed10b73bdb948e11e086544527b6c69b68ba`
+`29ff2b4e377743faf8aa7289223c0c953e921b6d34cc3161f71458a9301bb88c`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -64,7 +73,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`611c0294ba7d97af54defda3e9140596603a5cdb65d0ec07842c05774eed504a`
+`44208c6a335e4ee46558f9e9188fc2131daff2c1176f6a993acc3e39d6113c89`
 
 ## Android
 
@@ -96,6 +105,10 @@ revalidation and a fallback for truncated scans. The Explorer can duplicate
 files/folders with bounded, policy-aware copying and drag items onto folders to
 move them through the same validated path checks. No workspace content is
 uploaded or analyzed remotely.
+
+Canvas no longer inherits blue grid, snapping, or center-guide settings from
+older sessions, so opened images start without overlay lines; any grid or guide
+overlay you enable now uses a neutral theme color instead of blue.
 
 The editor includes a local Custom Error Detection engine with built-in rules
 for common Python, JavaScript/TypeScript, C/C++, Rust, and Java defects, plus

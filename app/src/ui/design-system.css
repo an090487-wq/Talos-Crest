@@ -29,6 +29,10 @@
   --tc-space-2: var(--space-2, 8px);
   --tc-space-3: var(--space-3, 12px);
   --tc-space-4: var(--space-4, 16px);
+  --tc-control-height: var(--control-height, 30px);
+  --tc-control-height-sm: var(--control-height-sm, 26px);
+  --tc-activity-width: calc(52px * var(--ui-scale, 1));
+  --tc-activity-width-expanded: calc(184px * var(--ui-scale, 1));
   --tc-motion-fast: var(--transition-fast, 120ms ease);
   --tc-shadow-sm: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.28));
   --tc-shadow-md: var(--shadow-md, 0 10px 30px rgba(0, 0, 0, 0.38));
@@ -46,7 +50,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--tc-space-2);
-  min-height: 30px;
+  min-height: var(--tc-control-height);
   border: 1px solid var(--tc-border);
   border-radius: var(--tc-radius-md);
   background: var(--tc-surface);
@@ -61,7 +65,7 @@
 }
 
 .tc-icon-button {
-  width: 32px;
+  width: var(--tc-control-height);
   padding: 0;
 }
 
@@ -399,8 +403,8 @@ input:focus-visible,
     "title search windows"
     "actions actions actions";
   align-items: center;
-  column-gap: 12px;
-  row-gap: 6px;
+  column-gap: var(--tc-space-3);
+  row-gap: var(--toolbar-gap, var(--tc-space-2));
   flex-wrap: nowrap;
 }
 
@@ -413,16 +417,20 @@ input:focus-visible,
 .tc-command-trigger {
   grid-area: search;
   justify-self: center;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
+  gap: var(--tc-space-2);
   width: 100%;
-  min-width: 380px;
+  min-width: 0;
   max-width: 560px;
-  min-height: 42px;
-  padding: 8px 16px;
-  font-size: 14px;
+  min-height: var(--tc-control-height);
+  padding: 4px 9px;
+  border: 1px solid var(--tc-border);
+  border-radius: var(--tc-radius-md);
+  background: var(--tc-panel-2);
+  color: var(--tc-muted);
+  font-size: var(--font-sm, 11px);
+  text-align: left;
 }
 
 .tc-command-trigger > span:first-child {
@@ -431,8 +439,13 @@ input:focus-visible,
 }
 
 .tc-command-trigger kbd {
-  padding: 3px 8px;
-  font-size: var(--font-xs, 11px);
+  margin-left: auto;
+  padding: 2px 6px;
+  border: 1px solid var(--tc-border);
+  border-radius: var(--tc-radius-sm);
+  background: var(--tc-surface);
+  color: var(--tc-muted);
+  font: var(--font-xs, 10px) var(--mono-font);
 }
 
 .run-args-input {
@@ -461,7 +474,7 @@ input:focus-visible,
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--toolbar-gap, var(--tc-space-2));
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -492,10 +505,10 @@ input:focus-visible,
 
 .tc-activity-bar {
   display: flex;
-  flex: 0 0 52px;
+  flex: 0 0 var(--tc-activity-width);
   flex-direction: column;
   gap: 2px;
-  width: 52px;
+  width: var(--tc-activity-width);
   padding: 6px 4px;
   overflow-x: hidden;
   overflow-y: auto;
@@ -505,13 +518,13 @@ input:focus-visible,
 }
 
 .tc-activity-bar.expanded {
-  flex-basis: 184px;
-  width: 184px;
+  flex-basis: var(--tc-activity-width-expanded);
+  width: var(--tc-activity-width-expanded);
 }
 
 .tc-activity-toggle {
   justify-content: center;
-  min-height: 34px;
+  min-height: calc(var(--tc-control-height) + 4px);
   margin-bottom: 4px;
   color: var(--tc-muted);
 }
@@ -522,8 +535,8 @@ input:focus-visible,
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 38px;
-  padding: 0 13px;
+  min-height: calc(var(--tc-control-height) + 8px);
+  padding: 0 var(--tc-space-3);
   border: 1px solid transparent;
   border-radius: var(--tc-radius-md);
   background: transparent;
@@ -559,10 +572,10 @@ input:focus-visible,
 }
 
 .tc-nav-icon {
-  width: 18px;
-  flex: 0 0 18px;
+  width: var(--icon-size, 18px);
+  flex: 0 0 var(--icon-size, 18px);
   color: var(--tc-accent);
-  font-size: 16px;
+  font-size: var(--font-md, 13px);
   text-align: center;
 }
 
@@ -580,8 +593,8 @@ input:focus-visible,
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  max-width: 220px;
-  min-height: 28px;
+  max-width: calc(220px * var(--ui-scale, 1));
+  min-height: var(--tc-control-height-sm);
   padding: 3px 9px;
   border: 1px solid var(--tc-border);
   border-radius: var(--tc-radius-md);
@@ -594,30 +607,6 @@ input:focus-visible,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.tc-command-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  min-height: 30px;
-  padding: 4px 9px;
-  border: 1px solid var(--tc-border);
-  border-radius: var(--tc-radius-md);
-  background: var(--tc-panel-2);
-  color: var(--tc-muted);
-  text-align: left;
-}
-
-.tc-command-trigger kbd {
-  margin-left: auto;
-  padding: 2px 6px;
-  border: 1px solid var(--tc-border);
-  border-radius: var(--tc-radius-sm);
-  background: var(--tc-surface);
-  color: var(--tc-muted);
-  font: var(--font-xs, 10px) var(--mono-font);
 }
 
 /* WebKit sometimes leaves modal dialogs at the top-left or offsets them when
@@ -720,8 +709,8 @@ dialog#command-palette.tc-command-dialog {
   align-items: center;
   gap: 2px var(--tc-space-3);
   width: 100%;
-  min-height: 48px;
-  padding: 7px 10px;
+  min-height: calc(var(--tc-control-height) + var(--tc-space-4));
+  padding: var(--space-2) var(--space-3);
   border: 1px solid transparent;
   border-radius: var(--tc-radius-md);
   background: transparent;
@@ -1119,14 +1108,14 @@ dialog#command-palette.tc-command-dialog {
 #canvas,
 #architecture,
 #chronicle-dialog {
-  font-family: var(--sans-font, var(--font-ui, inherit));
+  font-family: var(--ui-font, inherit);
 }
 
 #calc-dialog .mini,
 #canvas .mini,
 #arch-window .mini,
 #chronicle-dialog .mini {
-  min-height: 28px;
+  min-height: var(--tc-control-height-sm);
   border-radius: var(--tc-radius-md);
 }
 

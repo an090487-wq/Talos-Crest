@@ -75,7 +75,7 @@ import { measure, LABEL, FUN } from "./meter";
 import type { Reading } from "./meter";
 import { openPdf, isPdfFocused, initPdfPane } from "./pdf";
 import { clearExtensionThemePreference, initExtensions, installedSnippets } from "./extensions";
-import { chooseWorkspace, createExplorerEntry, initArchitectureExplorer, openQuickOpen, openObservatory, openRecentWorkspace, openWorkspace, rememberRecent, setExplorerIconPack } from "./architecture";
+import { chooseWorkspace, createExplorerEntry, initArchitectureExplorer, openQuickOpen, openObservatory, openRecentWorkspace, openWorkspace, rememberRecent, selectExplorerPath, setExplorerIconPack } from "./architecture";
 import { currentWorkspace, markWorkspaceIndexing, subscribeWorkspace } from "./workspace";
 import { initCommandPalette, openCommandPalette } from "./command-palette";
 import { collectOutline } from "./outline";
@@ -324,7 +324,7 @@ function resetEditorFontSize() {
   applyEditorFontSize(0);
 }
 
-const UI_SCALE_VALUES = [0.9, 1, 1.1, 1.25];
+const UI_SCALE_VALUES = [0.9, 1, 1.1, 1.25, 1.5];
 
 function applyUiScale(scale: number) {
   const next = UI_SCALE_VALUES.find((value) => Math.abs(value - scale) < 0.001) ?? 1;
@@ -717,12 +717,13 @@ function refreshTitle() {
   const path = currentPath && android ? fileNameFromPath(currentPath) : currentPath;
   const name = (path ?? suggestedName ?? "Working file") + (dirty ? " \u2022" : "");
   updateBreadcrumbs();
-  // The custom title bar shows the product only. Never put the "Working file"
-  // placeholder or workspace path in native chrome: it makes the editor look
-  // like a terminal window and misidentifies the app in the taskbar.
+  // The custom title bar identifies the active document. The native/taskbar
+  // title keeps the product suffix, while the in-app chrome stays compact.
   const title = path && !android ? [name, productName].join(" \u2014 ") : productName;
   const titleText = $("window-title-text");
-  if (titleText.textContent !== productName) titleText.textContent = productName;
+  const displayTitle = path ? name : productName;
+  if (titleText.textContent !== displayTitle) titleText.textContent = displayTitle;
+  titleText.title = title;
   if (document.title === title) return;
   document.title = title;
   if (title !== lastNativeTitle) {
@@ -789,6 +790,11 @@ function renderMeter(r: Reading) {
     meterText = text;
     $("meter-text").textContent = text;
   }
+  $("meter").setAttribute("aria-valuenow", String(r.score));
+  $("meter").setAttribute(
+    "aria-valuetext",
+    `${label}: ${r.score}% pressure, ${r.errors} errors, ${r.warnings} warnings`
+  );
 }
 
 async function restoreEditorSession(): Promise<boolean> {
@@ -1193,7 +1199,9 @@ function showTab(tab: BottomTab, focus = false) {
   if (tab === "output" && sourceControlBusy) return;
   setWindowValue("talos.bottom-panel-tab", tab);
   for (const b of document.querySelectorAll<HTMLElement>("[data-tab]")) {
-    b.classList.toggle("active", b.dataset.tab === tab);
+    const active = b.dataset.tab === tab;
+    b.classList.toggle("active", active);
+    if (b.getAttribute("role") === "tab") b.setAttribute("aria-selected", String(active));
   }
   for (const [name, id] of Object.entries(bottomViews)) {
     $(id).classList.toggle("hidden", name !== tab);
@@ -1652,6 +1660,68 @@ function installWorkspaceResizers() {
   });
 }
 
+function installExplorerResizer() {
+  const handle = $("explorer-splitter");
+  const explorer = $("architecture");
+  const workspace = $("workspace-body");
+  const clampSize = (size: number, min: number, max: number) => Math.max(min, Math.min(max, size));
+  const bounds = () => {
+    const available = workspace.getBoundingClientRect().width;
+    const min = Math.min(220, Math.max(180, available - 360));
+    const max = Math.max(min + 40, Math.min(480, available - 360));
+    return { min, max };
+  };
+  const applySize = (size: number, persist: boolean) => {
+    const { min, max } = bounds();
+    const next = Math.round(clampSize(size, min, max));
+    explorer.style.flexBasis = `${next}px`;
+    explorer.style.width = `${next}px`;
+    handle.setAttribute("aria-valuemin", String(min));
+    handle.setAttribute("aria-valuemax", String(max));
+    handle.setAttribute("aria-valuenow", String(next));
+    if (persist) setWindowValue("talos.explorer-size", String(next));
+    scheduleEditorMeasure();
+  };
+  const sync = () => {
+    const open = !explorer.classList.contains("hidden") && !explorer.classList.contains("fullscreen");
+    handle.classList.toggle("hidden", !open);
+    const { min, max } = bounds();
+    handle.setAttribute("aria-valuemin", String(min));
+    handle.setAttribute("aria-valuemax", String(max));
+    handle.setAttribute("aria-valuenow", String(Math.round(explorer.getBoundingClientRect().width)));
+  };
+  const stored = Number(getWindowValue("talos.explorer-size"));
+  if (Number.isFinite(stored) && stored > 0) applySize(stored, false);
+
+  let drag: { x: number; width: number } | null = null;
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    drag = { x: event.clientX, width: explorer.getBoundingClientRect().width };
+    handle.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  handle.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    applySize(drag.width + event.clientX - drag.x, true);
+  });
+  const endDrag = (event: PointerEvent) => {
+    if (!drag) return;
+    drag = null;
+    if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+  };
+  handle.addEventListener("pointerup", endDrag);
+  handle.addEventListener("pointercancel", endDrag);
+  handle.addEventListener("keydown", (event) => {
+    const delta = event.key === "ArrowLeft" ? -16 : event.key === "ArrowRight" ? 16 : 0;
+    if (!delta) return;
+    event.preventDefault();
+    applySize(explorer.getBoundingClientRect().width + delta, true);
+  });
+  new MutationObserver(sync).observe(explorer, { attributes: true, attributeFilter: ["class"] });
+  window.addEventListener("resize", sync);
+  sync();
+}
+
 function persistEditorTabs() {
   if (!($("restore-session-on-startup") as HTMLInputElement).checked) return;
   const serialize = (tab: EditorTab): DocumentTabSession => ({
@@ -1827,6 +1897,14 @@ function activateEditorTab(tab: EditorTab | undefined) {
     renderProblems();
   }
   syncHistoryButtons(view.state);
+  scheduleEditorChrome();
+  renderMeter(
+    measure(
+      problemRows.map((row) => row.severity),
+      tab.state.doc.lines
+    )
+  );
+  selectExplorerPath(tab.path ?? null);
   refreshTitle();
   renderDocumentTabs();
   if (tab.path) setWindowValue("talos.open-file", tab.path);
@@ -1981,6 +2059,7 @@ async function loadPath(path: string) {
 async function openAny(path: string) {
   rememberRecent(path);
   breadcrumbPath = path;
+  selectExplorerPath(path);
   updateBreadcrumbs();
   const name = fileNameFromPath(path).toLowerCase();
   if (name.endsWith(".pdf")) {
@@ -2010,6 +2089,7 @@ async function openPdfDialog() {
   });
   if (typeof picked !== "string") return;
   breadcrumbPath = picked;
+  selectExplorerPath(picked);
   updateBreadcrumbs();
   closeHtmlPreview();
   toggleOutline(false);
@@ -2025,6 +2105,7 @@ async function openBinaryDialog() {
   if (typeof picked !== "string") return;
   rememberRecent(picked);
   breadcrumbPath = picked;
+  selectExplorerPath(picked);
   updateBreadcrumbs();
   await openBinaryUi(picked);
 }
@@ -2876,9 +2957,22 @@ const nativeWindow = getCurrentWindow();
 $("win-min").addEventListener("click", () => {
   void nativeWindow.minimize().catch((error: unknown) => say(`Could not minimize window: ${String(error)}`));
 });
+function syncWindowMaxButton() {
+  void nativeWindow.isMaximized().then((maximized) => {
+    const button = $("win-max");
+    button.textContent = maximized ? "❐" : "□";
+    button.title = maximized ? "Restore window" : "Maximize window";
+    button.setAttribute("aria-label", button.title);
+  }).catch(() => {
+    // Some platforms do not expose maximize state; the button still works.
+  });
+}
 $("win-max").addEventListener("click", () => {
-  void nativeWindow.toggleMaximize().catch((error: unknown) => say(`Could not maximize window: ${String(error)}`));
+  void nativeWindow.toggleMaximize()
+    .then(() => syncWindowMaxButton())
+    .catch((error: unknown) => say(`Could not maximize window: ${String(error)}`));
 });
+syncWindowMaxButton();
 $("win-close").addEventListener("click", () => {
   void guard(() => nativeWindow.close());
 });
@@ -2960,6 +3054,7 @@ initArchitectureExplorer(openAny, (oldPath, newPath) => {
     warnings: problemRows.filter((row) => row.severity === "warning").length,
   };
 });
+installExplorerResizer();
 function updateWorkspaceLabel() {
   const workspace = getWindowValue("talos.workspace-root");
   const label = workspace?.replace(/[\\/]+$/, "").split(/[\\/]/).pop();
@@ -2969,7 +3064,10 @@ function updateWorkspaceLabel() {
 
 function setActiveNav(view: string) {
   for (const button of document.querySelectorAll<HTMLElement>("#activity-bar [data-view]")) {
-    button.classList.toggle("active", button.dataset.view === view);
+    const active = button.dataset.view === view;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
   }
 }
 
@@ -2990,7 +3088,7 @@ document.addEventListener("talos:open-error", (event) => {
   if (typeof detail === "string") say(detail);
 });
 $("btn-workspace").addEventListener("click", () => void guard(() => chooseWorkspace()));
-$("breadcrumb-root").addEventListener("click", () => openObservatory());
+$("breadcrumb-root").addEventListener("click", () => $("btn-architecture").click());
 $("btn-command-palette").addEventListener("click", () => openCommandPalette());
 
 const activityBar = $("activity-bar");

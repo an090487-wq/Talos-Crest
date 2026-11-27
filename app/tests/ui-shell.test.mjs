@@ -140,7 +140,8 @@ test("launcher matches the running window so the Talos icon is shown", () => {
 test("the top search bar sits in the header's top row", () => {
   assert.match(css, /"title search windows"\s*"actions actions actions"/);
   assert.match(css, /grid-template-columns: minmax\(0, 1fr\) minmax\(380px, 560px\) minmax\(0, 1fr\)/);
-  assert.match(css, /\.tc-command-trigger \{[\s\S]*?grid-area: search;[\s\S]*?max-width: 560px;[\s\S]*?min-height: 42px;/);
+  assert.match(css, /\.tc-command-trigger \{[\s\S]*?grid-area: search;[\s\S]*?max-width: 560px;[\s\S]*?min-height: var\(--tc-control-height\);/);
+  assert.doesNotMatch(css, /\.tc-command-trigger \{[^}]*min-height: 30px;/);
   assert.match(html, /<\/div>\s*<button id="btn-command-palette"[\s\S]{0,200}<\/button>\s*<div class="tc-row tc-header-actions">/);
   assert.doesNotMatch(html, /<div class="tc-row tc-header-actions">\s*<button id="btn-command-palette"/);
 });
@@ -277,4 +278,62 @@ test("installed icon packs visibly change Explorer file icons", () => {
   ]) {
     assert.ok(architecture.includes(`"${id}"`), `missing visible style for ${id}`);
   }
+});
+
+test("the shell has one compact brand and an active-file title", () => {
+  assert.match(html, /#window-titlebar:not\(\.hidden\) ~ header \.brand \{ display: none; \}/);
+  assert.match(html, /<span id="window-title-text">Talos Crest<\/span>/);
+  assert.match(main, /const displayTitle = path \? name : productName;/);
+  assert.match(main, /if \(titleText\.textContent !== displayTitle\) titleText\.textContent = displayTitle;/);
+  assert.match(html, /<div class="tc-titlebar-controls" role="toolbar" aria-label="Window controls">/);
+  assert.doesNotMatch(html, /<div class="window-controls" role="toolbar" aria-label="Window controls">/);
+  assert.match(main, /function syncWindowMaxButton\(\)/);
+});
+
+test("search entry points state exactly what they search", () => {
+  assert.match(html, /<span>Search commands<\/span>/);
+  assert.doesNotMatch(html, /<span>Search files and commands<\/span>/);
+  assert.match(html, /data-view="search"[^>]*aria-label="Find files by name"/);
+  assert.match(html, /id="arch-search"[^>]*placeholder="Filter files and folders…"/);
+  assert.match(html, /id="workspace-text-search-dialog"/);
+  assert.match(architecture, /openModalDialog\("workspace-text-search-dialog"\)/);
+  assert.doesNotMatch(architecture, /window\.prompt\("Search text in all workspace files:"\)/);
+  assert.match(html, /data-search-results="true"\] #arch-details-pane/);
+});
+
+test("Explorer keeps project controls separate from graph controls and can resize", () => {
+  assert.match(html, /<div class="arch-control-group" role="group" aria-label="Project actions">/);
+  assert.match(html, /<div class="arch-control-group" id="arch-graph-actions"/);
+  assert.match(html, /#architecture:not\(\.fullscreen\) #arch-graph-actions \{ display: none; \}/);
+  assert.match(html, /#architecture:not\(\.fullscreen\) #arch-header \{ min-height: 28px;/);
+  assert.match(html, /id="explorer-splitter"[^>]*role="separator"/);
+  assert.match(main, /function installExplorerResizer\(\)/);
+  assert.match(main, /setWindowValue\("talos\.explorer-size"/);
+  assert.match(architecture, /export function selectExplorerPath\(path: string \| null\)/);
+  assert.match(main, /selectExplorerPath\(tab\.path \?\? null\)/);
+});
+
+test("active document identity and status metrics stay synchronized", () => {
+  assert.match(main, /scheduleEditorChrome\(\);[\s\S]{0,400}renderMeter\(/);
+  assert.match(main, /\$\("meter"\)\.setAttribute\(\s*"aria-valuetext"/);
+  assert.match(html, /id="meter"[^>]*role="meter"/);
+  assert.match(html, /<span id="meter-label">Diagnostic pressure<\/span>/);
+  assert.match(html, /id="tabs" class="tc-tabs" role="tablist"/);
+  assert.match(main, /b\.setAttribute\("aria-selected", String\(active\)\)/);
+  assert.match(main, /button\.setAttribute\("aria-current", "page"\)/);
+});
+
+test("the design system scales controls through shared tokens", () => {
+  assert.match(css, /--tc-control-height: var\(--control-height, 30px\)/);
+  assert.match(css, /--tc-activity-width: calc\(52px \* var\(--ui-scale, 1\)\)/);
+  assert.match(css, /min-height: var\(--tc-control-height\);/);
+  assert.match(html, /<option value="1\.5">UI 150%<\/option>/);
+  assert.match(main, /const UI_SCALE_VALUES = \[0\.9, 1, 1\.1, 1\.25, 1\.5\]/);
+  assert.doesNotMatch(css, /var\(--sans-font/);
+});
+
+test("the command palette stays inside short and narrow windows", () => {
+  assert.match(commandPalette, /const edge = Math\.min\(160, Math\.max\(8, window\.innerWidth \/ 2 - 8\)\)/);
+  assert.match(commandPalette, /const availableHeight = Math\.max\(120, window\.innerHeight - top - 12\)/);
+  assert.match(commandPalette, /Math\.min\(preferredHeight, availableHeight\)/);
 });

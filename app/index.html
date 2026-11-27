@@ -94,14 +94,15 @@
       .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); min-height: 120px; padding: var(--space-4); color: var(--muted); text-align: center; font-size: var(--font-sm); }
       .empty-state strong { color: var(--text); font-size: var(--font-md); font-weight: 650; }
 
-      #window-titlebar { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 8px; background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--font-xs); font-weight: 650; letter-spacing: .08em; text-transform: uppercase; user-select: none; -webkit-user-select: none; }
-      #window-titlebar .tc-brand-icon { width: 18px; height: 18px; flex: 0 0 auto; border-radius: 4px; }
-      #window-titlebar .window-controls { display: inline-flex; gap: 2px; margin-left: auto; }
-      #window-titlebar .window-controls button { width: 28px; min-height: 22px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); font-size: 15px; line-height: 1; }
-      #window-titlebar .window-controls button:hover { color: var(--text); border-color: var(--line); background: var(--surface-raised); }
-      #window-titlebar #win-close:hover { color: #fff; border-color: transparent; background: #c42b1c; }
-      header, footer { display: flex; align-items: center; gap: var(--space-1); padding: 8px var(--space-3); background: var(--panel); }
-      header { position: relative; border-bottom: 1px solid var(--line); flex-wrap: wrap; gap: 6px; padding: 8px var(--space-3); }
+      #window-titlebar { display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-height-sm); padding: 0 var(--space-2); background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--font-xs); font-weight: 650; letter-spacing: .08em; text-transform: uppercase; user-select: none; -webkit-user-select: none; }
+      #window-titlebar .tc-brand-icon { width: var(--icon-size); height: var(--icon-size); flex: 0 0 auto; border-radius: var(--radius-sm); }
+      #window-titlebar .tc-titlebar-controls { display: inline-flex; gap: 2px; margin-left: auto; }
+      #window-titlebar .tc-titlebar-controls button { width: var(--control-height-sm); min-height: calc(var(--control-height-sm) - 4px); padding: 0; border-color: transparent; background: transparent; color: var(--muted); font-size: 15px; line-height: 1; }
+      #window-titlebar .tc-titlebar-controls button:hover { color: var(--text); border-color: var(--line); background: var(--surface-raised); }
+      #window-titlebar #win-close:hover { color: #fff; border-color: transparent; background: var(--danger); }
+      #window-titlebar:not(.hidden) ~ header .brand { display: none; }
+      header, footer { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-2) var(--space-3); background: var(--panel); }
+      header { position: relative; border-bottom: 1px solid var(--line); flex-wrap: wrap; gap: var(--toolbar-gap); }
       header::after { position: absolute; inset: auto 0 0; height: 2px; content: ""; background: var(--accent); opacity: .72; pointer-events: none; }
       footer { border-top: 1px solid var(--line); color: var(--muted); font-size: var(--font-sm); }
       .brand { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 700; letter-spacing: .12em; color: var(--text); margin-right: var(--space-1); white-space: nowrap; }
@@ -196,11 +197,12 @@
       #sc-diff-bar { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-bottom: 1px solid var(--line); font-size: 11px; }
       #sc-diff-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       #sc-diff-text { flex: 1 1 auto; min-height: 0; margin: 0; padding: 8px; overflow: auto; white-space: pre; color: var(--text); font: 11px/1.5 var(--mono-font); }
-      #side-splitter, #panel-splitter { position: relative; z-index: 2; background: var(--line); flex: 0 0 auto; touch-action: none; }
+      #explorer-splitter, #side-splitter, #panel-splitter { position: relative; z-index: 2; background: var(--line); flex: 0 0 auto; touch-action: none; }
+      #explorer-splitter { width: 5px; cursor: col-resize; }
       #side-splitter { width: 5px; cursor: col-resize; }
       #panel-splitter { height: 5px; cursor: row-resize; }
-      #side-splitter:hover, #panel-splitter:hover { background: var(--accent); }
-      #side-splitter:focus-visible, #panel-splitter:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+      #explorer-splitter:hover, #side-splitter:hover, #panel-splitter:hover { background: var(--accent); }
+      #explorer-splitter:focus-visible, #side-splitter:focus-visible, #panel-splitter:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
       /* Widen the drag target without making the separator visually thicker. */
       #panel-splitter::after { content: ""; position: absolute; inset: -5px 0; }
       #editor-region.panel-maximized #main,
@@ -244,7 +246,7 @@
       #output .err { color: var(--danger); }
       #output .ok { color: var(--success); }
       #output .dim { color: var(--muted); }
-      .output-input-bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--border); background: var(--panel); }
+      .output-input-bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--line); background: var(--panel); }
       .output-input-bar label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
       .output-input-bar input { flex: 1; min-width: 0; }
       .row { padding: 3px 6px; cursor: pointer; border-radius: var(--radius-sm); white-space: pre; }
@@ -310,6 +312,14 @@
       #arch-header strong { color: var(--text); white-space: nowrap; }
       #arch-root { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font: 11px ui-monospace, Menlo, monospace; }
       #arch-toolbar { flex-wrap: wrap; background: var(--bg); }
+      .arch-control-group { display: inline-flex; align-items: center; gap: var(--toolbar-gap); min-width: 0; }
+      #arch-filter-actions { flex: 1 1 180px; }
+      #arch-filter-options { position: relative; flex: 0 0 auto; }
+      #arch-filter-options > summary { display: inline-flex; align-items: center; min-height: var(--control-height-sm); padding: 2px 8px; border: 1px solid var(--line); border-radius: var(--radius-md); color: var(--muted); font-size: var(--font-sm); cursor: pointer; list-style: none; }
+      #arch-filter-options > summary::-webkit-details-marker { display: none; }
+      #arch-filter-options[open] > summary { color: var(--accent); border-color: var(--accent); }
+      #arch-filter-options:not([open]) > div { display: none; }
+      #arch-filter-options > div { position: absolute; top: calc(100% + 4px); left: 0; z-index: 60; display: flex; flex-direction: column; align-items: stretch; gap: var(--space-2); width: min(280px, calc(100vw - 24px)); padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--panel); box-shadow: var(--shadow-md); }
       .arch-hidden-toggle { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; white-space: nowrap; }
       .arch-hidden-toggle input { min-height: auto; accent-color: var(--accent); }
       #arch-modes { display: flex; gap: 4px; padding-right: 8px; border-right: 1px solid var(--line); }
@@ -368,6 +378,13 @@
       #github-compose textarea { min-height: 64px; resize: vertical; }
       #github-actions { display: flex; flex-wrap: wrap; gap: 6px; }
       .github-privacy { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
+      #architecture:not(.fullscreen) #arch-graph-actions { display: none; }
+      #architecture:not(.fullscreen) #arch-window[data-search-results="true"] #arch-graph-pane { display: none; }
+      #architecture:not(.fullscreen) #arch-window[data-search-results="true"] #arch-details-pane { display: flex; flex: 1 1 auto; border-left: 0; }
+      #arch-details-pane h3 { display: flex; align-items: center; gap: var(--space-2); }
+      #arch-window[data-search-results="true"] #arch-details-title { display: none; }
+      #arch-window:not([data-search-results="true"]) #arch-results-title,
+      #arch-window:not([data-search-results="true"]) #arch-results-close { display: none; }
       #arch-window[data-insight="true"] #arch-focus,
       #arch-window[data-insight="true"] #arch-zoom-out,
       #arch-window[data-insight="true"] #arch-zoom-in,
@@ -419,7 +436,10 @@
       #architecture:not(.fullscreen) #arch-details-pane { display: none; }
       #architecture:not(.fullscreen) #arch-toolbar { padding: 6px 8px; }
       #architecture:not(.fullscreen) #arch-modes { display: none; }
-      #architecture:not(.fullscreen) #arch-header { display: none; }
+      #architecture:not(.fullscreen) #arch-header { min-height: 28px; padding: 4px var(--space-2); gap: var(--space-2); }
+      #architecture:not(.fullscreen) #arch-header strong { font-size: var(--font-xs); letter-spacing: .08em; text-transform: uppercase; }
+      #architecture:not(.fullscreen) #arch-root { font-size: var(--font-xs); }
+      #architecture:not(.fullscreen) #arch-close { display: none; }
       #architecture:not(.fullscreen) #arch-graph-pane { padding: 0; }
       #arch-details-pane h3 { margin: 0; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
       #arch-details { display: flex; flex-direction: column; gap: 12px; overflow-wrap: anywhere; }
@@ -432,6 +452,11 @@
       #arch-context-menu { position: fixed; z-index: 90; display: flex; min-width: 180px; flex-direction: column; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow-md); }
       #arch-context-menu button { border: 0; background: transparent; text-align: left; }
       dialog.workspace-dialog { width: min(620px, calc(100vw - 24px)); max-height: min(720px, calc(100vh - 24px)); padding: 0; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow-md); }
+      #workspace-text-search-dialog { width: min(520px, calc(100vw - 24px)); }
+      #workspace-text-search-dialog form { display: flex; flex-direction: column; }
+      #workspace-text-search-dialog form > header { display: flex; align-items: center; gap: var(--space-2); padding: 9px; border-bottom: 1px solid var(--line); }
+      #workspace-text-search-dialog form > header::after { display: none; }
+      #workspace-text-search-dialog .tc-command-search { margin: var(--space-2); }
       dialog.workspace-dialog::backdrop { background: var(--overlay); }
       .workspace-dialog > header { display: flex; padding: 9px; border-bottom: 1px solid var(--line); }
       .workspace-dialog > header::after { display: none; }
@@ -524,8 +549,8 @@
       #canvas-stage[data-transparency="white"] { background-color: #fff; }
       #canvas-stage[data-transparency="black"] { background-color: #000; }
       #canvas-stage[data-transparency="magenta"] { background-color: #ff00ff; }
-      #canvas-stage[data-grid="true"]::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background-image: linear-gradient(to right, rgba(120,190,220,.22) 1px, transparent 1px), linear-gradient(to bottom, rgba(120,190,220,.22) 1px, transparent 1px); background-size: var(--canvas-grid-size, 32px 32px); }
-      #canvas-stage[data-guides="true"]::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(to right, transparent calc(50% - .5px), rgba(120,190,220,.45) 50%, transparent calc(50% + .5px)), linear-gradient(to bottom, transparent calc(50% - .5px), rgba(120,190,220,.45) 50%, transparent calc(50% + .5px)); }
+      #canvas-stage[data-grid="true"]::before { content: ""; position: absolute; inset: 0; z-index: 0; color: var(--muted); opacity: .22; pointer-events: none; background-image: linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px); background-size: var(--canvas-grid-size, 32px 32px); }
+      #canvas-stage[data-guides="true"]::after { content: ""; position: absolute; inset: 0; z-index: 2; color: var(--muted); opacity: .45; pointer-events: none; background: linear-gradient(to right, transparent calc(50% - .5px), currentColor 50%, transparent calc(50% + .5px)), linear-gradient(to bottom, transparent calc(50% - .5px), currentColor 50%, transparent calc(50% + .5px)); }
       #canvas-surface, #canvas-preview, #canvas-adjust-preview, #canvas-compare-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; max-width: none; touch-action: none; }
       #canvas-preview, #canvas-adjust-preview { pointer-events: none; }
       #canvas-adjust-preview { z-index: 1; display: none; }
@@ -709,7 +734,7 @@
       html[data-layout-mode="compact"] .tc-app-header { column-gap: 6px; row-gap: 4px; }
       html[data-layout-mode="compact"] #btn-toolbar-overflow { display: inline-flex; }
       html[data-layout-mode="compact"] .tc-header-actions .toolbar-group[aria-label="File actions"],
-      html[data-layout-mode="compact"] .tc-header-actions .toolbar-group[aria-label="Extensions"] { display: none; }
+      html[data-layout-mode="compact"] .tc-header-actions .toolbar-group[aria-label="More tools"] { display: none; }
 
       /* The activity bar already owns these views. Keep the header focused on
          file and run actions; keyboard shortcuts still reach the hidden ones. */
@@ -764,7 +789,7 @@
       .error-rule-row.disabled { opacity: .5; }
       .error-rule-severity { font-weight: 600; text-transform: uppercase; font-size: 10px; }
       .error-rule-severity.error { color: var(--danger); }
-      .error-rule-severity.warning { color: var(--warn, #d9a441); }
+      .error-rule-severity.warning { color: var(--warning); }
       .error-rule-severity.info { color: var(--accent); }
       .error-rule-detail { grid-column: 2; color: var(--muted); }
       .error-rules-actions { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 10px 10px; }
@@ -776,7 +801,7 @@
       <div id="window-titlebar" data-tauri-drag-region="deep">
         <img class="tc-brand-icon" src="/talos.svg" alt="" aria-hidden="true" />
         <span id="window-title-text">Talos Crest</span>
-        <div class="window-controls" role="toolbar" aria-label="Window controls">
+        <div class="tc-titlebar-controls" role="toolbar" aria-label="Window controls">
           <button id="win-min" type="button" title="Minimize" aria-label="Minimize">−</button>
           <button id="win-max" type="button" title="Maximize" aria-label="Maximize">□</button>
           <button id="win-close" type="button" title="Close" aria-label="Close">×</button>
@@ -792,11 +817,11 @@
         </div>
         <button id="btn-command-palette" class="tc-command-trigger" title="Command palette (Ctrl+K)">
           <span aria-hidden="true">⌕</span>
-          <span>Search files and commands</span>
+          <span>Search commands</span>
           <kbd>Ctrl K</kbd>
         </button>
         <div class="tc-row tc-header-actions">
-          <div class="toolbar-group" role="toolbar" aria-label="Workspace">
+          <div class="toolbar-group" role="toolbar" aria-label="Files and views">
             <button id="btn-open" title="Open a file (Ctrl+O)">Open</button>
             <button id="btn-quick-open" title="Quick Open files (Ctrl+P)">Files</button>
             <button id="btn-architecture" title="Explore project structure (Ctrl+Shift+E)">Explorer</button>
@@ -825,7 +850,7 @@
             <label class="sr-only" for="run-args">Run arguments</label>
             <input id="run-args" class="run-args-input" type="text" spellcheck="false" autocomplete="off" aria-label="Run arguments" title="Arguments passed to the program, e.g. build" placeholder="Args" />
           </div>
-          <div class="toolbar-group" role="toolbar" aria-label="Extensions">
+          <div class="toolbar-group" role="toolbar" aria-label="More tools">
             <button id="btn-ext" title="Extensions">Extensions</button>
             <button id="btn-tpl" title="New from template">New from template</button>
           </div>
@@ -853,10 +878,11 @@
               <option value="1">UI 100%</option>
               <option value="1.1">UI 110%</option>
               <option value="1.25">UI 125%</option>
+              <option value="1.5">UI 150%</option>
             </select>
           </div>
         </div>
-        <div id="window-controls" class="toolbar-group" role="toolbar" aria-label="Windows">
+        <div id="window-controls" class="toolbar-group" role="toolbar" aria-label="Window manager">
           <button id="btn-toolbar-overflow" class="mini" title="More options" aria-label="More options" aria-haspopup="menu" aria-expanded="false">⋯</button>
           <button id="btn-new-window" title="New Window (Ctrl+Shift+N)">New Window</button>
           <button id="btn-window-switcher" title="Switch between open Talos windows">Windows…</button>
@@ -866,9 +892,9 @@
 
       <div id="workspace-body">
         <nav id="activity-bar" class="tc-activity-bar" aria-label="Workspace navigation">
-          <button id="btn-activity-toggle" class="tc-icon-button tc-activity-toggle" title="Collapse navigation" aria-label="Toggle navigation labels">⌘</button>
+          <button id="btn-activity-toggle" class="tc-icon-button tc-activity-toggle" title="Collapse navigation" aria-label="Toggle navigation labels">≡</button>
           <button class="tc-nav-item active" data-view="explorer" title="Explorer" aria-label="Explorer"><span class="tc-nav-icon" aria-hidden="true">▤</span><span class="tc-nav-label">Explorer</span></button>
-          <button class="tc-nav-item" data-view="search" title="Search files" aria-label="Search files"><span class="tc-nav-icon" aria-hidden="true">⌕</span><span class="tc-nav-label">Search</span></button>
+          <button class="tc-nav-item" data-view="search" title="Find files by name" aria-label="Find files by name"><span class="tc-nav-icon" aria-hidden="true">⌕</span><span class="tc-nav-label">Find Files</span></button>
           <button class="tc-nav-item" data-view="source-control" title="Source Control" aria-label="Source Control"><span class="tc-nav-icon" aria-hidden="true">⑂</span><span class="tc-nav-label">Source Control</span></button>
           <button class="tc-nav-item" data-view="run" title="Run and Debug" aria-label="Run and Debug"><span class="tc-nav-icon" aria-hidden="true">▷</span><span class="tc-nav-label">Run and Debug</span></button>
           <button class="tc-nav-item" data-view="extensions" title="Extensions" aria-label="Extensions"><span class="tc-nav-icon" aria-hidden="true">⧉</span><span class="tc-nav-label">Extensions</span></button>
@@ -881,7 +907,7 @@
         <div id="architecture" class="hidden">
           <div id="arch-window">
             <div id="arch-header">
-              <strong>Talos Observatory</strong>
+              <strong>Explorer</strong>
               <span id="arch-root">No project selected</span>
               <button id="arch-close" class="mini" aria-label="Close Talos Observatory">×</button>
             </div>
@@ -896,22 +922,33 @@
                 <button class="arch-mode" data-arch-mode="debt" role="tab">Technical Debt</button>
                 <button class="arch-mode" data-arch-mode="github" role="tab">GitHub</button>
               </div>
-              <button id="arch-open-project" class="accent" title="Open a project folder">Open Folder</button>
-              <select id="arch-recent" aria-label="Recent projects" title="Reopen a recent project">
-                <option value="">Recent projects</option>
-              </select>
-              <button id="arch-refresh" title="Rescan the current project">Refresh</button>
-              <button id="arch-find-text" title="Search text across all workspace files">Find in Files</button>
-              <input id="arch-search" type="search" placeholder="Search files and folders…" aria-label="Search project graph" />
-              <input id="arch-excludes" type="text" aria-label="Excluded directory names" title="Comma-separated directory names to exclude" />
-              <label class="arch-hidden-toggle"><input id="arch-show-hidden" type="checkbox" /> Show hidden files</label>
-              <label class="arch-hidden-toggle"><input id="arch-show-ignored" type="checkbox" /> Show ignored files</label>
-              <button id="arch-focus" disabled title="Focus on the selected file and its direct neighbors">Focus</button>
-              <button id="arch-zoom-out" title="Zoom out">−</button>
-              <button id="arch-zoom-in" title="Zoom in">+</button>
-              <button id="arch-fit" title="Reset zoom and scroll">Fit</button>
-              <button id="arch-export" disabled>Export SVG</button>
-              <button id="arch-export-png" disabled>PNG</button>
+              <div class="arch-control-group" role="group" aria-label="Project actions">
+                <button id="arch-open-project" class="accent" title="Open a project folder">Open Folder</button>
+                <button id="arch-refresh" title="Rescan the current project">Refresh</button>
+                <button id="arch-find-text" title="Search file contents in this workspace">Find in Files</button>
+              </div>
+              <div class="arch-control-group" id="arch-filter-actions" role="group" aria-label="File filters">
+                <input id="arch-search" type="search" placeholder="Filter files and folders…" aria-label="Filter files and folders" />
+                <details id="arch-filter-options">
+                  <summary title="Filter and visibility options">Filters</summary>
+                  <div>
+                    <select id="arch-recent" aria-label="Recent projects" title="Reopen a recent project">
+                      <option value="">Recent projects</option>
+                    </select>
+                    <input id="arch-excludes" type="text" aria-label="Excluded directory names" title="Comma-separated directory names to exclude" />
+                    <label class="arch-hidden-toggle"><input id="arch-show-hidden" type="checkbox" /> Show hidden files</label>
+                    <label class="arch-hidden-toggle"><input id="arch-show-ignored" type="checkbox" /> Show ignored files</label>
+                  </div>
+                </details>
+              </div>
+              <div class="arch-control-group" id="arch-graph-actions" role="group" aria-label="Graph view">
+                <button id="arch-focus" disabled title="Focus on the selected file and its direct neighbors">Focus</button>
+                <button id="arch-zoom-out" title="Zoom out">−</button>
+                <button id="arch-zoom-in" title="Zoom in">+</button>
+                <button id="arch-fit" title="Reset zoom and scroll">Fit</button>
+                <button id="arch-export" disabled title="Export graph as SVG" aria-label="Export graph as SVG">SVG</button>
+                <button id="arch-export-png" disabled title="Export graph as PNG" aria-label="Export graph as PNG">PNG</button>
+              </div>
             </div>
             <div id="arch-message" role="status">Choose a project folder to explore.</div>
             <div id="arch-privacy">Project structure and import analysis stay on this device. No source is sent to AI or external services.</div>
@@ -925,7 +962,7 @@
                 <div id="arch-summary">Choose a project folder to explore.</div>
               </div>
               <aside id="arch-details-pane">
-                <h3>Selection details</h3>
+                <h3><span id="arch-details-title">Selection details</span><span id="arch-results-title">Search results</span><span class="spacer"></span><button id="arch-results-close" class="mini" title="Close search results" aria-label="Close search results">×</button></h3>
                 <div id="arch-details"><p>Select a node to inspect it.</p></div>
               </aside>
             </div>
@@ -989,15 +1026,16 @@
             </div>
           </div>
         </div>
+        <div id="explorer-splitter" class="hidden" role="separator" aria-label="Resize Explorer" aria-controls="architecture" aria-orientation="vertical" aria-valuemin="220" aria-valuemax="480" aria-valuenow="300" tabindex="0"></div>
         <div id="editor-region">
           <nav id="breadcrumbs" aria-label="Breadcrumb">
-            <button id="breadcrumb-root" class="tc-breadcrumb-root" title="Open Talos Observatory">Workspace</button>
+            <button id="breadcrumb-root" class="tc-breadcrumb-root" title="Open project Explorer">Workspace</button>
             <span id="breadcrumb-path"></span>
           </nav>
           <div id="document-tabs" role="tablist" aria-label="Open documents"></div>
           <div id="main">
             <div id="editor"></div>
-            <div id="side-splitter" class="hidden" role="separator" aria-label="Resize editor and side pane" aria-controls="editor" aria-orientation="vertical" aria-valuemin="240" aria-valuenow="0" tabindex="0"></div>
+            <div id="side-splitter" class="hidden" role="separator" aria-label="Resize editor and side pane" aria-controls="editor" aria-orientation="vertical" aria-valuemin="0" aria-valuenow="0" tabindex="0"></div>
             <aside id="outline-pane" class="side-pane hidden">
               <div id="outline-bar">
                 <strong>Code Outline</strong>
@@ -1102,12 +1140,12 @@
 
           <div id="panel-splitter" class="hidden" role="separator" aria-label="Resize bottom panel" aria-controls="panel" aria-orientation="horizontal" aria-valuemin="136" aria-valuemax="400" aria-valuenow="280" tabindex="0"></div>
           <section id="panel" class="hidden">
-            <div id="tabs" class="tc-tabs">
-              <button class="tab active" data-tab="problems">Problems <span id="count">0</span></button>
-              <button class="tab" data-tab="output">Output</button>
-              <button class="tab" data-tab="terminal">Terminal</button>
-              <button class="tab" data-tab="build">Build</button>
-              <button class="tab" data-tab="debug">Debug Console</button>
+            <div id="tabs" class="tc-tabs" role="tablist" aria-label="Panel views">
+              <button class="tab active" data-tab="problems" role="tab" aria-selected="true">Problems <span id="count">0</span></button>
+              <button class="tab" data-tab="output" role="tab" aria-selected="false">Output</button>
+              <button class="tab" data-tab="terminal" role="tab" aria-selected="false">Terminal</button>
+              <button class="tab" data-tab="build" role="tab" aria-selected="false">Build</button>
+              <button class="tab" data-tab="debug" role="tab" aria-selected="false">Debug Console</button>
               <span class="spacer"></span>
               <button id="btn-panel-max" class="mini" title="Maximize panel" aria-label="Maximize panel" aria-pressed="false">Max</button>
               <button id="btn-panel-close" class="mini">&times;</button>
@@ -1171,8 +1209,8 @@
         <span class="spacer"></span>
         <button id="btn-fun" class="mini">Fun mode: off</button>
         <button id="btn-shortcuts" class="mini" title="Keyboard shortcuts (F1)">Shortcuts</button>
-        <span id="meter" data-level="Clean">
-          <span id="meter-label">Error Meter</span>
+        <span id="meter" data-level="Clean" role="meter" aria-label="Diagnostic pressure" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="No diagnostics">
+          <span id="meter-label">Diagnostic pressure</span>
           <span id="gauge"><i id="gauge-fill"></i></span>
           <span id="meter-text"></span>
         </span>
@@ -1188,6 +1226,21 @@
       </header>
       <div id="quick-open-status" class="workspace-dialog-status" role="status">Type to search workspace files, or choose a recent file.</div>
       <div id="quick-open-results" class="workspace-results" role="listbox" aria-label="Workspace files"></div>
+    </dialog>
+    <dialog id="workspace-text-search-dialog" class="workspace-dialog" aria-label="Search file contents">
+      <form id="workspace-text-search-form" method="dialog">
+        <header>
+          <strong>Search file contents</strong>
+          <span class="spacer"></span>
+          <button id="workspace-text-search-close" type="button" class="mini" aria-label="Close content search">×</button>
+        </header>
+        <div class="workspace-dialog-status">Searches this workspace only. Results appear in the Explorer.</div>
+        <div class="tc-command-search">
+          <span aria-hidden="true">⌕</span>
+          <input id="workspace-text-query" type="search" placeholder="Text to find in files" aria-label="Text to find in files" autocomplete="off" spellcheck="false" required />
+          <button id="workspace-text-search-submit" type="submit" class="accent" value="search">Search</button>
+        </div>
+      </form>
     </dialog>
     <dialog id="command-palette" class="tc-command-dialog" aria-label="Command palette">
       <div class="tc-command-box">

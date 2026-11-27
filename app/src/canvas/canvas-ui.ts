@@ -4,7 +4,7 @@
 
 import { open } from "@tauri-apps/plugin-dialog";
 import { fileNameFromPath, readBytes, writeBytes } from "../platform";
-import { getWindowValue, setWindowValue } from "../window-state";
+import { getWindowValue, removeWindowValue, setWindowValue } from "../window-state";
 import {
   ASSET_PRESETS, BoundedHistory, DEFAULT_MAX_PIXELS, DEFAULT_PREVIEW_PIXELS, EXPORT_PRESETS,
   MAX_DOCUMENT_PIXELS, adjustCropRect, arrowHeadPoints, brushBounds, clampRect,
@@ -1894,6 +1894,15 @@ function restoreSettings(): void {
   if (storedTool && CANVAS_TOOLS.includes(storedTool as Tool)) tool = storedTool as Tool;
   const storedSpacing = Number(getWindowValue("talos.canvas.grid-spacing"));
   if (Number.isFinite(storedSpacing) && storedSpacing >= 2) gridSpacing = Math.min(500, storedSpacing);
+  // Older sessions persisted grid, snapping, and center guides as enabled, so
+  // every opened image inherited blue overlay lines. Clear those once, then
+  // respect any explicit choice made after this migration.
+  if (getWindowValue("talos.canvas.overlays-reset-v2") !== "done") {
+    removeWindowValue("talos.canvas.grid");
+    removeWindowValue("talos.canvas.snap");
+    removeWindowValue("talos.canvas.guides");
+    setWindowValue("talos.canvas.overlays-reset-v2", "done");
+  }
   gridVisible = getWindowValue("talos.canvas.grid") === "true";
   snapEnabled = getWindowValue("talos.canvas.snap") === "true";
   guidesVisible = getWindowValue("talos.canvas.guides") === "true";

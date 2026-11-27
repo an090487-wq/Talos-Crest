@@ -201,9 +201,10 @@ export function initCommandPalette(
 function positionCommandPalette() {
   const dialog = element("command-palette") as HTMLDialogElement;
   const trigger = element("btn-command-palette").getBoundingClientRect();
-  const top = Math.max(8, Math.min(trigger.bottom + 8, window.innerHeight - 240));
+  const top = Math.max(8, Math.min(trigger.bottom + 8, window.innerHeight - 160));
   const center = trigger.left + trigger.width / 2;
-  const clampedCenter = Math.max(160, Math.min(center, window.innerWidth - 160));
+  const edge = Math.min(160, Math.max(8, window.innerWidth / 2 - 8));
+  const clampedCenter = Math.max(edge, Math.min(center, window.innerWidth - edge));
 
   dialog.style.top = `${Math.round(top)}px`;
   dialog.style.left = `${Math.round(clampedCenter)}px`;
@@ -214,7 +215,9 @@ function positionCommandPalette() {
 
   const box = dialog.querySelector<HTMLElement>(".tc-command-box");
   if (box) {
-    box.style.maxHeight = `${Math.round(Math.min(680, Math.max(280, window.innerHeight - top - 16)))}px`;
+    const preferredHeight = Math.min(680, Math.max(280, window.innerHeight - top - 16));
+    const availableHeight = Math.max(120, window.innerHeight - top - 12);
+    box.style.maxHeight = `${Math.round(Math.min(preferredHeight, availableHeight))}px`;
   }
 }
 

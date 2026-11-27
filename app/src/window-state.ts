@@ -19,4 +19,5 @@ export function setWindowValue(key: string, value: string): void {
 
 export function removeWindowValue(key: string): void {
   localStorage.removeItem(prefix + key);
+  if (windowLabel === "main") localStorage.removeItem(key);
 }

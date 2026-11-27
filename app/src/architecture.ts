@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { closeOtherDialogs, closeTopmostDialog } from "./ui/dialogs";
+import { closeOtherDialogs, closeTopmostDialog, openModalDialog } from "./ui/dialogs";
 import { isReadOnlyAppImagePath } from "./workspace-paths";
 import { initGitHubPanel, renderGitHubPanel } from "./github-ui";
 import { getWindowValue, setWindowValue } from "./window-state";
@@ -452,6 +452,39 @@ function absolutePath(relative: string): string {
   return scan ? `${normalizedPath(scan.root).replace(/\/$/, "")}/${relative}` : relative;
 }
 
+/** Keep the Explorer selection aligned with the document opened elsewhere. */
+export function selectExplorerPath(path: string | null): void {
+  const normalized = path ? normalizedPath(path).replace(/\/$/, "") : "";
+  if (!normalized) {
+    if (!selectedPath) return;
+    selectedPath = "";
+    render();
+    return;
+  }
+  if (scan) {
+    const root = normalizedPath(scan.root).replace(/\/$/, "");
+    if (normalized !== root && !normalized.startsWith(`${root}/`)) return;
+    const segments = relativePath(normalized).split("/").filter(Boolean);
+    let changed = false;
+    for (let index = 1; index < segments.length; index++) {
+      const directory = absolutePath(segments.slice(0, index).join("/"));
+      if (entryByPath.get(directory)?.kind === "directory" && !expanded.has(directory)) {
+        expanded.add(directory);
+        changed = true;
+      }
+    }
+    if (changed) {
+      expandedVersion++;
+      cachedTreeRows = null;
+      scheduleExpandedSave();
+      void restoreLazyExpansion(scanGeneration);
+    }
+  }
+  if (normalizedPath(selectedPath) === normalized) return;
+  selectedPath = path!;
+  render();
+}
+
 function recentPaths(): string[] {
   try {
     const stored: unknown = JSON.parse(getWindowValue(RECENT_PATHS_KEY) ?? "[]");
@@ -513,6 +546,7 @@ function addDetailRows(details: HTMLElement, rows: [string, string][]) {
 
 function renderDetails() {
   const details = $("arch-details");
+  delete $("arch-window").dataset.searchResults;
   details.textContent = "";
   if (mode === "architecture") {
     const component = components.find((item) => item.id === selectedComponent);
@@ -2001,8 +2035,23 @@ async function findInWorkspace() {
   const snapshotPaths = snapshot.truncated || snapshot.lazy
     ? undefined
     : snapshot.entries.filter((entry) => entry.kind === "file").map((entry) => entry.path);
-  const query = window.prompt("Search text in all workspace files:");
-  if (!query?.trim()) return;
+  const dialog = openModalDialog("workspace-text-search-dialog");
+  if (!dialog) return;
+  const input = $("workspace-text-query") as HTMLInputElement;
+  dialog.returnValue = "";
+  input.value = "";
+  $("workspace-text-search-close").onclick = () => {
+    dialog.returnValue = "cancel";
+    dialog.close();
+  };
+  input.focus();
+  input.select();
+  const query = await new Promise<string | null>((resolve) => {
+    const onClose = () => resolve(dialog.returnValue === "search" ? input.value.trim() : null);
+    dialog.addEventListener("close", onClose, { once: true });
+  });
+  if (!query) return;
+  $("arch-window").dataset.searchResults = "true";
   const summary = $("arch-details");
   summary.textContent = "Searching workspace files…";
   try {
@@ -2624,6 +2673,9 @@ export function initArchitectureExplorer(
   getFileDecoration = decorationForPath;
   initGitHubPanel();
   const showArchitecture = () => {
+    // Explorer is the docked file-tree mode. Other visualizations remain
+    // reachable from the fullscreen Observatory rail item and mode tabs.
+    setMode("structure");
     showArchitectureWindow();
     if (!scan) void chooseProject();
     else void refreshTree(scan.root);
@@ -2654,6 +2706,9 @@ export function initArchitectureExplorer(
     else void chooseProject();
   });
   $("arch-find-text").addEventListener("click", () => void findInWorkspace());
+  $("arch-results-close").addEventListener("click", () => {
+    delete $("arch-window").dataset.searchResults;
+  });
   $("arch-search").addEventListener("input", () => {
     if (archSearchTimer) window.clearTimeout(archSearchTimer);
     archSearchTimer = window.setTimeout(() => {
