@@ -23,8 +23,10 @@ choices across refreshes, and stays a sidebar instead of stacking into the
 Terminal/Output area on narrow windows. Git refresh caches successful repository
 roots and reads remotes in one pass, while the PDF viewer loads its parser only
 when a PDF is opened. The toolbar hides buttons already present in the activity
-bar, the top search field sits with toolbar actions, and the breadcrumb follows
-the active document even for images, PDFs, and binary previews.
+bar, the top search field sits inside the toolbar actions row, and the breadcrumb
+follows the active document even for images, PDFs, and binary previews. The status
+bar shows a language icon, the working file name, and the active language instead
+of an Untitled placeholder.
 
 ## Linux
 
@@ -37,7 +39,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`77ae5088cd0af013d5f6b1f5b42809196b8165e005f2b5152698c8525fd5e450`
+`8a04ec1b704e04ea35e68f121940ffbceb01eff614bded051721b75718996baa`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -54,7 +56,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`86ca19f6f1ddb2efded0400b06d79232426695e54b072b8f56175d6705cf7708`
+`27111099643bd777879204c065bc1cf8381752d23a6da60d935247d0ac573bca`
 
 ## Android
 
