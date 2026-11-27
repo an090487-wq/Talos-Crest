@@ -394,7 +394,7 @@ input:focus-visible,
 
 .tc-app-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 340px) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 340px) minmax(0, 1fr);
   grid-template-areas:
     "title search windows"
     "actions actions actions";
@@ -407,6 +407,7 @@ input:focus-visible,
 .tc-title-area {
   grid-area: title;
   min-width: 0;
+  overflow: hidden;
 }
 
 .tc-command-trigger {
@@ -914,7 +915,7 @@ dialog#command-palette.tc-command-dialog {
 
 @media (max-width: 1180px) {
   .tc-app-header {
-    grid-template-columns: minmax(0, 1fr) minmax(180px, 260px) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 260px) minmax(0, 1fr);
     column-gap: 8px;
   }
   .tc-header-actions .toolbar-group {
@@ -931,8 +932,9 @@ dialog#command-palette.tc-command-dialog {
       "actions actions";
   }
   .tc-command-trigger {
-    justify-self: stretch;
-    max-width: none;
+    justify-self: center;
+    width: min(100%, 340px);
+    max-width: 340px;
   }
   #window-controls {
     justify-self: end;

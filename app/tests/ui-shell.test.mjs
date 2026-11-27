@@ -113,7 +113,8 @@ test("window actions live in a three-dot More menu", () => {
 
 test("the top search bar sits in the header's top row", () => {
   assert.match(css, /"title search windows"\s*"actions actions actions"/);
-  assert.match(css, /\.tc-command-trigger \{[\s\S]*?grid-area: search;/);
+  assert.match(css, /grid-template-columns: minmax\(0, 1fr\) minmax\(220px, 340px\) minmax\(0, 1fr\)/);
+  assert.match(css, /\.tc-command-trigger \{[\s\S]*?grid-area: search;[\s\S]*?justify-self: center;/);
   assert.match(html, /<\/div>\s*<button id="btn-command-palette"[\s\S]{0,200}<\/button>\s*<div class="tc-row tc-header-actions">/);
   assert.doesNotMatch(html, /<div class="tc-row tc-header-actions">\s*<button id="btn-command-palette"/);
 });
