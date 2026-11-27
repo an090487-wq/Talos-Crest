@@ -635,6 +635,54 @@ function say(text: string) {
   $("msg").textContent = text;
 }
 
+function languageFromFileName(fileName: string): string {
+  if (fileName.toLowerCase().endsWith(".pdf")) return "PDF";
+  if (isImagePath(fileName)) return "Image";
+  return LanguageDescription.matchFilename(languages, fileName)?.name ?? "Plain text";
+}
+
+function activeFileGlyph(language: string, fileName: string): string {
+  const lang = language.trim().toLowerCase();
+  const extension = fileName.includes(".") ? (fileName.split(".").pop() ?? "").toLowerCase() : "";
+  if (lang === "python" || extension === "py") return "PY";
+  if (lang === "typescript" || ["ts", "tsx"].includes(extension)) return "TS";
+  if (lang === "javascript" || ["js", "jsx", "mjs", "cjs"].includes(extension)) return "JS";
+  if (lang === "rust" || extension === "rs") return "RS";
+  if (lang === "java" || extension === "java") return "JV";
+  if (lang.includes("c++") || ["cpp", "cc", "cxx", "hpp"].includes(extension)) return "C++";
+  if (lang === "c#" || lang === "csharp" || extension === "cs") return "C#";
+  if (lang === "c" || extension === "c" || extension === "h") return "C";
+  if (lang === "go" || extension === "go") return "GO";
+  if (lang === "ruby" || extension === "rb") return "RB";
+  if (lang === "php" || extension === "php") return "PHP";
+  if (lang === "swift" || extension === "swift") return "SW";
+  if (lang === "kotlin" || extension === "kt") return "KT";
+  if (lang === "shell" || lang === "bash" || ["sh", "zsh", "fish"].includes(extension)) return "SH";
+  if (lang === "html" || ["html", "htm"].includes(extension)) return "HT";
+  if (lang === "css" || extension === "css") return "CS";
+  if (lang === "json" || extension === "json") return "{}";
+  if (lang === "markdown" || ["md", "markdown"].includes(extension)) return "MD";
+  if (lang === "sql" || ["sql", "db"].includes(extension)) return "DB";
+  if (lang === "yaml" || ["yaml", "yml"].includes(extension)) return "YM";
+  if (lang === "toml" || extension === "toml") return "TM";
+  if (lang === "xml" || extension === "xml") return "XM";
+  if (lang === "pdf" || extension === "pdf") return "PDF";
+  if (lang === "image") return "IMG";
+  return "◇";
+}
+
+function updateActiveFileStatus(source = breadcrumbPath ?? currentPath ?? suggestedName ?? ""): void {
+  const fileName = source ? fileNameFromPath(source) : "Working file";
+  const inferred = languageFromFileName(fileName);
+  const language = inferred === "Plain text" ? (currentLanguageName || inferred) : inferred;
+  const status = $("active-file-status");
+  status.title = source ? `${source} — ${language}` : `Unsaved working file — ${language}`;
+  status.dataset.language = language.toLowerCase();
+  $("active-file-icon").textContent = activeFileGlyph(language, fileName);
+  $("active-file-name").textContent = fileName + (dirty ? " \u2022" : "");
+  $("lang").textContent = language;
+}
+
 function renderWorkspaceStatus() {
   const state = currentWorkspace();
   const status = $("workspace-status");
@@ -656,19 +704,18 @@ void listen<{ phase: string }>("chronicle://progress", ({ payload }) => {
 }).catch(() => undefined);
 
 function updateBreadcrumbs() {
-  const source = breadcrumbPath ?? currentPath ?? suggestedName ?? "Untitled";
+  const source = breadcrumbPath ?? currentPath ?? suggestedName ?? "";
   const parts = source.replace(/\\/g, "/").split("/").filter(Boolean);
   const visible = parts.length > 4 ? ["…", ...parts.slice(-4)] : parts;
-  const label = visible.join(" / ") || "Untitled";
+  const label = visible.join(" / ");
   const breadcrumb = $("breadcrumb-path");
   if (breadcrumb.textContent !== label) breadcrumb.textContent = label;
+  updateActiveFileStatus(source);
 }
 
 function refreshTitle() {
   const path = currentPath && android ? fileNameFromPath(currentPath) : currentPath;
-  const name = (path ?? suggestedName ?? "Untitled") + (dirty ? " \u2022" : "");
-  const file = $("file");
-  if (file.textContent !== name) file.textContent = name;
+  const name = (path ?? suggestedName ?? "Working file") + (dirty ? " \u2022" : "");
   updateBreadcrumbs();
   const workspace = getWindowValue("talos.workspace-root");
   const workspaceName = workspace?.replace(/[\\/]+$/, "").split(/[\\/]/).pop();
@@ -843,7 +890,7 @@ function renderProblems(rows = problemRows) {
   for (const r of visible.slice(0, 300)) {
     const el = document.createElement("div");
     el.className = "row " + r.severity;
-    const path = currentPath ?? suggestedName ?? "Untitled";
+    const path = currentPath ?? suggestedName ?? "Working file";
     el.textContent =
       path +
       ":" +
@@ -1645,10 +1692,10 @@ function renderDocumentTabs() {
     button.setAttribute("role", "tab");
     button.setAttribute("aria-selected", String(tab === activeTab));
     button.tabIndex = tab === activeTab ? 0 : -1;
-    button.title = tab.path ?? tab.suggestedName ?? "Untitled";
+    button.title = tab.path ?? tab.suggestedName ?? "Working file";
     const name = document.createElement("span");
     name.className = "document-tab-name";
-    name.textContent = fileNameFromPath(tab.path ?? tab.suggestedName ?? "Untitled");
+    name.textContent = fileNameFromPath(tab.path ?? tab.suggestedName ?? "Working file");
     button.appendChild(name);
     if (tab.dirty) {
       const marker = document.createElement("span");
@@ -1847,7 +1894,7 @@ async function openSnapshotInTab(path: string, snapshot: { contents: string; rev
 async function closeEditorTab(tab: EditorTab) {
   if (tab.dirty) {
     activateEditorTab(tab);
-    const choice = await askUnsavedChanges(`Save changes to ${fileNameFromPath(tab.path ?? tab.suggestedName ?? "Untitled")} before closing?`);
+    const choice = await askUnsavedChanges(`Save changes to ${fileNameFromPath(tab.path ?? tab.suggestedName ?? "Working file")} before closing?`);
     if (choice === "cancel") return;
     if (choice === "save") {
       await saveFile();
@@ -1899,7 +1946,7 @@ async function setLanguage(fileName: string) {
     view.setState(target.state);
     currentLanguageName = target.languageName;
     setDiagnosticsLanguage(currentLanguageName);
-    $("lang").textContent = desc ? desc.name : "Plain text";
+    updateActiveFileStatus();
     whenIdle(() => {
       if (activeTab === target) forceLinting(view);
     }, 350);
@@ -2440,7 +2487,7 @@ async function handleWindowCloseRequest(event: { preventDefault: () => void }) {
         activateEditorTab(tab);
         await saveFile();
         if (tab.dirty) {
-          say(`Could not save ${fileNameFromPath(tab.path ?? tab.suggestedName ?? "Untitled")}. Close cancelled; no changes were discarded.`);
+          say(`Could not save ${fileNameFromPath(tab.path ?? tab.suggestedName ?? "Working file")}. Close cancelled; no changes were discarded.`);
           return;
         }
       }

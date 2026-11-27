@@ -102,9 +102,24 @@ test("More adds creation and UI size actions instead of repeating sidebar button
   assert.match(html, /#btn-architecture,[\s\S]{0,120}#btn-calc,[\s\S]{0,120}#ui-scale,[\s\S]{0,120}display: none !important/);
 });
 
-test("the top search bar sits with toolbar actions, not between title and file", () => {
-  assert.match(css, /"title file windows"\s*"command actions actions"/);
-  assert.match(css, /\.tc-command-trigger \{[\s\S]*?grid-area: command;[\s\S]*?width: auto;/);
+test("the top search bar sits inside the toolbar actions row", () => {
+  assert.match(css, /"title windows"\s*"actions actions"/);
+  assert.doesNotMatch(css, /grid-area: command/);
+  assert.match(html, /<div class="tc-row tc-header-actions">\s*<button id="btn-command-palette"/);
+});
+
+test("the status bar shows the active file icon and language instead of Untitled", () => {
+  assert.ok(!html.includes(`id="file"`));
+  assert.ok(!html.includes(`<span id="breadcrumb-path">Untitled</span>`));
+  assert.match(html, /id="active-file-status"/);
+  assert.match(html, /id="active-file-icon"/);
+  assert.match(html, /id="active-file-name">Working file</);
+  assert.match(html, /id="lang">Plain text</);
+  assert.match(main, /function languageFromFileName/);
+  assert.match(main, /function activeFileGlyph/);
+  assert.match(main, /function updateActiveFileStatus/);
+  assert.match(main, /updateActiveFileStatus\(source\)/);
+  assert.doesNotMatch(main, /suggestedName \?\? "Untitled"/);
 });
 
 test("the breadcrumb follows the active document, including non-editor views", () => {

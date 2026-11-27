@@ -121,12 +121,15 @@
       }
       button:focus-visible, select:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
       button:disabled { opacity: .58; cursor: not-allowed; }
-      #file { margin-left: auto; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 100px; max-width: 260px; padding: 5px 10px; border-left: 2px solid var(--accent); background: color-mix(in srgb, var(--surface-raised) 65%, transparent); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font: var(--font-sm)/1.3 var(--mono-font); }
       #theme-select { max-width: 138px; }
       #editor-font { max-width: 138px; }
       #ui-scale { max-width: 88px; }
       header select { min-height: 30px; border-color: color-mix(in srgb, var(--line) 75%, transparent); font-size: var(--font-sm); }
       #msg { color: var(--danger); }
+      #active-file-status { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 320px; color: var(--text); }
+      #active-file-icon { display: inline-grid; place-items: center; flex: 0 0 auto; min-width: 26px; height: 18px; padding: 0 5px; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line)); border-radius: var(--radius-sm); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised)); font: 700 9px/1 var(--mono-font); letter-spacing: .04em; }
+      #active-file-name { min-width: 0; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--font-sm)/1.3 var(--mono-font); }
+      #lang { color: var(--accent); font-size: var(--font-sm); white-space: nowrap; }
       #workspace-status { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       #workspace-status[data-state="opening"] { color: var(--accent); }
       #workspace-status[data-state="error"], #workspace-status[data-watcher="error"] { color: var(--danger); }
@@ -602,15 +605,7 @@
           padding: 7px 10px;
           touch-action: manipulation;
         }
-        #file {
-          flex: 1 0 100%;
-          min-width: 0;
-          margin: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          text-align: left;
-        }
+        #active-file-name { max-width: 110px; }
         #main { flex-direction: column; }
         /* Source Control stays an overlay sidebar; it must never become a
            second bottom panel stacked above the Terminal/Output panel. */
@@ -777,12 +772,12 @@
             <span id="workspace-name">No workspace</span>
           </button>
         </div>
-        <button id="btn-command-palette" class="tc-command-trigger" title="Command palette (Ctrl+K)">
-          <span aria-hidden="true">⌕</span>
-          <span>Search files and commands</span>
-          <kbd>Ctrl K</kbd>
-        </button>
         <div class="tc-row tc-header-actions">
+          <button id="btn-command-palette" class="tc-command-trigger" title="Command palette (Ctrl+K)">
+            <span aria-hidden="true">⌕</span>
+            <span>Search files and commands</span>
+            <kbd>Ctrl K</kbd>
+          </button>
           <div class="toolbar-group" role="toolbar" aria-label="Workspace">
             <button id="btn-open" title="Open a file (Ctrl+O)">Open</button>
             <button id="btn-quick-open" title="Quick Open files (Ctrl+P)">Files</button>
@@ -841,7 +836,6 @@
             </select>
           </div>
         </div>
-        <span id="file">Untitled</span>
         <div id="window-controls" class="toolbar-group" role="toolbar" aria-label="Windows">
           <button id="btn-toolbar-overflow" class="mini" title="More toolbar actions" aria-haspopup="menu" aria-expanded="false">More</button>
           <button id="btn-new-window" title="New Window (Ctrl+Shift+N)">New Window</button>
@@ -978,7 +972,7 @@
         <div id="editor-region">
           <nav id="breadcrumbs" aria-label="Breadcrumb">
             <button id="breadcrumb-root" class="tc-breadcrumb-root" title="Open Talos Observatory">Workspace</button>
-            <span id="breadcrumb-path">Untitled</span>
+            <span id="breadcrumb-path"></span>
           </nav>
           <div id="document-tabs" role="tablist" aria-label="Open documents"></div>
           <div id="main">
@@ -1146,7 +1140,11 @@
       </div>
 
       <footer>
-        <span id="lang">Plain text</span>
+        <span id="active-file-status" role="status" title="No active file">
+          <span id="active-file-icon" aria-hidden="true">◇</span>
+          <span id="active-file-name">Working file</span>
+          <span id="lang">Plain text</span>
+        </span>
         <span id="pos">Ln 1, Col 1</span>
         <button id="workspace-status" class="mini" data-state="closed" data-watcher="idle" data-indexing="idle" title="No workspace">No workspace</button>
         <span id="msg"></span>
@@ -1610,7 +1608,7 @@
         <span title="Zoom">Zoom <b id="canvas-zoom">100%</b></span>
         <span title="Layers"><b id="canvas-layer-count">0 layers</b></span>
         <span title="Estimated layer memory">Memory <b id="canvas-memory">0 MB</b></span>
-        <span title="File">File <b id="canvas-status-file">Untitled canvas</b></span>
+        <span title="File">File <b id="canvas-status-file">Working canvas</b></span>
         <span id="canvas-message" role="status"></span>
       </div>
     </div>

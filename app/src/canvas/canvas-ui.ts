@@ -434,7 +434,7 @@ function updateChrome(): void {
   input("canvas-height").value = String(height);
   const bytes = layers.reduce((sum, layer) => sum + estimateRgbaBytes(layer.canvas.width, layer.canvas.height), 0);
   $("canvas-memory").textContent = `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  const name = sourcePath ? fileNameFromPath(sourcePath) : "Untitled canvas";
+  const name = sourcePath ? fileNameFromPath(sourcePath) : "Working canvas";
   $("canvas-file").textContent = name;
   $("canvas-status-file").textContent = name;
   updateColorInspector();
