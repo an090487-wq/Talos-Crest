@@ -394,10 +394,10 @@ input:focus-visible,
 
 .tc-app-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 340px) auto;
   grid-template-areas:
-    "title windows"
-    "actions actions";
+    "title search windows"
+    "actions actions actions";
   align-items: center;
   column-gap: 12px;
   row-gap: 6px;
@@ -410,16 +410,24 @@ input:focus-visible,
 }
 
 .tc-command-trigger {
-  flex: 0 0 auto;
-  width: auto;
+  grid-area: search;
+  justify-self: center;
+  width: 100%;
   min-width: 220px;
-  max-width: 320px;
+  max-width: 340px;
 }
 
 #window-controls {
   grid-area: windows;
   justify-self: end;
   border-right: 0;
+}
+
+#btn-toolbar-overflow {
+  min-width: 34px;
+  padding: 2px 8px;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .tc-header-actions {
@@ -891,7 +899,7 @@ dialog.tc-chronicle-dialog {
 
 @media (max-width: 1180px) {
   .tc-app-header {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 260px) auto;
     column-gap: 8px;
   }
   .tc-header-actions .toolbar-group {
@@ -904,7 +912,12 @@ dialog.tc-chronicle-dialog {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "title windows"
+      "search search"
       "actions actions";
+  }
+  .tc-command-trigger {
+    justify-self: stretch;
+    max-width: none;
   }
   #window-controls {
     justify-self: end;

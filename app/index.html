@@ -82,7 +82,7 @@
       html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font: var(--font-size)/1.45 var(--ui-font); }
       #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
       .hidden { display: none !important; }
-      #btn-toolbar-overflow { display: none; }
+      #btn-toolbar-overflow { display: inline-flex; }
       .toolbar-overflow-menu { position: fixed; z-index: 70; display: flex; flex-direction: column; gap: 2px; width: min(240px, calc(100vw - 16px)); padding: 5px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
       .toolbar-overflow-item { width: 100%; min-height: var(--control-height-sm); border-color: transparent; background: transparent; color: var(--text); text-align: left; }
       .toolbar-overflow-item:hover:not(:disabled) { border-color: var(--line); background: var(--surface-raised); }
@@ -712,6 +712,8 @@
       #btn-canvas,
       #btn-calc,
       #ui-scale,
+      #btn-new-window,
+      #btn-window-switcher,
       label[for="ui-scale"] { display: none !important; }
       html[data-layout-mode="compact"] #breadcrumbs { min-height: 24px; padding: 0 8px; }
       html[data-layout-mode="compact"] #document-tabs { min-height: 32px; }
@@ -772,12 +774,12 @@
             <span id="workspace-name">No workspace</span>
           </button>
         </div>
+        <button id="btn-command-palette" class="tc-command-trigger" title="Command palette (Ctrl+K)">
+          <span aria-hidden="true">⌕</span>
+          <span>Search files and commands</span>
+          <kbd>Ctrl K</kbd>
+        </button>
         <div class="tc-row tc-header-actions">
-          <button id="btn-command-palette" class="tc-command-trigger" title="Command palette (Ctrl+K)">
-            <span aria-hidden="true">⌕</span>
-            <span>Search files and commands</span>
-            <kbd>Ctrl K</kbd>
-          </button>
           <div class="toolbar-group" role="toolbar" aria-label="Workspace">
             <button id="btn-open" title="Open a file (Ctrl+O)">Open</button>
             <button id="btn-quick-open" title="Quick Open files (Ctrl+P)">Files</button>
@@ -837,7 +839,7 @@
           </div>
         </div>
         <div id="window-controls" class="toolbar-group" role="toolbar" aria-label="Windows">
-          <button id="btn-toolbar-overflow" class="mini" title="More toolbar actions" aria-haspopup="menu" aria-expanded="false">More</button>
+          <button id="btn-toolbar-overflow" class="mini" title="More options" aria-label="More options" aria-haspopup="menu" aria-expanded="false">⋯</button>
           <button id="btn-new-window" title="New Window (Ctrl+Shift+N)">New Window</button>
           <button id="btn-window-switcher" title="Switch between open Talos windows">Windows…</button>
         </div>

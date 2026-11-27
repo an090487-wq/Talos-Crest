@@ -84,12 +84,12 @@ test("Source Control never stacks into the bottom panel area", () => {
   assert.match(main, /talos:source-control-closed[\s\S]{0,260}setActiveNav\(previousNavBeforeSourceControl \?\? "explorer"\)/);
 });
 
-test("compact layout exposes secondary toolbar actions through an overflow menu", () => {
+test("the three-dot More menu exposes secondary toolbar actions", () => {
   assert.match(html, /id="btn-toolbar-overflow"/);
   assert.match(html, /id="toolbar-overflow-menu"/);
   assert.match(main, /function openToolbarOverflow/);
   assert.match(main, /function refreshToolbarOverflow/);
-  assert.match(html, /html\[data-layout-mode="compact"\] #btn-toolbar-overflow \{ display: inline-flex; \}/);
+  assert.match(html, /#btn-toolbar-overflow \{ display: inline-flex; \}/);
 });
 
 test("More adds creation and UI size actions instead of repeating sidebar buttons", () => {
@@ -102,10 +102,19 @@ test("More adds creation and UI size actions instead of repeating sidebar button
   assert.match(html, /#btn-architecture,[\s\S]{0,120}#btn-calc,[\s\S]{0,120}#ui-scale,[\s\S]{0,120}display: none !important/);
 });
 
-test("the top search bar sits inside the toolbar actions row", () => {
-  assert.match(css, /"title windows"\s*"actions actions"/);
-  assert.doesNotMatch(css, /grid-area: command/);
-  assert.match(html, /<div class="tc-row tc-header-actions">\s*<button id="btn-command-palette"/);
+test("window actions live in a three-dot More menu", () => {
+  assert.match(html, /id="btn-toolbar-overflow"[^>]*>⋯<\/button>/);
+  assert.match(html, /id="btn-new-window"/);
+  assert.match(html, /id="btn-window-switcher"/);
+  assert.match(html, /#btn-new-window,[\s\S]{0,160}#btn-window-switcher,[\s\S]{0,160}display: none !important/);
+  assert.match(main, /"btn-new-window",\s*"btn-window-switcher"/);
+});
+
+test("the top search bar sits in the header's top row", () => {
+  assert.match(css, /"title search windows"\s*"actions actions actions"/);
+  assert.match(css, /\.tc-command-trigger \{[\s\S]*?grid-area: search;/);
+  assert.match(html, /<\/div>\s*<button id="btn-command-palette"[\s\S]{0,200}<\/button>\s*<div class="tc-row tc-header-actions">/);
+  assert.doesNotMatch(html, /<div class="tc-row tc-header-actions">\s*<button id="btn-command-palette"/);
 });
 
 test("the status bar shows the active file icon and language instead of Untitled", () => {
@@ -185,6 +194,16 @@ test("read-only AppImage files are saved through Save As", () => {
   assert.match(main, /import \{ isReadOnlyAppImagePath \} from "\.\/workspace-paths"/);
   assert.match(main, /readOnlyAppImageFile && !forceDialog/);
   assert.match(main, /Choose a writable location to save a copy/);
+});
+
+test("new Explorer files cannot be created inside the read-only AppImage", () => {
+  assert.match(architecture, /import \{ open, save \} from "@tauri-apps\/plugin-dialog"/);
+  assert.match(architecture, /import \{ isReadOnlyAppImagePath \} from "\.\/workspace-paths"/);
+  assert.match(architecture, /function splitPathForCreation/);
+  assert.match(architecture, /function writableProject/);
+  assert.match(architecture, /save\(\{ title: "Create file in a writable location"/);
+  assert.match(architecture, /Choose a writable folder instead/);
+  assert.match(architecture, /Bundled files are read-only\. Open a writable folder to/);
 });
 
 test("binary files open in a bounded hex and strings preview", () => {

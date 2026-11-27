@@ -1496,14 +1496,16 @@ function updateLayoutButton() {
 }
 
 // Only actions the current layout hides belong in More. The activity bar
-// already exposes Explorer/Search/Extensions/Canvas/Calc, so those never appear
-// in the toolbar menu again.
+// already exposes Explorer/Search/Extensions/Canvas/Calc, and window actions are
+// intentionally hidden from the header, so those never duplicate the rail.
 const overflowActionIds = [
   "btn-undo",
   "btn-redo",
   "btn-save",
   "btn-saveas",
   "btn-tpl",
+  "btn-new-window",
+  "btn-window-switcher",
 ];
 
 function closeToolbarOverflow() {

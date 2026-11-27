@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { closeOtherDialogs, closeTopmostDialog } from "./ui/dialogs";
+import { isReadOnlyAppImagePath } from "./workspace-paths";
 import { initGitHubPanel, renderGitHubPanel } from "./github-ui";
 import { getWindowValue, setWindowValue } from "./window-state";
 import {
@@ -631,6 +632,21 @@ function targetDirectory(entry: ProjectEntry): string {
   return entry.kind === "directory" ? relativePath(entry.path) : relativePath(entry.parent);
 }
 
+function splitPathForCreation(value: string): { parent: string; name: string } {
+  const normalized = value.replace(/\\/g, "/");
+  const index = normalized.lastIndexOf("/");
+  return {
+    parent: index > 0 ? normalized.slice(0, index) : "",
+    name: index >= 0 ? normalized.slice(index + 1) : normalized,
+  };
+}
+
+function writableProject(action: string): boolean {
+  if (!scan || !isReadOnlyAppImagePath(scan.root)) return true;
+  setMessage(`Bundled files are read-only. Open a writable folder to ${action}.`, true);
+  return false;
+}
+
 async function createEntry(kind: "file" | "directory") {
   if (!scan) {
     setMessage("Open a project folder before creating a file or folder.", true);
@@ -640,28 +656,57 @@ async function createEntry(kind: "file" | "directory") {
   const name = validEntryName(window.prompt(`New ${kind === "file" ? "file" : "folder"} name:`));
   if (!name) return;
   const root = scan.root;
-  const parent = targetDirectory(entry ?? scan.entries[0]);
-  const path = [parent, name].filter(Boolean).join("/");
-  const createdPath = absolutePath(path);
+  const readOnlyRoot = isReadOnlyAppImagePath(root);
+  let createRoot = root;
+  let path = [targetDirectory(entry ?? scan.entries[0]), name].filter(Boolean).join("/");
+  let createdPath = absolutePath(path);
+
+  if (readOnlyRoot) {
+    if (kind === "file") {
+      const chosen = await save({ title: "Create file in a writable location", defaultPath: name });
+      if (typeof chosen !== "string") return;
+      if (isReadOnlyAppImagePath(chosen)) {
+        setMessage("That location is inside the read-only AppImage. Choose a writable folder instead.", true);
+        return;
+      }
+      const parts = splitPathForCreation(chosen);
+      createRoot = parts.parent;
+      path = parts.name;
+      createdPath = chosen;
+    } else {
+      const chosen = await open({ directory: true, multiple: false, title: `Choose a writable parent folder for ${name}` });
+      if (typeof chosen !== "string") return;
+      if (isReadOnlyAppImagePath(chosen)) {
+        setMessage("That folder is inside the read-only AppImage. Choose a writable folder instead.", true);
+        return;
+      }
+      createRoot = chosen;
+      path = name;
+      createdPath = splitPathForCreation(chosen).parent
+        ? `${chosen.replace(/[\\/]+$/, "")}/${name}`
+        : `${chosen}/${name}`;
+    }
+  }
+
   try {
     await invoke(kind === "file" ? "create_project_file" : "create_project_folder", {
-      root,
+      root: createRoot,
       path,
     });
-    await refreshTree(root);
+    await refreshTree(createRoot);
     selectedPath = createdPath;
     render();
-    setMessage(`Created ${path}`);
+    setMessage(`Created ${createdPath}`);
     if (kind === "file" && onOpenFile) {
       try {
         await onOpenFile(createdPath);
         rememberRecent(createdPath);
       } catch (error) {
-        setMessage(`Created ${path}, but could not open it: ${String(error)}`, true);
+        setMessage(`Created ${createdPath}, but could not open it: ${String(error)}`, true);
       }
     }
   } catch (error) {
-    setMessage(`Could not create ${path}: ${String(error)}`, true);
+    setMessage(`Could not create ${createdPath}: ${String(error)}`, true);
   }
 }
 
@@ -670,7 +715,7 @@ export function createExplorerEntry(kind: "file" | "directory"): Promise<void> {
 }
 
 async function renameSelected() {
-  if (!scan) return;
+  if (!scan || !writableProject("rename files")) return;
   const entry = selectedEntry();
   if (!entry || entry.path === scan.root || entry.kind === "link") return;
   const name = validEntryName(window.prompt(`Rename ${entry.name} to:`, entry.name));
@@ -692,7 +737,7 @@ async function renameSelected() {
 }
 
 async function performMove(entry: ProjectEntry, to: string) {
-  if (!scan) return;
+  if (!scan || !writableProject("move files")) return;
   const from = relativePath(entry.path);
   if (to === from) return;
   const root = scan.root;
@@ -728,7 +773,7 @@ async function moveSelected() {
 }
 
 async function duplicateSelected(entryOverride?: ProjectEntry) {
-  if (!scan) return;
+  if (!scan || !writableProject("duplicate files")) return;
   const entry = entryOverride ?? selectedEntry();
   if (!entry || entry.path === scan.root || entry.kind === "link") return;
   const root = scan.root;
@@ -775,7 +820,7 @@ async function dropEntryOn(sourcePath: string, target: ProjectEntry) {
 }
 
 async function deleteSelected() {
-  if (!scan) return;
+  if (!scan || !writableProject("delete files")) return;
   const entry = selectedEntry();
   if (!entry || entry.path === scan.root || entry.kind === "link") return;
   const detail = entry.kind === "directory"
