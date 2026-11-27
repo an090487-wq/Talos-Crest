@@ -25,6 +25,11 @@ static PROJECT_WATCHERS: OnceLock<Mutex<HashMap<String, notify::RecommendedWatch
 static ACTIVE_RUN_STDINS: OnceLock<Mutex<HashMap<String, ChildStdin>>> = OnceLock::new();
 static FILE_WRITE_LOCK: Mutex<()> = Mutex::new(());
 static NEXT_WINDOW_ID: AtomicU64 = AtomicU64::new(0);
+// A hung renderer must never trap the window. Any close request arms a backend
+// watchdog that runs outside the webview event loop; the renderer cancels it as
+// soon as it receives the close request and takes over with its own guarded
+// shutdown.
+static CLOSE_WATCHDOG_TOKEN: AtomicU64 = AtomicU64::new(0);
 // Repository roots are stable for the life of a workspace. Every Git command
 // needs the toplevel (porcelain paths are repo-relative); resolving it with a
 // fresh `git rev-parse` for each command spawned ~20 processes per Source
@@ -373,15 +378,21 @@ fn create_window(
         // Centering is a desktop-only Tauri builder method.
         #[cfg(not(target_os = "android"))]
         let builder = builder.center();
-        let result = builder.build();
-        if let Err(error) = result {
-            contexts
-                .0
-                .lock()
-                .map_err(|lock_error| format!("window context lock failed: {lock_error}"))?
-                .remove(&label);
-            return Err(format!("could not create Talos window: {error}"));
-        }
+        let window = match builder.build() {
+            Ok(window) => window,
+            Err(error) => {
+                contexts
+                    .0
+                    .lock()
+                    .map_err(|lock_error| format!("window context lock failed: {lock_error}"))?
+                    .remove(&label);
+                return Err(format!("could not create Talos window: {error}"));
+            }
+        };
+        #[cfg(not(target_os = "android"))]
+        window
+            .set_decorations(false)
+            .map_err(|error| format!("could not remove window decorations: {error}"))?;
         return Ok(label);
     }
     Err("could not allocate a unique Talos window identifier".into())
@@ -3149,6 +3160,22 @@ fn force_quit() {
 }
 
 #[tauri::command]
+fn arm_close_watchdog() {
+    let token = CLOSE_WATCHDOG_TOKEN.fetch_add(1, Ordering::SeqCst).wrapping_add(1);
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(4000));
+        if CLOSE_WATCHDOG_TOKEN.load(Ordering::SeqCst) == token {
+            std::process::exit(0);
+        }
+    });
+}
+
+#[tauri::command]
+fn cancel_close_watchdog() {
+    CLOSE_WATCHDOG_TOKEN.store(0, Ordering::SeqCst);
+}
+
+#[tauri::command]
 fn ext_list() -> Result<Vec<serde_json::Value>, String> {
     let mut out = Vec::new();
     let dir = ext_dir();
@@ -5420,10 +5447,28 @@ mod tests {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // GTK on Wayland paints its own headerbar even when Tauri asks for no
+    // decorations. Prefer X11 when it is available (Wayland sessions normally
+    // provide XWayland) so Talos's own header is the only one users see. The
+    // Wayland fallback keeps this safe on X11-less systems.
+    #[cfg(target_os = "linux")]
+    unsafe {
+        std::env::set_var("GDK_BACKEND", "x11,wayland");
+    }
+
     let builder = tauri::Builder::default()
         .manage(PendingWindowContexts::default())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init());
+        .plugin(tauri_plugin_dialog::init())
+        // Some Linux compositors still draw a native headerbar even when the
+        // window config asks for no decorations. Turn it off explicitly once
+        // the windows exist so only Talos's own header is visible.
+        .setup(|app| {
+            for window in app.webview_windows().values() {
+                window.set_decorations(false)?;
+            }
+            Ok(())
+        });
     #[cfg(target_os = "android")]
     let builder = builder.plugin(tauri_plugin_runner::init());
     builder
@@ -5476,6 +5521,8 @@ pub fn run() {
             git_diff,
             git_file_preview,
             force_quit,
+            arm_close_watchdog,
+            cancel_close_watchdog,
             github::github_token_status,
             github::github_set_token,
             github::github_clear_token,
@@ -5511,6 +5558,11 @@ pub fn run() {
             terminal::platform::terminal_resize,
             terminal::platform::terminal_close
         ])
+        .on_window_event(|_window, event| {
+            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                arm_close_watchdog();
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running Talos");
 }

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { closeOtherDialogs, closeTopmostDialog, openModalDialog } from "./ui/dialogs";
+import { askConfirm, askText, closeOtherDialogs, closeTopmostDialog, openModalDialog } from "./ui/dialogs";
 import { isReadOnlyAppImagePath } from "./workspace-paths";
 import { initGitHubPanel, renderGitHubPanel } from "./github-ui";
 import { getWindowValue, setWindowValue } from "./window-state";
@@ -687,7 +687,13 @@ async function createEntry(kind: "file" | "directory") {
     return;
   }
   const entry = selectedEntry();
-  const name = validEntryName(window.prompt(`New ${kind === "file" ? "file" : "folder"} name:`));
+  const name = validEntryName(await askText(`New ${kind}`, {
+    message: `Enter a name for the new ${kind}.`,
+    placeholder: kind === "file" ? "example.py" : "folder-name",
+    label: `New ${kind} name`,
+    confirmLabel: "Create",
+    required: true,
+  }));
   if (!name) return;
   const root = scan.root;
   const readOnlyRoot = isReadOnlyAppImagePath(root);
@@ -752,7 +758,13 @@ async function renameSelected() {
   if (!scan || !writableProject("rename files")) return;
   const entry = selectedEntry();
   if (!entry || entry.path === scan.root || entry.kind === "link") return;
-  const name = validEntryName(window.prompt(`Rename ${entry.name} to:`, entry.name));
+  const name = validEntryName(await askText(`Rename ${entry.name}`, {
+    message: "Enter the new name. Paths are not allowed here.",
+    value: entry.name,
+    label: "New name",
+    confirmLabel: "Rename",
+    required: true,
+  }));
   if (!name || name === entry.name) return;
   const from = relativePath(entry.path);
   const parent = relativePath(entry.parent);
@@ -801,7 +813,13 @@ async function moveSelected() {
   const entry = selectedEntry();
   if (!entry || entry.path === scan.root || entry.kind === "link") return;
   const from = relativePath(entry.path);
-  const to = validWorkspaceRelativePath(window.prompt(`Move "${entry.name}" to a new workspace-relative path:`, from));
+  const to = validWorkspaceRelativePath(await askText(`Move ${entry.name}`, {
+    message: "Enter a workspace-relative path, including the file name.",
+    value: from,
+    label: "Destination path",
+    confirmLabel: "Move",
+    required: true,
+  }));
   if (!to) return;
   await performMove(entry, to);
 }
@@ -860,7 +878,11 @@ async function deleteSelected() {
   const detail = entry.kind === "directory"
     ? `Delete folder "${entry.name}" and all of its contents?`
     : `Delete file "${entry.name}"?`;
-  if (!window.confirm(detail)) return;
+  if (!(await askConfirm(`Delete ${entry.name}?`, detail, {
+    confirmLabel: "Delete",
+    cancelLabel: "Keep",
+    tone: "danger",
+  }))) return;
   const root = scan.root;
   const path = relativePath(entry.path);
   const parentPath = entry.parent;

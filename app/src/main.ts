@@ -717,8 +717,8 @@ function refreshTitle() {
   const path = currentPath && android ? fileNameFromPath(currentPath) : currentPath;
   const name = (path ?? suggestedName ?? "Working file") + (dirty ? " \u2022" : "");
   updateBreadcrumbs();
-  // The custom title bar identifies the active document. The native/taskbar
-  // title keeps the product suffix, while the in-app chrome stays compact.
+  // The in-app header identifies the active document. The native/taskbar title
+  // keeps the product suffix, while the header stays compact.
   const title = path && !android ? [name, productName].join(" \u2014 ") : productName;
   const titleText = $("window-title-text");
   const displayTitle = path ? name : productName;
@@ -2510,6 +2510,28 @@ function emergencyExit(): void {
   });
 }
 
+function cancelBackendCloseWatchdog(): void {
+  void invoke("cancel_close_watchdog").catch(() => {
+    // The backend fallback is best-effort; the renderer watchdog still applies.
+  });
+}
+
+// The backend watchdog is armed before this renderer sees the close request.
+// Refreshing it while the close flow is active removes any ordering race and
+// keeps a user thinking in the save dialog from being force-closed.
+let closeWatchdogKeepalive = 0;
+
+function startCloseWatchdogKeepalive(): void {
+  if (closeWatchdogKeepalive) return;
+  closeWatchdogKeepalive = window.setInterval(cancelBackendCloseWatchdog, 1000);
+}
+
+function stopCloseWatchdogKeepalive(): void {
+  if (!closeWatchdogKeepalive) return;
+  window.clearInterval(closeWatchdogKeepalive);
+  closeWatchdogKeepalive = 0;
+}
+
 async function destroyCurrentWindow(): Promise<void> {
   const watchdog = window.setTimeout(emergencyExit, CLOSE_WATCHDOG_MS);
   try {
@@ -2546,8 +2568,12 @@ async function finishWindowClose(discardUnsaved = false) {
 
 async function handleWindowCloseRequest(event: { preventDefault: () => void }) {
   event.preventDefault();
+  // The renderer is responsive, so the backend-only fallback is no longer
+  // needed. Cancel it before any save prompt can wait on the user.
+  cancelBackendCloseWatchdog();
   if (closeInProgress) return;
   closeInProgress = true;
+  startCloseWatchdogKeepalive();
 
   try {
     if (!editorTabs.some((tab) => tab.dirty)) {
@@ -2598,6 +2624,8 @@ async function handleWindowCloseRequest(event: { preventDefault: () => void }) {
     // Release the guard on every path, including errors. A later close request
     // is therefore never ignored because an earlier one failed.
     closeInProgress = false;
+    stopCloseWatchdogKeepalive();
+    cancelBackendCloseWatchdog();
   }
 }
 
@@ -2954,6 +2982,12 @@ initShortcutsUi();
 initSourceControl();
 $("btn-shortcuts").addEventListener("click", openShortcutsDialog);
 const nativeWindow = getCurrentWindow();
+// GNOME/GTK can still show a native headerbar after window creation even when
+// the config requests no decorations. Remove it from the renderer once the
+// window is live; unsupported platforms simply ignore the no-op.
+void nativeWindow.setDecorations(false).catch(() => {
+  // No in-app decoration to remove on mobile or restricted platforms.
+});
 $("win-min").addEventListener("click", () => {
   void nativeWindow.minimize().catch((error: unknown) => say(`Could not minimize window: ${String(error)}`));
 });
@@ -3269,7 +3303,6 @@ void isAndroid()
       productName = "Talos Pocket";
       $("brand").querySelector(".brand-name")!.textContent = "TALOS POCKET";
       $("window-controls").classList.add("hidden");
-      $("window-titlebar").classList.add("hidden");
       refreshTitle();
       runButton.textContent = "▶ Run";
       runButton.title = "Run Python, C, C++, or Java locally through Termux.";

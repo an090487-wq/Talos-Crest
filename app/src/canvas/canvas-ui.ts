@@ -5,6 +5,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { fileNameFromPath, readBytes, writeBytes } from "../platform";
 import { getWindowValue, removeWindowValue, setWindowValue } from "../window-state";
+import { askText } from "../ui/dialogs";
 import {
   ASSET_PRESETS, BoundedHistory, DEFAULT_MAX_PIXELS, DEFAULT_PREVIEW_PIXELS, EXPORT_PRESETS,
   MAX_DOCUMENT_PIXELS, adjustCropRect, arrowHeadPoints, brushBounds, clampRect,
@@ -336,6 +337,22 @@ function scheduleComposite(region?: Rect): void {
   });
 }
 
+async function renameLayer(layer: Layer): Promise<void> {
+  const next = await askText("Rename layer", {
+    message: "Choose a short name for this layer.",
+    value: layer.name,
+    placeholder: "Layer name",
+    label: "Layer name",
+    confirmLabel: "Rename",
+    required: true,
+  });
+  if (!next || next === layer.name) return;
+  layer.name = next;
+  invalidateDocument();
+  pushHistory("Rename layer");
+  renderLayers();
+}
+
 function renderLayers(): void {
   const list = $("canvas-layers");
   list.replaceChildren();
@@ -365,14 +382,7 @@ function renderLayers(): void {
     name.textContent = layer.name;
     name.dataset.hidden = String(!layer.visible);
     name.title = index === 0 ? "Background · double-click to rename" : "Double-click to rename";
-    name.addEventListener("dblclick", () => {
-      const next = window.prompt("Layer name", layer.name)?.trim();
-      if (!next || next === layer.name) return;
-      layer.name = next;
-      invalidateDocument();
-      pushHistory("Rename layer");
-      renderLayers();
-    });
+    name.addEventListener("dblclick", () => void renameLayer(layer));
 
     const slider = document.createElement("input");
     slider.type = "range";

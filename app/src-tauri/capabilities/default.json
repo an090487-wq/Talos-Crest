@@ -12,6 +12,7 @@
     "core:window:allow-destroy",
     "core:window:allow-get-all-windows",
     "core:window:allow-set-focus",
+    "core:window:allow-set-decorations",
     "core:window:allow-set-title",
     "opener:default",
     "dialog:default",

@@ -94,13 +94,12 @@
       .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); min-height: 120px; padding: var(--space-4); color: var(--muted); text-align: center; font-size: var(--font-sm); }
       .empty-state strong { color: var(--text); font-size: var(--font-md); font-weight: 650; }
 
-      #window-titlebar { display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-height-sm); padding: 0 var(--space-2); background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--font-xs); font-weight: 650; letter-spacing: .08em; text-transform: uppercase; user-select: none; -webkit-user-select: none; }
-      #window-titlebar .tc-brand-icon { width: var(--icon-size); height: var(--icon-size); flex: 0 0 auto; border-radius: var(--radius-sm); }
-      #window-titlebar .tc-titlebar-controls { display: inline-flex; gap: 2px; margin-left: auto; }
-      #window-titlebar .tc-titlebar-controls button { width: var(--control-height-sm); min-height: calc(var(--control-height-sm) - 4px); padding: 0; border-color: transparent; background: transparent; color: var(--muted); font-size: 15px; line-height: 1; }
-      #window-titlebar .tc-titlebar-controls button:hover { color: var(--text); border-color: var(--line); background: var(--surface-raised); }
-      #window-titlebar #win-close:hover { color: #fff; border-color: transparent; background: var(--danger); }
-      #window-titlebar:not(.hidden) ~ header .brand { display: none; }
+      .tc-window-title { min-width: 0; max-width: 190px; overflow: hidden; color: var(--muted); font-size: var(--font-xs); text-overflow: ellipsis; white-space: nowrap; }
+      .tc-drag-region { flex: 1 1 24px; min-width: 12px; align-self: stretch; }
+      #window-controls .tc-titlebar-controls { display: inline-flex; flex: 0 0 auto; gap: 0; margin-left: 2px; }
+      #window-controls .tc-titlebar-controls button { width: calc(var(--control-height-sm) - 2px); min-height: calc(var(--control-height-sm) - 4px); padding: 0; border-color: transparent; background: transparent; color: var(--muted); font-size: 14px; line-height: 1; }
+      #window-controls .tc-titlebar-controls button:hover { color: var(--text); border-color: transparent; background: var(--surface-raised); }
+      #window-controls #win-close:hover { color: #fff; border-color: transparent; background: var(--danger); }
       header, footer { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-2) var(--space-3); background: var(--panel); }
       header { position: relative; border-bottom: 1px solid var(--line); flex-wrap: wrap; gap: var(--toolbar-gap); }
       header::after { position: absolute; inset: auto 0 0; height: 2px; content: ""; background: var(--accent); opacity: .72; pointer-events: none; }
@@ -452,16 +451,20 @@
       #arch-context-menu { position: fixed; z-index: 90; display: flex; min-width: 180px; flex-direction: column; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow-md); }
       #arch-context-menu button { border: 0; background: transparent; text-align: left; }
       dialog.workspace-dialog { width: min(620px, calc(100vw - 24px)); max-height: min(720px, calc(100vh - 24px)); padding: 0; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow-md); }
-      #workspace-text-search-dialog { width: min(520px, calc(100vw - 24px)); }
-      #workspace-text-search-dialog form { display: flex; flex-direction: column; }
-      #workspace-text-search-dialog form > header { display: flex; align-items: center; gap: var(--space-2); padding: 9px; border-bottom: 1px solid var(--line); }
-      #workspace-text-search-dialog form > header::after { display: none; }
-      #workspace-text-search-dialog .tc-command-search { margin: var(--space-2); }
+      #workspace-text-search-dialog, #shell-prompt-dialog, #shell-confirm-dialog { width: min(520px, calc(100vw - 24px)); }
+      .workspace-dialog form { display: flex; flex-direction: column; }
+      .workspace-dialog form > header { display: flex; align-items: center; gap: var(--space-2); padding: 9px; border-bottom: 1px solid var(--line); }
+      .workspace-dialog form > header::after { display: none; }
+      .workspace-dialog form .tc-command-search { margin: var(--space-2); }
       dialog.workspace-dialog::backdrop { background: var(--overlay); }
       .workspace-dialog > header { display: flex; padding: 9px; border-bottom: 1px solid var(--line); }
       .workspace-dialog > header::after { display: none; }
       .workspace-dialog > header input { flex: 1; min-width: 0; }
       .workspace-dialog-status { padding: 7px 10px; color: var(--muted); font-size: 11px; }
+      .workspace-dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-2); padding: 0 10px 10px; }
+      .workspace-dialog-actions button { min-width: 82px; }
+      .workspace-dialog-actions button.danger { color: #fff; border-color: transparent; background: var(--danger); }
+      .workspace-dialog-actions button.danger:hover { background: color-mix(in srgb, var(--danger) 82%, #000); }
       .window-actions { display: flex; flex-wrap: wrap; gap: 7px; padding: 10px; }
       #window-list { display: grid; gap: 4px; max-height: 45vh; overflow: auto; padding: 0 10px 10px; }
       .workspace-dialog-setting { display: flex; align-items: center; gap: 8px; padding: 8px 10px; color: var(--muted); font-size: 12px; }
@@ -798,18 +801,11 @@
   </head>
   <body>
     <div id="app">
-      <div id="window-titlebar" data-tauri-drag-region="deep">
-        <img class="tc-brand-icon" src="/talos.svg" alt="" aria-hidden="true" />
-        <span id="window-title-text">Talos Crest</span>
-        <div class="tc-titlebar-controls" role="toolbar" aria-label="Window controls">
-          <button id="win-min" type="button" title="Minimize" aria-label="Minimize">−</button>
-          <button id="win-max" type="button" title="Maximize" aria-label="Maximize">□</button>
-          <button id="win-close" type="button" title="Close" aria-label="Close">×</button>
-        </div>
-      </div>
       <header class="tc-app-header">
         <div class="tc-row tc-title-area">
           <span id="brand" class="brand"><span class="tc-brand-mark" aria-hidden="true"></span><span class="brand-name">TALOS CREST</span></span>
+          <span id="window-title-text" class="tc-window-title">Talos Crest</span>
+          <div class="tc-drag-region" data-tauri-drag-region="deep" aria-hidden="true"></div>
           <button id="btn-workspace" class="tc-workspace-button" title="Choose workspace">
             <span class="tc-dot tc-dot--accent" aria-hidden="true"></span>
             <span id="workspace-name">No workspace</span>
@@ -886,6 +882,11 @@
           <button id="btn-toolbar-overflow" class="mini" title="More options" aria-label="More options" aria-haspopup="menu" aria-expanded="false">⋯</button>
           <button id="btn-new-window" title="New Window (Ctrl+Shift+N)">New Window</button>
           <button id="btn-window-switcher" title="Switch between open Talos windows">Windows…</button>
+          <div class="tc-titlebar-controls" role="toolbar" aria-label="Window controls">
+            <button id="win-min" type="button" title="Minimize" aria-label="Minimize">−</button>
+            <button id="win-max" type="button" title="Maximize" aria-label="Maximize">□</button>
+            <button id="win-close" type="button" title="Close" aria-label="Close">×</button>
+          </div>
         </div>
       </header>
       <div id="toolbar-overflow-menu" class="toolbar-overflow-menu hidden" role="menu" aria-label="More toolbar actions"></div>
@@ -1239,6 +1240,35 @@
           <span aria-hidden="true">⌕</span>
           <input id="workspace-text-query" type="search" placeholder="Text to find in files" aria-label="Text to find in files" autocomplete="off" spellcheck="false" required />
           <button id="workspace-text-search-submit" type="submit" class="accent" value="search">Search</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="shell-prompt-dialog" class="workspace-dialog" aria-label="Enter text">
+      <form id="shell-prompt-form" method="dialog">
+        <header>
+          <strong id="shell-prompt-title">Enter text</strong>
+          <span class="spacer"></span>
+          <button id="shell-prompt-cancel" type="button" class="mini" aria-label="Cancel">×</button>
+        </header>
+        <div id="shell-prompt-message" class="workspace-dialog-status" role="status"></div>
+        <div class="tc-command-search">
+          <span aria-hidden="true">✎</span>
+          <input id="shell-prompt-input" type="text" placeholder="Value" aria-label="Value" autocomplete="off" spellcheck="false" required />
+          <button id="shell-prompt-submit" type="submit" class="accent" value="confirm">OK</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="shell-confirm-dialog" class="workspace-dialog" aria-label="Confirm action">
+      <form id="shell-confirm-form" method="dialog">
+        <header>
+          <strong id="shell-confirm-title">Confirm</strong>
+          <span class="spacer"></span>
+          <button id="shell-confirm-cancel" type="button" class="mini" aria-label="Cancel">×</button>
+        </header>
+        <div id="shell-confirm-message" class="workspace-dialog-status" role="status"></div>
+        <div class="workspace-dialog-actions">
+          <button id="shell-confirm-no" type="button" value="cancel">Cancel</button>
+          <button id="shell-confirm-yes" type="submit" class="accent" value="confirm">Confirm</button>
         </div>
       </form>
     </dialog>

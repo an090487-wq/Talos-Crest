@@ -348,6 +348,18 @@ test("canvas overlays never paint blue lines on opened images", () => {
   assert.match(ui, /removeWindowValue\("talos\.canvas\.snap"\)/);
 });
 
+test("Canvas rename uses a web dialog instead of a blocking native prompt", () => {
+  const html = readFileSync(resolve(appDir, "index.html"), "utf8");
+  const ui = readFileSync(resolve(appDir, "src/canvas/canvas-ui.ts"), "utf8");
+  const dialogs = readFileSync(resolve(appDir, "src/ui/dialogs.ts"), "utf8");
+  assert.doesNotMatch(ui, /window\.prompt\(/);
+  assert.match(html, /id="shell-prompt-dialog"/);
+  assert.match(html, /id="shell-prompt-input"/);
+  assert.match(dialogs, /export async function askText\(/);
+  assert.match(ui, /askText\("Rename layer"/);
+  assert.match(ui, /async function renameLayer\(layer: Layer\)/);
+});
+
 test("removing a window preference also clears the legacy main-window key", () => {
   const state = readFileSync(resolve(appDir, "src/window-state.ts"), "utf8");
   assert.match(state, /if \(windowLabel === "main"\) localStorage\.removeItem\(key\);/);

@@ -31,10 +31,16 @@ New Window, and Windows actions. New files and folders created from bundled
 read-only samples are placed in a writable location chosen by the user. The
 command palette opens directly under the header search field, and an Args field
 passes quoted arguments to desktop programs (for example `build` for setup.py).
-Desktop windows now use a branded title bar with the Talos crest and real
-window controls instead of the dark terminal-like native strip, and the Linux
-launcher matches the running window class so the Talos icon appears in the app
-menu and taskbar.
+Desktop windows use the app's own header instead of a GNOME-style title strip:
+the Talos crest, active file, and minimize/restore/close controls all live in
+the same compact header, with native decorations disabled. Linux launches prefer
+X11/XWayland so GTK cannot paint a system headerbar over it, while still falling
+back to Wayland where X11 is unavailable. The Linux launcher matches the running
+window class so the Talos icon appears in the app menu and taskbar. Closing is now guarded outside the renderer, so a
+stuck Canvas operation can no longer leave a window that refuses to close. Every
+text prompt and confirmation now uses a normal in-app dialog instead of a
+blocking native browser modal, including Canvas layer renaming, Explorer file
+actions, and Source Control discard.
 
 Canvas no longer inherits blue grid, snapping, or center-guide settings from
 older sessions, so opened images start without overlay lines; any grid or guide
@@ -56,7 +62,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`29ff2b4e377743faf8aa7289223c0c953e921b6d34cc3161f71458a9301bb88c`
+`344041dbb0cf4145d6e9db685a5acd63a1b9532cde06489217cf416e1f6389e9`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -73,7 +79,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`44208c6a335e4ee46558f9e9188fc2131daff2c1176f6a993acc3e39d6113c89`
+`903d4f72d6bf9ca468d41ebecf88106acadbbe2915f0ac4f26d64fa662dad06e`
 
 ## Android
 

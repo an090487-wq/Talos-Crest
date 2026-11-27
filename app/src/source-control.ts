@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { askConfirm } from "./ui/dialogs";
 import { workspaceRoot } from "./workspace";
 
 interface GitFileStatus {
@@ -387,7 +388,11 @@ async function unstagePaths(paths: string[]): Promise<void> {
 async function discardPaths(paths: string[]): Promise<void> {
   const root = await requireRoot();
   const label = paths.length === 1 ? paths[0] : `${paths.length} files`;
-  if (!window.confirm(`Discard local changes in ${label}? This cannot be undone.`)) return;
+  if (!(await askConfirm("Discard local changes?", `Discard local changes in ${label}? This cannot be undone.`, {
+    confirmLabel: "Discard",
+    cancelLabel: "Keep",
+    tone: "danger",
+  }))) return;
   await invoke("git_discard", { root, paths });
   await refresh();
 }

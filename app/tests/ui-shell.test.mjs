@@ -9,7 +9,9 @@ const html = readFileSync(resolve(appDir, "index.html"), "utf8");
 const css = readFileSync(resolve(appDir, "src/ui/design-system.css"), "utf8");
 const main = readFileSync(resolve(appDir, "src/main.ts"), "utf8");
 const architecture = readFileSync(resolve(appDir, "src/architecture.ts"), "utf8");
+const sourceControl = readFileSync(resolve(appDir, "src/source-control.ts"), "utf8");
 const tauriConfig = readFileSync(resolve(appDir, "src-tauri/tauri.conf.json"), "utf8");
+const capabilities = readFileSync(resolve(appDir, "src-tauri/capabilities/default.json"), "utf8");
 const canvas = readFileSync(resolve(appDir, "src/canvas/canvas-ui.ts"), "utf8");
 const commandPalette = readFileSync(resolve(appDir, "src/command-palette.ts"), "utf8");
 const rust = readFileSync(resolve(appDir, "src-tauri/src/lib.rs"), "utf8");
@@ -113,16 +115,24 @@ test("window actions live in a three-dot More menu", () => {
   assert.match(main, /"btn-new-window",\s*"btn-window-switcher"/);
 });
 
-test("the custom title bar replaces terminal-like native chrome", () => {
+test("the in-app header replaces terminal-like native chrome", () => {
   assert.match(tauriConfig, /"decorations": false/);
-  assert.match(html, /id="window-titlebar" data-tauri-drag-region="deep"/);
+  assert.doesNotMatch(html, /id="window-titlebar"/);
+  assert.match(rust, /window\.set_decorations\(false\)/);
+  assert.match(capabilities, /core:window:allow-set-decorations/);
+  assert.match(main, /nativeWindow\.setDecorations\(false\)/);
+  assert.match(rust, /GDK_BACKEND/, "Rust must prefer a decoration-free GTK backend");
+  assert.match(installScript, /GDK_BACKEND/, "Linux launcher must prefer a decoration-free GTK backend");
+  assert.match(html, /data-tauri-drag-region="deep"/);
   assert.match(html, /id="window-title-text"/);
   assert.match(html, /<link rel="icon" type="image\/svg\+xml" href="\/talos\.svg" \/>/);
-  assert.match(html, /<img class="tc-brand-icon" src="\/talos\.svg" alt="" aria-hidden="true" \/>/);
+  assert.match(html, /class="tc-brand-mark" aria-hidden="true"/);
   assert.match(brandIcon, /<polygon points="256,72 414,164 414,348 256,440 98,348 98,164"/);
   assert.match(html, /id="win-min"[^>]*aria-label="Minimize"/);
   assert.match(html, /id="win-max"[^>]*aria-label="Maximize"/);
   assert.match(html, /id="win-close"[^>]*aria-label="Close"/);
+  const controlsArea = html.slice(html.indexOf('id="window-controls"'), html.indexOf("</header>"));
+  assert.match(controlsArea, /class="tc-titlebar-controls" role="toolbar" aria-label="Window controls"/);
   assert.match(main, /nativeWindow\.minimize\(\)/);
   assert.match(main, /nativeWindow\.toggleMaximize\(\)/);
   assert.match(main, /guard\(\(\) => nativeWindow\.close\(\)\)/);
@@ -281,13 +291,34 @@ test("installed icon packs visibly change Explorer file icons", () => {
 });
 
 test("the shell has one compact brand and an active-file title", () => {
-  assert.match(html, /#window-titlebar:not\(\.hidden\) ~ header \.brand \{ display: none; \}/);
-  assert.match(html, /<span id="window-title-text">Talos Crest<\/span>/);
+  assert.match(html, /<span id="brand" class="brand">/);
+  assert.match(html, /<span id="window-title-text" class="tc-window-title">Talos Crest<\/span>/);
   assert.match(main, /const displayTitle = path \? name : productName;/);
   assert.match(main, /if \(titleText\.textContent !== displayTitle\) titleText\.textContent = displayTitle;/);
-  assert.match(html, /<div class="tc-titlebar-controls" role="toolbar" aria-label="Window controls">/);
-  assert.doesNotMatch(html, /<div class="window-controls" role="toolbar" aria-label="Window controls">/);
+  assert.doesNotMatch(html, /id="window-titlebar"/);
+  assert.match(html, /class="tc-drag-region" data-tauri-drag-region="deep"/);
   assert.match(main, /function syncWindowMaxButton\(\)/);
+});
+
+test("a hung renderer cannot trap the window on close", () => {
+  assert.match(rust, /CLOSE_WATCHDOG_TOKEN/);
+  assert.match(rust, /fn arm_close_watchdog\(/);
+  assert.match(rust, /fn cancel_close_watchdog\(/);
+  assert.match(rust, /tauri::WindowEvent::CloseRequested/);
+  assert.match(main, /function cancelBackendCloseWatchdog\(\)/);
+  assert.match(main, /function startCloseWatchdogKeepalive\(\)/);
+  assert.match(main, /window\.setInterval\(cancelBackendCloseWatchdog, 1000\)/);
+  assert.match(main, /stopCloseWatchdogKeepalive\(\);/);
+});
+
+test("no native browser modal can block a close request", () => {
+  for (const source of [architecture, canvas, sourceControl]) {
+    assert.doesNotMatch(source, /window\.prompt\(/);
+    assert.doesNotMatch(source, /window\.confirm\(/);
+    assert.doesNotMatch(source, /window\.alert\(/);
+  }
+  assert.match(html, /id="shell-prompt-dialog"/);
+  assert.match(html, /id="shell-confirm-dialog"/);
 });
 
 test("search entry points state exactly what they search", () => {

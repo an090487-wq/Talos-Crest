@@ -20,7 +20,17 @@ if [[ "$artifact_abs" != "$target" ]]; then
   install -m 755 "$artifact_abs" "$target"
 fi
 chmod 755 "$target"
-ln -sfn "$target" "$HOME/.local/bin/talos-crest"
+# Keep the backend preference here too, so terminal launches get the same
+# decoration-free window as the desktop launcher. Rust sets it as a fallback.
+# Older installs left a symlink here; replace it, or writing the wrapper would
+# overwrite the AppImage it pointed at.
+rm -f "$HOME/.local/bin/talos-crest"
+cat > "$HOME/.local/bin/talos-crest" <<EOF
+#!/usr/bin/env bash
+export GDK_BACKEND="\${GDK_BACKEND:-x11,wayland}"
+exec "$target" "\$@"
+EOF
+chmod 755 "$HOME/.local/bin/talos-crest"
 
 icon_src="$repo/app/src-tauri/icons"
 icon_dest="$HOME/.local/share/icons/hicolor"
