@@ -113,14 +113,16 @@ test("window actions live in a three-dot More menu", () => {
 
 test("the top search bar sits in the header's top row", () => {
   assert.match(css, /"title search windows"\s*"actions actions actions"/);
-  assert.match(css, /grid-template-columns: minmax\(0, 1fr\) minmax\(220px, 340px\) minmax\(0, 1fr\)/);
-  assert.match(css, /\.tc-command-trigger \{[\s\S]*?grid-area: search;[\s\S]*?justify-self: center;/);
+  assert.match(css, /grid-template-columns: minmax\(0, 1fr\) minmax\(380px, 560px\) minmax\(0, 1fr\)/);
+  assert.match(css, /\.tc-command-trigger \{[\s\S]*?grid-area: search;[\s\S]*?max-width: 560px;[\s\S]*?min-height: 42px;/);
   assert.match(html, /<\/div>\s*<button id="btn-command-palette"[\s\S]{0,200}<\/button>\s*<div class="tc-row tc-header-actions">/);
   assert.doesNotMatch(html, /<div class="tc-row tc-header-actions">\s*<button id="btn-command-palette"/);
 });
 
 test("the command palette opens under the top search field", () => {
   assert.match(css, /dialog#command-palette\.tc-command-dialog\s*\{[^}]*top: 72px;[^}]*transform: translateX\(-50%\)/);
+  assert.match(css, /\.tc-command-dialog \{[^}]*width: min\(820px/);
+  assert.match(commandPalette, /Math\.min\(680, Math\.max\(280/);
   assert.match(commandPalette, /function positionCommandPalette/);
   assert.match(commandPalette, /element\("btn-command-palette"\)\.getBoundingClientRect\(\)/);
   assert.match(commandPalette, /positionCommandPalette\(\);[\s\S]{0,80}if \(!dialog\.open\) dialog\.showModal\(\)/);

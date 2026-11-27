@@ -214,7 +214,7 @@ function positionCommandPalette() {
 
   const box = dialog.querySelector<HTMLElement>(".tc-command-box");
   if (box) {
-    box.style.maxHeight = `${Math.round(Math.min(560, Math.max(220, window.innerHeight - top - 16)))}px`;
+    box.style.maxHeight = `${Math.round(Math.min(680, Math.max(280, window.innerHeight - top - 16)))}px`;
   }
 }
 
