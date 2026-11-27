@@ -28,7 +28,9 @@ follows the active document even for images, PDFs, and binary previews. The stat
 bar shows a language icon, the working file name, and the active language instead
 of an Untitled placeholder. A three-dot More menu holds creation, interface size,
 New Window, and Windows actions. New files and folders created from bundled
-read-only samples are placed in a writable location chosen by the user.
+read-only samples are placed in a writable location chosen by the user. The
+command palette opens directly under the header search field, and an Args field
+passes quoted arguments to desktop programs (for example `build` for setup.py).
 
 ## Linux
 
@@ -41,7 +43,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`0a98738c1a5569f43aa5c211b37c59f9846f79f66455d41081ae32f1c1473fa1`
+`cd0a2597b8fb1e040dc827481bc5ffea7bd368d35745e08f6fa7e795a85db3b5`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -58,7 +60,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`5c823138836fe3d936a02d397af390afd4ea56732e60d2d109d9cd4eac42e74c`
+`1ba1e22ad48c644a46d20e21060e9fc2d758f8a43b9bbc2071ef5a70f2d57124`
 
 ## Android
 
