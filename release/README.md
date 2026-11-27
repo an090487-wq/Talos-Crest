@@ -20,7 +20,11 @@ commit, and the integrated terminal keeps its size and focus when panels change.
 The pane replaces the Explorer file tree while it is open (like VS Code),
 toggles shut when the rail button is pressed again, keeps branch and remote
 choices across refreshes, and stays a sidebar instead of stacking into the
-Terminal/Output area on narrow windows.
+Terminal/Output area on narrow windows. Git refresh caches successful repository
+roots and reads remotes in one pass, while the PDF viewer loads its parser only
+when a PDF is opened. The toolbar hides buttons already present in the activity
+bar, the top search field sits with toolbar actions, and the breadcrumb follows
+the active document even for images, PDFs, and binary previews.
 
 ## Linux
 
@@ -33,7 +37,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`43ea7f58465d123bbc8e401ff21a9a8742e52600e310e616b8bacf1adc4f6c8a`
+`77ae5088cd0af013d5f6b1f5b42809196b8165e005f2b5152698c8525fd5e450`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -50,7 +54,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`86203a207503e2574f8b33a13631d4df2a87b17fc31a8ec75785888a0bb6de10`
+`86ca19f6f1ddb2efded0400b06d79232426695e54b072b8f56175d6705cf7708`
 
 ## Android
 
