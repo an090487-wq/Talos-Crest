@@ -193,6 +193,29 @@ export function initCommandPalette(
   element("command-palette-close").addEventListener("click", () => {
     (element("command-palette") as HTMLDialogElement).close();
   });
+  window.addEventListener("resize", () => {
+    if ((element("command-palette") as HTMLDialogElement).open) positionCommandPalette();
+  });
+}
+
+function positionCommandPalette() {
+  const dialog = element("command-palette") as HTMLDialogElement;
+  const trigger = element("btn-command-palette").getBoundingClientRect();
+  const top = Math.max(8, Math.min(trigger.bottom + 8, window.innerHeight - 240));
+  const center = trigger.left + trigger.width / 2;
+  const clampedCenter = Math.max(160, Math.min(center, window.innerWidth - 160));
+
+  dialog.style.top = `${Math.round(top)}px`;
+  dialog.style.left = `${Math.round(clampedCenter)}px`;
+  dialog.style.right = "auto";
+  dialog.style.bottom = "auto";
+  dialog.style.margin = "0";
+  dialog.style.transform = "translateX(-50%)";
+
+  const box = dialog.querySelector<HTMLElement>(".tc-command-box");
+  if (box) {
+    box.style.maxHeight = `${Math.round(Math.min(560, Math.max(220, window.innerHeight - top - 16)))}px`;
+  }
 }
 
 export function openCommandPalette() {
@@ -202,7 +225,9 @@ export function openCommandPalette() {
   selected = 0;
   render();
   closeOtherDialogs("command-palette");
+  positionCommandPalette();
   if (!dialog.open) dialog.showModal();
+  positionCommandPalette();
   input.focus();
   input.select();
 }

@@ -2230,6 +2230,11 @@ function sendRunInput() {
   });
 }
 
+function runArguments(): string {
+  const value = ($("run-args") as HTMLInputElement).value.trim();
+  return value.length <= 4096 && !value.includes("\0") ? value : "";
+}
+
 async function runFile() {
   if (sourceControlBusy) return;
   const selectedLanguage = ($("run-language") as HTMLSelectElement).value;
@@ -2309,18 +2314,20 @@ async function runFile() {
     handleRunEvent(event.payload);
   });
   setRunInputVisible(true);
+  const args = runArguments();
   try {
     if (currentPath) {
       if (dirty) await saveFile();
-      appendOut("Running " + currentPath + " ...\n", "dim");
-      await invoke("run_file_interactive", { id: activeRunId, path: currentPath });
+      appendOut("Running " + currentPath + (args ? ` ${args}` : "") + " ...\n", "dim");
+      await invoke("run_file_interactive", { id: activeRunId, path: currentPath, args });
     } else {
-      appendOut("Running the current editor contents...\n", "dim");
+      appendOut("Running the current editor contents" + (args ? ` ${args}` : "") + "...\n", "dim");
       await invoke("run_source_interactive", {
         id: activeRunId,
         source: view.state.doc.toString(),
         languageId: language,
         fileName: suggestedName ?? null,
+        args,
       });
     }
     ($("run-input") as HTMLInputElement).focus();
@@ -3056,6 +3063,16 @@ function restoreSelect(id: string, key: string): void {
 
 restoreSelect("problems-severity", "talos.problems-severity");
 restoreSelect("run-language", "talos.run-language");
+const runArgsInput = $("run-args") as HTMLInputElement;
+const savedRunArgs = getWindowValue("talos.run-args");
+if (savedRunArgs && savedRunArgs.length <= 4096) runArgsInput.value = savedRunArgs;
+runArgsInput.addEventListener("change", () => setWindowValue("talos.run-args", runArgsInput.value));
+runArgsInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    void guard(runFile);
+  }
+});
 if (getWindowValue("talos.panel-visible") === "false") showPanel(false, false);
 if (
   getWindowValue("talos.panel-maximized") === "true" &&

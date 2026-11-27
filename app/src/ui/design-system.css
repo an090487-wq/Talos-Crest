@@ -417,6 +417,14 @@ input:focus-visible,
   max-width: 340px;
 }
 
+.run-args-input {
+  flex: 0 0 auto;
+  width: 132px;
+  min-width: 84px;
+  max-width: 180px;
+  font: var(--font-sm) / 1.3 var(--mono-font);
+}
+
 #window-controls {
   grid-area: windows;
   justify-self: end;
@@ -617,6 +625,13 @@ dialog.tc-chronicle-dialog {
   background: var(--tc-panel);
   color: var(--tc-text);
   box-shadow: var(--tc-shadow-md);
+}
+
+/* The command picker belongs under the header search field, not in the middle
+   of the editor. openCommandPalette() refines this from the real field rect. */
+dialog#command-palette.tc-command-dialog {
+  top: 72px;
+  transform: translateX(-50%);
 }
 
 .tc-command-dialog::backdrop {

@@ -11,6 +11,7 @@ const main = readFileSync(resolve(appDir, "src/main.ts"), "utf8");
 const architecture = readFileSync(resolve(appDir, "src/architecture.ts"), "utf8");
 const tauriConfig = readFileSync(resolve(appDir, "src-tauri/tauri.conf.json"), "utf8");
 const canvas = readFileSync(resolve(appDir, "src/canvas/canvas-ui.ts"), "utf8");
+const commandPalette = readFileSync(resolve(appDir, "src/command-palette.ts"), "utf8");
 const rust = readFileSync(resolve(appDir, "src-tauri/src/lib.rs"), "utf8");
 
 test("native controls keep their own chrome", () => {
@@ -115,6 +116,26 @@ test("the top search bar sits in the header's top row", () => {
   assert.match(css, /\.tc-command-trigger \{[\s\S]*?grid-area: search;/);
   assert.match(html, /<\/div>\s*<button id="btn-command-palette"[\s\S]{0,200}<\/button>\s*<div class="tc-row tc-header-actions">/);
   assert.doesNotMatch(html, /<div class="tc-row tc-header-actions">\s*<button id="btn-command-palette"/);
+});
+
+test("the command palette opens under the top search field", () => {
+  assert.match(css, /dialog#command-palette\.tc-command-dialog\s*\{[^}]*top: 72px;[^}]*transform: translateX\(-50%\)/);
+  assert.match(commandPalette, /function positionCommandPalette/);
+  assert.match(commandPalette, /element\("btn-command-palette"\)\.getBoundingClientRect\(\)/);
+  assert.match(commandPalette, /positionCommandPalette\(\);[\s\S]{0,80}if \(!dialog\.open\) dialog\.showModal\(\)/);
+  assert.match(commandPalette, /window\.addEventListener\("resize"/);
+});
+
+test("run arguments are accepted and passed to desktop programs", () => {
+  assert.match(html, /id="run-args"[^>]*class="run-args-input"/);
+  assert.match(css, /\.run-args-input \{/);
+  assert.match(main, /function runArguments/);
+  assert.match(main, /run_file_interactive", \{ id: activeRunId, path: currentPath, args \}/);
+  assert.match(main, /fileName: suggestedName \?\? null,\s*args,/);
+  assert.match(main, /talos\.run-args/);
+  assert.match(rust, /fn append_run_arguments/);
+  assert.match(rust, /fn split_run_arguments/);
+  assert.match(rust, /args: Option<String>/);
 });
 
 test("the status bar shows the active file icon and language instead of Untitled", () => {

@@ -3850,10 +3850,105 @@ enum RunEvent {
     Error { id: String, message: String },
 }
 
-fn run_process_command(lang: &Language, path: &Path) -> Result<Command, String> {
-    let cmd = lang
+fn split_run_arguments(input: &str) -> Result<Vec<String>, String> {
+    let mut result = Vec::new();
+    let mut current = String::new();
+    let mut quote: Option<char> = None;
+    let mut escaping = false;
+    let mut has_token = false;
+
+    for ch in input.chars() {
+        if escaping {
+            current.push(ch);
+            has_token = true;
+            escaping = false;
+            continue;
+        }
+        match quote {
+            Some('\'') => {
+                if ch == '\'' {
+                    quote = None;
+                } else {
+                    current.push(ch);
+                }
+                has_token = true;
+            }
+            Some('"') => {
+                if ch == '\\' {
+                    escaping = true;
+                } else if ch == '"' {
+                    quote = None;
+                } else {
+                    current.push(ch);
+                }
+                has_token = true;
+            }
+            _ => {
+                if ch == '\\' {
+                    escaping = true;
+                    has_token = true;
+                } else if ch == '\'' || ch == '"' {
+                    quote = Some(ch);
+                    has_token = true;
+                } else if ch.is_whitespace() {
+                    if has_token {
+                        result.push(std::mem::take(&mut current));
+                        has_token = false;
+                    }
+                } else {
+                    current.push(ch);
+                    has_token = true;
+                }
+            }
+        }
+    }
+
+    if escaping {
+        current.push('\\');
+        has_token = true;
+    }
+    if quote.is_some() {
+        return Err("run arguments contain an unclosed quote".into());
+    }
+    if has_token {
+        result.push(current);
+    }
+    Ok(result)
+}
+
+#[cfg(windows)]
+fn quote_run_argument(token: &str) -> String {
+    format!("\"{}\"", token.replace('%', "%%").replace('"', "\"\""))
+}
+
+#[cfg(not(windows))]
+fn quote_run_argument(token: &str) -> String {
+    format!("'{}'", token.replace('\'', "'\\''"))
+}
+
+fn append_run_arguments(command: &str, args: &str) -> Result<String, String> {
+    if args.trim().is_empty() {
+        return Ok(command.to_string());
+    }
+    if args.len() > 4096 {
+        return Err("run arguments are too long".into());
+    }
+    if args.contains('\0') {
+        return Err("run arguments contain an invalid character".into());
+    }
+    let mut result = command.to_string();
+    for token in split_run_arguments(args)? {
+        result.push(' ');
+        result.push_str(&quote_run_argument(&token));
+    }
+    Ok(result)
+}
+
+fn run_process_command(lang: &Language, path: &Path, args: &str) -> Result<Command, String> {
+    let base = lang
         .run_command(path)
         .ok_or_else(|| format!("{} has no run command configured", lang.name))?;
+    let cmd = append_run_arguments(&base, args)?;
     let mut command;
     #[cfg(windows)]
     {
@@ -3880,7 +3975,7 @@ fn run_process_command(lang: &Language, path: &Path) -> Result<Command, String> 
 }
 
 fn run_language(lang: &Language, path: &Path) -> Result<RunResult, String> {
-    let mut command = run_process_command(lang, path)?;
+    let mut command = run_process_command(lang, path, "")?;
     let out = command
         .output()
         .map_err(|e| format!("failed to start run command: {e}"))?;
@@ -3942,8 +4037,9 @@ fn spawn_interactive_run(
     lang: &Language,
     path: &Path,
     cleanup_dir: Option<PathBuf>,
+    args: &str,
 ) -> Result<(), String> {
-    let mut command = run_process_command(lang, path)?;
+    let mut command = run_process_command(lang, path, args)?;
     command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -4234,6 +4330,7 @@ fn run_file_interactive(
     app: tauri::AppHandle,
     id: String,
     path: String,
+    args: Option<String>,
 ) -> Result<(), String> {
     if !valid_run_id(&id) {
         return Err("invalid run identifier".into());
@@ -4241,7 +4338,7 @@ fn run_file_interactive(
     let resources = app.path().resource_dir().ok();
     let p = Path::new(&path);
     let lang = resolve_language_for_path(resources.as_deref(), p)?;
-    spawn_interactive_run(&app, id, &lang, p, None)
+    spawn_interactive_run(&app, id, &lang, p, None, args.as_deref().unwrap_or(""))
 }
 
 /// Run unsaved editor contents with a live stdin channel.
@@ -4252,6 +4349,7 @@ fn run_source_interactive(
     source: String,
     language_id: Option<String>,
     file_name: Option<String>,
+    args: Option<String>,
 ) -> Result<(), String> {
     if !valid_run_id(&id) {
         return Err("invalid run identifier".into());
@@ -4263,7 +4361,14 @@ fn run_source_interactive(
         file_name.as_deref(),
     )?;
     let (dir, path) = write_temporary_source(&lang, source)?;
-    if let Err(error) = spawn_interactive_run(&app, id, &lang, &path, Some(dir.clone())) {
+    if let Err(error) = spawn_interactive_run(
+        &app,
+        id,
+        &lang,
+        &path,
+        Some(dir.clone()),
+        args.as_deref().unwrap_or(""),
+    ) {
         let _ = fs::remove_dir_all(&dir);
         return Err(error);
     }
@@ -5255,6 +5360,29 @@ mod tests {
             fs::canonicalize(&root).unwrap()
         );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn run_arguments_are_bounded_tokenized_and_quoted() {
+        assert_eq!(
+            split_run_arguments("build --flag=\"two words\" 'last one'").unwrap(),
+            vec!["build", "--flag=two words", "last one"]
+        );
+        assert!(split_run_arguments("'unterminated").is_err());
+        assert_eq!(
+            append_run_arguments("python3 'file.py'", "").unwrap(),
+            "python3 'file.py'"
+        );
+        assert_eq!(
+            append_run_arguments("python3 'file.py'", "build install").unwrap(),
+            format!(
+                "python3 'file.py' {} {}",
+                quote_run_argument("build"),
+                quote_run_argument("install")
+            )
+        );
+        assert!(append_run_arguments("python3 'file.py'", &"x".repeat(4097)).is_err());
+        assert!(append_run_arguments("python3 'file.py'", "bad\0args").is_err());
     }
 
     #[test]
