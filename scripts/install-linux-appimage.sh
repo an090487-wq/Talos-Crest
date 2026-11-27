@@ -24,21 +24,26 @@ ln -sfn "$target" "$HOME/.local/bin/talos-crest"
 
 icon_src="$repo/app/src-tauri/icons"
 icon_dest="$HOME/.local/share/icons/hicolor"
-install -Dm644 "$icon_src/icon.png" "$icon_dest/512x512/apps/talos-crest.png"
-install -Dm644 "$icon_src/128x128.png" "$icon_dest/128x128/apps/talos-crest.png"
-install -Dm644 "$icon_src/64x64.png" "$icon_dest/64x64/apps/talos-crest.png"
-install -Dm644 "$icon_src/32x32.png" "$icon_dest/32x32/apps/talos-crest.png"
+for size in 512x512:icon.png 128x128:128x128.png 64x64:64x64.png 32x32:32x32.png; do
+  dir="${size%%:*}"
+  source="${size##*:}"
+  install -Dm644 "$icon_src/$source" "$icon_dest/$dir/apps/talos-crest.png"
+  # The AppImage's own desktop entry uses Icon=talos-gui, so install the same
+  # crest under that name as well. This prevents a generic gear icon when the
+  # window manager matches the running app to the bundled launcher.
+  install -Dm644 "$icon_src/$source" "$icon_dest/$dir/apps/talos-gui.png"
+done
 
 cat > "$HOME/.local/share/applications/talos-crest.desktop" <<EOF
 [Desktop Entry]
 Name=Talos Crest
 Comment=Professional offline-first code editor
 Exec="$HOME/.local/bin/talos-crest" %f
-Icon=talos-crest
+Icon=$icon_dest/512x512/apps/talos-crest.png
 Type=Application
 Categories=Development;IDE;
 Terminal=false
-StartupWMClass=talos-crest
+StartupWMClass=talos-gui
 EOF
 
 # Override the older system-wide launcher so the app menu never starts
@@ -59,9 +64,10 @@ Type=Application
 Name=Talos Crest
 Comment=Professional code editor
 Exec="$HOME/.local/bin/talos-crest" %f
-Icon=talos-crest
+Icon=$icon_dest/512x512/apps/talos-crest.png
 Terminal=false
 Categories=Development;TextEditor;
+StartupWMClass=talos-gui
 EOF
   chmod +x "$desktop_dir/talos.desktop"
 fi

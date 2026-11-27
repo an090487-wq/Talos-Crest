@@ -13,6 +13,8 @@ const tauriConfig = readFileSync(resolve(appDir, "src-tauri/tauri.conf.json"), "
 const canvas = readFileSync(resolve(appDir, "src/canvas/canvas-ui.ts"), "utf8");
 const commandPalette = readFileSync(resolve(appDir, "src/command-palette.ts"), "utf8");
 const rust = readFileSync(resolve(appDir, "src-tauri/src/lib.rs"), "utf8");
+const installScript = readFileSync(resolve(appDir, "../scripts/install-linux-appimage.sh"), "utf8");
+const brandIcon = readFileSync(resolve(appDir, "public/talos.svg"), "utf8");
 
 test("native controls keep their own chrome", () => {
   assert.match(html, /input\[type="checkbox"\], input\[type="radio"\], input\[type="range"\], input\[type="color"\]/);
@@ -109,6 +111,30 @@ test("window actions live in a three-dot More menu", () => {
   assert.match(html, /id="btn-window-switcher"/);
   assert.match(html, /#btn-new-window,[\s\S]{0,160}#btn-window-switcher,[\s\S]{0,160}display: none !important/);
   assert.match(main, /"btn-new-window",\s*"btn-window-switcher"/);
+});
+
+test("the custom title bar replaces terminal-like native chrome", () => {
+  assert.match(tauriConfig, /"decorations": false/);
+  assert.match(html, /id="window-titlebar" data-tauri-drag-region="deep"/);
+  assert.match(html, /id="window-title-text"/);
+  assert.match(html, /<link rel="icon" type="image\/svg\+xml" href="\/talos\.svg" \/>/);
+  assert.match(html, /<img class="tc-brand-icon" src="\/talos\.svg" alt="" aria-hidden="true" \/>/);
+  assert.match(brandIcon, /<polygon points="256,72 414,164 414,348 256,440 98,348 98,164"/);
+  assert.match(html, /id="win-min"[^>]*aria-label="Minimize"/);
+  assert.match(html, /id="win-max"[^>]*aria-label="Maximize"/);
+  assert.match(html, /id="win-close"[^>]*aria-label="Close"/);
+  assert.match(main, /nativeWindow\.minimize\(\)/);
+  assert.match(main, /nativeWindow\.toggleMaximize\(\)/);
+  assert.match(main, /guard\(\(\) => nativeWindow\.close\(\)\)/);
+  assert.doesNotMatch(main, /\[productName, workspaceName, name\]\.filter\(Boolean\)\.join/);
+});
+
+test("launcher matches the running window so the Talos icon is shown", () => {
+  assert.match(installScript, /Icon=\$icon_dest\/512x512\/apps\/talos-crest\.png/);
+  assert.match(installScript, /StartupWMClass=talos-gui/);
+  assert.match(installScript, /apps\/talos-gui\.png/);
+  assert.doesNotMatch(installScript, /StartupWMClass=talos-crest/);
+  assert.match(rust, /\.decorations\(false\)/);
 });
 
 test("the top search bar sits in the header's top row", () => {

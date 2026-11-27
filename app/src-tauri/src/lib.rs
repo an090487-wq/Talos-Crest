@@ -368,7 +368,8 @@ fn create_window(
             tauri::WebviewUrl::App("index.html".into()),
         )
         .title("Talos Crest")
-        .inner_size(1100.0, 720.0);
+        .inner_size(1100.0, 720.0)
+        .decorations(false);
         // Centering is a desktop-only Tauri builder method.
         #[cfg(not(target_os = "android"))]
         let builder = builder.center();

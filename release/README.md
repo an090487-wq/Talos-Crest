@@ -31,6 +31,10 @@ New Window, and Windows actions. New files and folders created from bundled
 read-only samples are placed in a writable location chosen by the user. The
 command palette opens directly under the header search field, and an Args field
 passes quoted arguments to desktop programs (for example `build` for setup.py).
+Desktop windows now use a branded title bar with the Talos crest and real
+window controls instead of the dark terminal-like native strip, and the Linux
+launcher matches the running window class so the Talos icon appears in the app
+menu and taskbar.
 
 ## Linux
 
@@ -43,7 +47,7 @@ File: `appimage/TalosCrest-Linux-x86_64.AppImage`
 - Not an ARM/Raspberry Pi or Alpine/musl build.
 
 SHA-256:
-`773d3ddd783d4db9df4cad5cb33af842248294d81540bc1da7afb57a963eac9a`
+`23f8095c8de89997948e07756b88ed10b73bdb948e11e086544527b6c69b68ba`
 
 Examples of Linux releases that meet the current glibc floor: Ubuntu 24.04+,
 Linux Mint 22+, Pop!_OS 24.04+, Debian 13+, Fedora 39+, Arch Linux, Manjaro,
@@ -60,7 +64,7 @@ File: `windows/TalosCrest-Windows-x64-portable.zip`
 - Not an ARM Windows build.
 
 SHA-256:
-`738dd6031a98ec1dd6063e429a4192b34b0e7c30664b935278e552f858093908`
+`611c0294ba7d97af54defda3e9140596603a5cdb65d0ec07842c05774eed504a`
 
 ## Android
 

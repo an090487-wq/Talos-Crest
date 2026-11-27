@@ -717,9 +717,12 @@ function refreshTitle() {
   const path = currentPath && android ? fileNameFromPath(currentPath) : currentPath;
   const name = (path ?? suggestedName ?? "Working file") + (dirty ? " \u2022" : "");
   updateBreadcrumbs();
-  const workspace = getWindowValue("talos.workspace-root");
-  const workspaceName = workspace?.replace(/[\\/]+$/, "").split(/[\\/]/).pop();
-  const title = [productName, workspaceName, name].filter(Boolean).join(" \u2014 ");
+  // The custom title bar shows the product only. Never put the "Working file"
+  // placeholder or workspace path in native chrome: it makes the editor look
+  // like a terminal window and misidentifies the app in the taskbar.
+  const title = path && !android ? [name, productName].join(" \u2014 ") : productName;
+  const titleText = $("window-title-text");
+  if (titleText.textContent !== productName) titleText.textContent = productName;
   if (document.title === title) return;
   document.title = title;
   if (title !== lastNativeTitle) {
@@ -2869,7 +2872,17 @@ installGlobalShortcuts();
 initShortcutsUi();
 initSourceControl();
 $("btn-shortcuts").addEventListener("click", openShortcutsDialog);
-void getCurrentWindow()
+const nativeWindow = getCurrentWindow();
+$("win-min").addEventListener("click", () => {
+  void nativeWindow.minimize().catch((error: unknown) => say(`Could not minimize window: ${String(error)}`));
+});
+$("win-max").addEventListener("click", () => {
+  void nativeWindow.toggleMaximize().catch((error: unknown) => say(`Could not maximize window: ${String(error)}`));
+});
+$("win-close").addEventListener("click", () => {
+  void guard(() => nativeWindow.close());
+});
+void nativeWindow
   .onCloseRequested(async (event) => {
     await handleWindowCloseRequest(event);
   })
@@ -3158,6 +3171,7 @@ void isAndroid()
       productName = "Talos Pocket";
       $("brand").querySelector(".brand-name")!.textContent = "TALOS POCKET";
       $("window-controls").classList.add("hidden");
+      $("window-titlebar").classList.add("hidden");
       refreshTitle();
       runButton.textContent = "▶ Run";
       runButton.title = "Run Python, C, C++, or Java locally through Termux.";

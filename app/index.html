@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="icon" type="image/svg+xml" href="/talos.svg" />
     <title>Talos Crest</title>
     <style>
       :root {
@@ -93,6 +94,12 @@
       .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); min-height: 120px; padding: var(--space-4); color: var(--muted); text-align: center; font-size: var(--font-sm); }
       .empty-state strong { color: var(--text); font-size: var(--font-md); font-weight: 650; }
 
+      #window-titlebar { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 8px; background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--font-xs); font-weight: 650; letter-spacing: .08em; text-transform: uppercase; user-select: none; -webkit-user-select: none; }
+      #window-titlebar .tc-brand-icon { width: 18px; height: 18px; flex: 0 0 auto; border-radius: 4px; }
+      #window-titlebar .window-controls { display: inline-flex; gap: 2px; margin-left: auto; }
+      #window-titlebar .window-controls button { width: 28px; min-height: 22px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); font-size: 15px; line-height: 1; }
+      #window-titlebar .window-controls button:hover { color: var(--text); border-color: var(--line); background: var(--surface-raised); }
+      #window-titlebar #win-close:hover { color: #fff; border-color: transparent; background: #c42b1c; }
       header, footer { display: flex; align-items: center; gap: var(--space-1); padding: 8px var(--space-3); background: var(--panel); }
       header { position: relative; border-bottom: 1px solid var(--line); flex-wrap: wrap; gap: 6px; padding: 8px var(--space-3); }
       header::after { position: absolute; inset: auto 0 0; height: 2px; content: ""; background: var(--accent); opacity: .72; pointer-events: none; }
@@ -766,6 +773,15 @@
   </head>
   <body>
     <div id="app">
+      <div id="window-titlebar" data-tauri-drag-region="deep">
+        <img class="tc-brand-icon" src="/talos.svg" alt="" aria-hidden="true" />
+        <span id="window-title-text">Talos Crest</span>
+        <div class="window-controls" role="toolbar" aria-label="Window controls">
+          <button id="win-min" type="button" title="Minimize" aria-label="Minimize">−</button>
+          <button id="win-max" type="button" title="Maximize" aria-label="Maximize">□</button>
+          <button id="win-close" type="button" title="Close" aria-label="Close">×</button>
+        </div>
+      </div>
       <header class="tc-app-header">
         <div class="tc-row tc-title-area">
           <span id="brand" class="brand"><span class="tc-brand-mark" aria-hidden="true"></span><span class="brand-name">TALOS CREST</span></span>
